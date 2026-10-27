@@ -37,7 +37,7 @@ class ConsultaVentasWindow(VentanaConDetalleDeVenta):
 
     def _armar_interfaz(self):
         self.tabla = crear_tabla(
-            ["Nº Factura", "Fecha", "Turno", "Origen", "Vendedor", "Total", "Estado"],
+            ["Nº Factura", "Fecha", "Turno", "Vendedor", "Total", "Estado"],
             estirar=1, por_filas=True,
         )
         self.tabla.itemSelectionChanged.connect(self._mostrar_detalle)
@@ -79,13 +79,12 @@ class ConsultaVentasWindow(VentanaConDetalleDeVenta):
             self.tabla.setItem(fila, 0, QTableWidgetItem(str(venta["id"])))
             self.tabla.setItem(fila, 1, QTableWidgetItem(formato_fecha_hora(venta["fecha"])))
             self.tabla.setItem(fila, 2, QTableWidgetItem(venta["turno"]))
-            self.tabla.setItem(fila, 3, QTableWidgetItem(dominio.NOMBRE_ORIGEN_VENTA[venta["origen"]]))
-            self.tabla.setItem(fila, 4, QTableWidgetItem(venta["vendedor"]))
-            self.tabla.setItem(fila, 5, QTableWidgetItem(formato_pesos(venta["total"])))
+            self.tabla.setItem(fila, 3, QTableWidgetItem(venta["vendedor"]))
+            self.tabla.setItem(fila, 4, QTableWidgetItem(formato_pesos(venta["total"])))
             item_estado = QTableWidgetItem(venta["estado"])
             if venta["estado"] == dominio.VENTA_ANULADA:
                 item_estado.setForeground(Qt.red)
-            self.tabla.setItem(fila, 6, item_estado)
+            self.tabla.setItem(fila, 5, item_estado)
         self.tabla_detalle.setRowCount(0)
 
     @manejar_errores

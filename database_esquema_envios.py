@@ -3,8 +3,8 @@ database_esquema_envios.py
 ===========================
 La cola de los Cierres de Turno que se mandan a la app de gastos del dueño (la
 PWA "Gestión Central"; pedido del dueño, 2026-10-26; reglas en
-repositories/envio_pwa_repo.py). En su propio archivo porque
-database_esquema.py ya pasó las 600 líneas (CLAUDE.md, regla 12); la crea
+repositories/envio_pwa_repo.py). En su propio archivo, como las cajas (en
+CYBERCONTROL database_esquema.py ya pasaba las 600 líneas); la crea
 database_esquema.inicializar_base_de_datos con CREATE TABLE IF NOT EXISTS: una
 base vieja la recibe vacía y ninguno de sus cierres anteriores se manda solo.
 """

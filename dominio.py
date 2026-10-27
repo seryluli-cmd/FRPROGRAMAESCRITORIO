@@ -27,7 +27,6 @@ NOMBRE_METODO_PAGO = {
 # La venta sigue llevando origen para que el dato guardado sea explícito.
 ORIGEN_KIOSKO = "KIOSKO"
 ORIGENES_VENTA = (ORIGEN_KIOSKO,)
-NOMBRE_ORIGEN_VENTA = {ORIGEN_KIOSKO: "Kiosko"}
 
 # Impresiones es un artículo de mercadería, pero se muestra aparte en Caja.
 CODIGO_ARTICULO_IMPRESIONES = "4"

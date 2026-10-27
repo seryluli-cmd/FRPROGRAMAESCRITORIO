@@ -191,26 +191,6 @@ def formato_fecha_hora(fecha) -> str:
         return str(fecha)
 
 
-def formato_tiempo(segundos: int, con_segundos: bool = False) -> str:
-    """
-    Convierte segundos en un texto legible ("2h 05m" o "45m 12s"). Con
-    `con_segundos` también muestra los segundos pasada la hora ("2h 05m 31s"):
-    lo usaba la cuenta regresiva de las PCs en CYBERCONTROL, de donde salió
-    este programa; queda para cualquier pantalla que muestre un tiempo.
-    """
-    horas, resto = divmod(segundos, 3600)
-    minutos, seg = divmod(resto, 60)
-    if horas:
-        return f"{horas}h {minutos:02d}m {seg:02d}s" if con_segundos else f"{horas}h {minutos:02d}m"
-    return f"{minutos}m {seg:02d}s"
-
-
-def formato_transcurrido(desde: datetime) -> str:
-    """Cuánto pasó desde `desde` hasta ahora, como formato_tiempo ("2h 05m").
-    Nunca negativo: un reloj apenas corrido no tiene que mostrar "-1m"."""
-    return formato_tiempo(max(0, int((datetime.now() - desde).total_seconds())))
-
-
 def aplicar_clase(widget, clase: str):
     """
     Marca un botón como "primario" (acción principal, ej. Cobrar,
@@ -260,29 +240,6 @@ def fila_guardar_cancelar(dialogo, al_guardar=None, texto_guardar: str = "Guarda
     return botones
 
 
-def fila_agregar_quitar(tabla: QTableWidget, texto_agregar: str, al_agregar):
-    """
-    Los botones de una tabla que se edita a mano: uno para agregar una fila
-    (`texto_agregar`, y `al_agregar` es lo que hace) y "Quitar seleccionado",
-    que borra la fila elegida de `tabla`. Devuelve el layout, para agregarlo
-    al del diálogo.
-    """
-    def quitar_la_elegida():
-        fila = tabla.currentRow()
-        if fila >= 0:
-            tabla.removeRow(fila)
-
-    boton_agregar = QPushButton(texto_agregar)
-    boton_agregar.clicked.connect(al_agregar)
-    boton_quitar = QPushButton("Quitar seleccionado")
-    aplicar_clase(boton_quitar, "peligro")
-    boton_quitar.clicked.connect(quitar_la_elegida)
-    botones = QHBoxLayout()
-    botones.addWidget(boton_agregar)
-    botones.addWidget(boton_quitar)
-    return botones
-
-
 class _FiltroEnter(QObject):
     """Intercepta la tecla Enter/Intro en el widget donde se instala y,
     en vez de dejarla pasar, ejecuta `accion` (ver `encadenar_enter`)."""
@@ -316,8 +273,8 @@ def _widgets_de_teclado(widget):
     QLineEdit, pero con el teclado de verdad el Enter le llega al widget de
     afuera (el de adentro le pasa el foco a él) y nunca al de adentro. Se
     midió el 2026-10-18 con el PySide6 del programa: enganchado solo al de
-    adentro, Enter no hacía nada en ningún importe (el cobro, Contar plata,
-    Trámites, Cargar Saldo...). Las pruebas no lo veían porque mandaban el
+    adentro, Enter no hacía nada en ningún importe (el cobro, Contar plata...).
+    Las pruebas no lo veían porque mandaban el
     Enter directo al de adentro. Se engancha a los dos por si otra versión
     de Qt lo entrega al de adentro: el primero que lo ve lo consume, así que
     un Enter nunca dispara la acción dos veces.

@@ -135,8 +135,8 @@ def _aparte_por_metodo(conexion, desde: str, hasta: str, cierre_grabado: bool = 
     es la ventana de un cierre ya guardado (ver _condicion_vigente): lo usa el
     detalle de un cierre en Control de Cierres.
 
-    El reparto se hace venta por venta con los pagos de ESA venta: un trámite o
-    unas impresiones cobradas solas (el botón Impresiones) quedan exactas; si las
+    El reparto se hace venta por venta con los pagos de ESA venta: unas
+    impresiones cobradas solas (el botón Impresiones) quedan exactas; si las
     impresiones iban en un carrito con otras cosas y se pagó una parte en cada
     medio, se reparten en la misma proporción que se pagó. Las dos partes de una
     venta suman siempre su importe de impresiones, así que Kiosko menos
@@ -186,8 +186,8 @@ def _separar_de_kiosko(desglose: dict, por_metodo: dict) -> dict:
     de Kiosko (ver ahí), a partir del desglose del turno (o de un
     cierre ya guardado: alcanza con que traiga kiosko_efectivo/kiosko_digital)
     y de _aparte_por_metodo. Se redondea cada parte una sola vez y Kiosko sale
-    por resta, así los tres renglones suman exactamente lo que dice Kiosko en el
-    cierre, al centavo.
+    por resta, así los dos renglones (Kiosko e Impresiones) suman exactamente lo
+    que dice Kiosko en el cierre, al centavo.
     """
     resultado = {}
     resto = {"efectivo": desglose["kiosko_efectivo"], "digital": desglose["kiosko_digital"]}

@@ -30,7 +30,7 @@ _COLOR_ANULADA = QColor("#C62828")
 
 # Columnas de plata de cada tabla: se alinean a la derecha.
 _COLUMNAS_PLATA_OPERADORES = (3, 4, 5)
-_COLUMNAS_PLATA_VENTAS = (4, 5, 6)
+_COLUMNAS_PLATA_VENTAS = (3, 4, 5)
 
 
 def _celda(texto, derecha=False, color=None):
@@ -64,13 +64,13 @@ class PestañaPorOperador(QWidget):
         self.etiqueta_detalle.setStyleSheet("font-weight: bold; font-size: 13px; padding-top: 6px;")
 
         self.tabla_ventas = crear_tabla(
-            ["Fecha y hora", "Turno", "Origen", "Concepto", "Efectivo", "Digital", "Total", "Estado"],
-            estirar=3, por_filas=True,
+            ["Fecha y hora", "Turno", "Concepto", "Efectivo", "Digital", "Total", "Estado"],
+            estirar=2, por_filas=True,
         )
         # Todas al ancho de su contenido menos "Concepto", que se estira: con el
         # ancho por defecto, "Fecha y hora" cortaba justo la hora.
         for columna in range(self.tabla_ventas.columnCount()):
-            if columna != 3:
+            if columna != 2:
                 self.tabla_ventas.horizontalHeader().setSectionResizeMode(columna, QHeaderView.ResizeToContents)
 
         nota = QLabel(
@@ -150,7 +150,6 @@ class PestañaPorOperador(QWidget):
             valores = [
                 formato_fecha_hora(venta["fecha"]),
                 etiqueta_turno(dia_en_que_empezo_el_turno(momento), venta["turno"]),
-                dominio.NOMBRE_ORIGEN_VENTA.get(venta["origen"], venta["origen"]),
                 venta["concepto"] or "—",
                 formato_pesos(venta["efectivo"]),
                 formato_pesos(venta["digital"]),
@@ -161,6 +160,6 @@ class PestañaPorOperador(QWidget):
             self.tabla_ventas.insertRow(fila)
             for columna, valor in enumerate(valores):
                 celda = _celda(valor, derecha=columna in _COLUMNAS_PLATA_VENTAS, color=color)
-                if columna == 3 and valor != "—":
+                if columna == 2 and valor != "—":
                     celda.setToolTip(valor)  # un ticket largo se lee entero al pasar el mouse
                 self.tabla_ventas.setItem(fila, columna, celda)

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
 from repositories import (  # noqa: E402
-    articulos_repo, detalle_dia_repo, relevo_repo, reportes_repo, turnos_repo, usuarios_repo, ventas_repo,
+    articulos_repo, detalle_dia_repo, relevo_repo, turnos_repo, usuarios_repo, ventas_repo,
 )
 from ui import imprimir  # noqa: E402
 from ui.reportes_detalle_dia import _COLUMNAS_RENGLONES, _renglones  # noqa: E402
@@ -104,15 +104,11 @@ class _UnDiaConDeTodo(BaseConBaseTemporal):
 
 
 class TestCadaVentaDiceQueSeVendio(_UnDiaConDeTodo):
-    def test_cada_cosa_con_su_rubro_y_su_detalle(self):
+    def test_cada_venta_con_su_detalle(self):
         detalle = detalle_dia_repo.detalle_del_dia(self.dia)
-        esperado = {
-            self.v_kiosko: (reportes_repo.CATEGORIA_KIOSKO, "2 x Coca 500"),
-            self.v_alfajor: (reportes_repo.CATEGORIA_KIOSKO, "1 x Alfajor"),
-        }
-        for venta_id, (rubro, texto) in esperado.items():
-            venta = self._venta(detalle, venta_id)
-            self.assertEqual((venta["rubro"], venta["detalle"]), (rubro, texto))
+        esperado = {self.v_kiosko: "2 x Coca 500", self.v_alfajor: "1 x Alfajor"}
+        for venta_id, texto in esperado.items():
+            self.assertEqual(self._venta(detalle, venta_id)["detalle"], texto)
 
     def test_operador_turno_hora_y_medio_de_pago(self):
         detalle = detalle_dia_repo.detalle_del_dia(self.dia)
@@ -168,10 +164,10 @@ class TestElDetalleSumaLoMismoQueLosTurnos(_UnDiaConDeTodo):
 
     def test_lo_vendido_por_producto_y_por_operador(self):
         cerrado = self._turno_cerrado(detalle_dia_repo.detalle_del_dia(self.dia))
-        productos = {(p["rubro"], p["producto"]): (p["cantidad"], p["importe"]) for p in cerrado["por_producto"]}
+        productos = {p["producto"]: (p["cantidad"], p["importe"]) for p in cerrado["por_producto"]}
         # 2 Cocas de Lucía; las 3 anuladas y la del Administrador (anulada después) no cuentan.
-        self.assertEqual(productos[(reportes_repo.CATEGORIA_KIOSKO, "Coca 500")], (2, 2000.0))
-        self.assertEqual(productos[(reportes_repo.CATEGORIA_KIOSKO, "Alfajor")], (1, 800.0))
+        self.assertEqual(productos["Coca 500"], (2, 2000.0))
+        self.assertEqual(productos["Alfajor"], (1, 800.0))
         self.assertEqual(sum(importe for _, importe in productos.values()), cerrado["totales"]["total"])
 
         operadores = {o["operador"]: o for o in cerrado["por_operador"]}
@@ -205,9 +201,9 @@ class TestPantallaDelDetalle(_UnDiaConDeTodo):
         cerrado = self._turno_cerrado(detalle)
         self.assertTrue(panel.titulo.text().startswith(cerrado["etiqueta"]))
         self.assertEqual(panel.tabla_ventas.rowCount(), len(cerrado["ventas"]))
-        textos = [panel.tabla_ventas.item(fila, 5).text() for fila in range(panel.tabla_ventas.rowCount())]
+        textos = [panel.tabla_ventas.item(fila, 4).text() for fila in range(panel.tabla_ventas.rowCount())]
         self.assertIn("1 x Alfajor", textos)
-        estados = [panel.tabla_ventas.item(fila, 9).text() for fila in range(panel.tabla_ventas.rowCount())]
+        estados = [panel.tabla_ventas.item(fila, 8).text() for fila in range(panel.tabla_ventas.rowCount())]
         self.assertIn("ANULADA después del cierre", estados)
         self.assertEqual(panel.tabla_operadores.item(0, 0).text(), "LUCIA")
 

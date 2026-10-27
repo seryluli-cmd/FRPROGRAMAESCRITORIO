@@ -253,8 +253,8 @@ HOJA_DE_ESTILOS = """
         border: 1px solid #E1E4EA;
         border-radius: 14px;
     }
-    /* Barra de arriba oscura, estilo cyber, haciendo juego con el mosaico de PCs
-       (pedido del dueño, 2026-10-19: "no parecen ni botones"). */
+    /* Barra de arriba oscura, estilo cyber (pedido del dueño en CYBERCONTROL,
+       2026-10-19: "no parecen ni botones"). */
     #encabezadoInicio {
         background-color: #1E2330;
         border: 1px solid #2B3242;
@@ -352,13 +352,6 @@ HOJA_DE_ESTILOS = """
     }
     QPushButton[clase="alerta"]:hover {
         background-color: #E5404C;
-    }
-
-    QLabel#tituloSeccion {
-        font-size: 12px;
-        font-weight: 600;
-        color: #5B6472;
-        padding: 6px 2px 2px 2px;
     }
 
     /* Aviso informativo, en azul suave (no es una alarma): lo usa el Resumen del
@@ -618,21 +611,6 @@ HOJA_DE_ESTILOS = """
         border: 1px solid rgba(76, 141, 255, 110);
         color: #9DC0FF;
     }
-    QLabel#pastillaCabecera[tono="celeste"] {
-        background-color: rgba(34, 195, 230, 36);
-        border: 1px solid rgba(34, 195, 230, 110);
-        color: #8FE3F4;
-    }
-    QLabel#pastillaCabecera[tono="naranja"] {
-        background-color: rgba(245, 140, 50, 40);
-        border: 1px solid rgba(245, 140, 50, 120);
-        color: #FFB677;
-    }
-    QLabel#pastillaCabecera[tono="rojo"] {
-        background-color: rgba(255, 90, 102, 40);
-        border: 1px solid rgba(255, 90, 102, 120);
-        color: #FF9AA2;
-    }
     QLabel#pastillaCabecera[tono="gris"] {
         background-color: rgba(255, 255, 255, 14);
         border: 1px solid #3A4358;
@@ -651,10 +629,6 @@ HOJA_DE_ESTILOS = """
         font-size: 11px;
         font-weight: 700;
         padding: 2px 2px 0 2px;
-    }
-    QFrame#lineaDivisoria {
-        background-color: #E4E7EC;
-        border: none;
     }
     /* Tarjeta de menú: botón grande con dibujito, título y para qué es. El texto lo
        dibujan etiquetas de adentro (ver ui/piezas_ventana.tarjeta_de_menu). */
@@ -834,11 +808,6 @@ HOJA_DE_ESTILOS = """
     QLabel#nombreNegocio[vacio="true"], QLabel#montoNegocio[vacio="true"] {
         color: #A9B0BC;
         font-weight: 400;
-    }
-    QLabel#detalleNegocio {
-        color: #1D48A0;
-        font-size: 11px;
-        padding: 0 0 6px 0;
     }
     QFrame#lineaRenglon {
         background-color: #EEF1F5;

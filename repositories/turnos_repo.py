@@ -11,7 +11,7 @@ cajas_repo.py y relevo_repo.py: acá solo se las une a su cierre.
 Los turnos vencidos sin cierre viven en turnos_faltantes_repo.py y se
 reexportan acá para conservar la API de las pantallas.
 Las consultas de "qué se vendió en una ventana (desde, hasta]" (por origen y
-método, cuántas ventas, impresiones y trámites aparte) viven en
+método, cuántas ventas, impresiones aparte) viven en
 turnos_ventas_repo.py (se separaron el 2026-10-17, cuando este archivo pasó
 las 600 líneas) y se usan desde acá con los mismos nombres.
 
@@ -31,7 +31,7 @@ import dominio
 from database import conexion_db
 from turnos import (
     calcular_turno, dia_del_turno_que_arranca_tras_un_cierre, dia_en_que_empezo_el_turno, etiqueta_turno,
-    fin_del_turno, limites_de_los_dias, turno_que_arranca_tras_un_cierre, turno_vencimiento, turnos_del_dia,
+    limites_de_los_dias, turno_que_arranca_tras_un_cierre, turno_vencimiento, turnos_del_dia,
 )
 from repositories.config_repo import obtener_fondo_cambio
 from repositories import cajas_repo, envio_pwa_repo
@@ -139,15 +139,6 @@ def _ventana_en_curso(conexion, ahora_dt=None) -> dict:
         "dia": dia,
         "caja": caja,
     }
-
-
-def ventana_del_turno_en_curso() -> dict:
-    """La ventana del turno abierto (ver _ventana_en_curso) con "fin": la hora en
-    que termina ese turno (turnos.fin_del_turno)."""
-    with conexion_db() as conexion:
-        ventana = _ventana_en_curso(conexion)
-    return {**ventana, "fin": fin_del_turno(ventana["dia"], ventana["turno"]),
-            "turno_label": etiqueta_turno(ventana["dia"], ventana["turno"])}
 
 
 def _desglose_de_totales(totales: dict) -> dict:

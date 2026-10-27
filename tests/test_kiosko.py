@@ -1254,7 +1254,6 @@ class TestRankingVentas(BaseConBaseTemporal):
         self._vender("COD9", "Producto", 3)
 
         fila = next(f for f in self._ranking() if f["descripcion"] == "Producto")
-        self.assertEqual(fila["categoria"], reportes_repo.CATEGORIA_KIOSKO)
         self.assertEqual(fila["codigo"], "COD9")
         self.assertEqual(fila["cantidad"], 3)
         self.assertEqual(fila["importe"], 300.0)

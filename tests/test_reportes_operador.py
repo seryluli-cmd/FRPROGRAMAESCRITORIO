@@ -196,13 +196,13 @@ class TestPestañaPorOperador(_ConVentas):
         # Arranca con el primero elegido.
         self.assertEqual(pestaña.tabla_ventas.rowCount(), 1)
         self.assertEqual(pestaña.tabla_ventas.item(0, 0).text(), ahora.strftime("%d/%m/%Y 10:30"))
-        self.assertEqual(pestaña.tabla_ventas.item(0, 3).text(), "2 x Coca 500")
+        self.assertEqual(pestaña.tabla_ventas.item(0, 2).text(), "2 x Coca 500")
 
         pestaña.tabla_operadores.selectRow(1)
 
         self.assertIn("Nair", pestaña.etiqueta_detalle.text())
         self.assertEqual(pestaña.tabla_ventas.rowCount(), 2)
-        self.assertEqual(pestaña.tabla_ventas.item(1, 7).text(), "ANULADA")
+        self.assertEqual(pestaña.tabla_ventas.item(1, 6).text(), "ANULADA")
         self.assertEqual(pestaña.tabla_ventas.item(1, 0).foreground().color().name(), "#c62828")
 
     def test_buscar_de_nuevo_conserva_el_operador_elegido(self):

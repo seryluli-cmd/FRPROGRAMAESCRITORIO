@@ -2,8 +2,8 @@
 database_esquema_cajas.py
 ==========================
 Las tablas de las cajas con número (pedido del dueño, 2026-10-18). Viven en un
-archivo aparte porque database_esquema.py ya pasaba las 600 líneas (CLAUDE.md,
-regla 12); las crea database_esquema.inicializar_base_de_datos.
+archivo aparte (en CYBERCONTROL database_esquema.py ya pasaba las 600 líneas,
+CLAUDE.md regla 12); las crea database_esquema.inicializar_base_de_datos.
 
 Una caja es lo que tiene a cargo UNA persona por vez: se abre contando el cambio
 del cajón, puede pasar de mano en un relevo (quien llega cuenta todo el cajón) y
@@ -70,8 +70,8 @@ def crear_tablas_de_cajas(cursor, valores_sql):
 
     # En qué caja quedó cada venta. Tabla aparte (y no una columna de "ventas")
     # a propósito: "ventas" es la tabla madre de la plata y reconstruirla tiene
-    # su propia receta (database_migraciones._migrar_check_origen_en_ventas);
-    # una columna nueva ahí obligaba a tocar esa migración y sus pruebas.
+    # su propia receta (CLAUDE.md, regla 6); una columna nueva ahí obligaba a
+    # reconstruirla.
     # cargada_por: quién apretó cobrar cuando no fue la responsable (el Admin
     # que vende con la caja de la empleada abierta: la venta queda a nombre de
     # ella, pedido del dueño 2026-10-18). NULL = la cobró la misma responsable.

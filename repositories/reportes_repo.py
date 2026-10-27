@@ -21,13 +21,6 @@ from turnos import limites_de_los_dias, sql_dia_del_local
 # y sin la madrugada del 1 (que es la Noche del 30). Cada función pasa sus dos
 # fechas por turnos.limites_de_los_dias antes de consultar.
 
-# Categorías del Ranking de Ventas -- son un rótulo de la pantalla, no un
-# valor que se guarda en la base (por eso viven acá y no en dominio.py,
-# que es para strings que sí viajan hasta una columna). Un artículo de
-# kiosko sale de venta_detalle.
-CATEGORIA_KIOSKO = "Kiosko"
-
-
 def resumen_ventas(desde: str, hasta: str):
     """
     Totales de ventas confirmadas entre dos fechas (incluidas ambas
@@ -202,7 +195,7 @@ def ranking_ventas(desde: str, hasta: str, ordenar_por: str = "cantidad"):
     with conexion_db() as conexion:
         return conexion.execute(
             f"""
-            SELECT ? AS categoria, venta_detalle.articulo_codigo AS codigo,
+            SELECT venta_detalle.articulo_codigo AS codigo,
                    venta_detalle.descripcion AS descripcion,
                    SUM(venta_detalle.cantidad) AS cantidad,
                    SUM(venta_detalle.subtotal) AS importe
@@ -212,7 +205,7 @@ def ranking_ventas(desde: str, hasta: str, ordenar_por: str = "cantidad"):
             GROUP BY venta_detalle.articulo_codigo, venta_detalle.descripcion
             ORDER BY {columna_orden} DESC, descripcion
             """,
-            (CATEGORIA_KIOSKO, *rango),
+            rango,
         ).fetchall()
 
 # ---------------------------------------------------------------------
@@ -284,14 +277,14 @@ def ventas_de_operador(usuario_id: int, desde: str, hasta: str):
     """
     Las ventas de un usuario entre dos fechas, una por una y en orden de hora
     (las anuladas también, con su estado, para que se vea que existieron). Cada
-    fila trae "id", "fecha" (con la hora, tal como se grabó), "turno", "origen",
-    "estado", "total", "efectivo", "digital" y "concepto": qué se vendió, en
-    corto -- los artículos de kiosko ("2 x Coca 500").
+    fila trae "id", "fecha" (con la hora, tal como se grabó), "turno", "estado",
+    "total", "efectivo", "digital" y "concepto": qué se vendió, en corto -- los
+    artículos de kiosko ("2 x Coca 500").
     """
     with conexion_db() as conexion:
         return [dict(fila) for fila in conexion.execute(
             """
-            SELECT ventas.id, ventas.fecha, ventas.turno, ventas.origen, ventas.estado,
+            SELECT ventas.id, ventas.fecha, ventas.turno, ventas.estado,
                    ventas.total,
                    COALESCE((SELECT SUM(monto) FROM venta_pagos
                              WHERE venta_id = ventas.id AND metodo = ?), 0) AS efectivo,

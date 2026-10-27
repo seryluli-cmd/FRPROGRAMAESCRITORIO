@@ -84,9 +84,9 @@ class PanelDetalleDelDia(QWidget):
     operador) sobre el detalle de detalle_dia_repo.detalle_del_dia, del día
     entero o de un turno, y el botón para imprimir el renglón por renglón."""
 
-    _COLUMNAS_VENTAS = ["Nº", "Hora", "Turno", "Operador", "Rubro", "Qué se vendió",
+    _COLUMNAS_VENTAS = ["Nº", "Hora", "Turno", "Operador", "Qué se vendió",
                         "Efectivo", "Digital", "Total", "Estado"]
-    _COLUMNAS_PRODUCTOS = ["Rubro", "Producto", "Cantidad", "Importe"]
+    _COLUMNAS_PRODUCTOS = ["Producto", "Cantidad", "Importe"]
     _COLUMNAS_OPERADORES = ["Operador", "Ventas", "Anuladas", "Efectivo", "Digital", "Total"]
 
     def __init__(self):
@@ -102,8 +102,8 @@ class PanelDetalleDelDia(QWidget):
         self._a_la_vista = None
 
         self.tabla_renglones = crear_tabla(_COLUMNAS_RENGLONES, estirar=_COLUMNA_DESCRIPCION)
-        self.tabla_ventas = crear_tabla(self._COLUMNAS_VENTAS, estirar=5)
-        self.tabla_productos = crear_tabla(self._COLUMNAS_PRODUCTOS, estirar=1)
+        self.tabla_ventas = crear_tabla(self._COLUMNAS_VENTAS, estirar=4)
+        self.tabla_productos = crear_tabla(self._COLUMNAS_PRODUCTOS, estirar=0)
         self.tabla_operadores = crear_tabla(self._COLUMNAS_OPERADORES, estirar=0)
         self.pestañas = QTabWidget()
         self.pestañas.addTab(self.tabla_renglones, "Renglón por renglón")
@@ -215,13 +215,13 @@ class PanelDetalleDelDia(QWidget):
         for fila, venta in enumerate(ventas):
             valores = [
                 str(venta["id"]), _texto_hora(venta, dia), venta["etiqueta_turno"], _texto_operador(venta),
-                venta["rubro"], venta["detalle"], formato_pesos(venta["efectivo"]),
+                venta["detalle"], formato_pesos(venta["efectivo"]),
                 formato_pesos(venta["digital"]), formato_pesos(venta["total"]), _texto_estado(venta),
             ]
             self._poner(tabla, fila, valores, None, color=_COLOR_ANULADA if venta["anulada"] else None)
-            for columna in (6, 7, 8):
+            for columna in (5, 6, 7):
                 tabla.item(fila, columna).setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            tabla.item(fila, 5).setToolTip(venta["detalle"])
+            tabla.item(fila, 4).setToolTip(venta["detalle"])
         tabla.resizeColumnsToContents()
 
     def _llenar_productos(self, productos):
@@ -229,12 +229,11 @@ class PanelDetalleDelDia(QWidget):
         tabla.setRowCount(0)
         for fila, producto in enumerate(productos):
             self._poner(tabla, fila, [
-                producto["rubro"], producto["producto"], _texto_cantidad(producto["cantidad"]),
-                formato_pesos(producto["importe"]),
-            ], 2)
+                producto["producto"], _texto_cantidad(producto["cantidad"]), formato_pesos(producto["importe"]),
+            ], 1)
         self._poner(tabla, len(productos), [
-            "TOTAL", "", "", formato_pesos(sum(producto["importe"] for producto in productos)),
-        ], 2, negrita=True)
+            "TOTAL", "", formato_pesos(sum(producto["importe"] for producto in productos)),
+        ], 1, negrita=True)
         tabla.resizeColumnsToContents()
 
     def _llenar_operadores(self, operadores):

@@ -23,9 +23,6 @@ from ui.utils import aplicar_clase
 # cifras destacadas (QFrame#cifraDestacada[tono=...], solo azul y verde).
 TONO_AZUL = "azul"
 TONO_VERDE = "verde"
-TONO_CELESTE = "celeste"
-TONO_NARANJA = "naranja"
-TONO_ROJO = "rojo"
 TONO_GRIS = "gris"
 
 TEXTO_SOLO_ADMIN = "Solo el Administrador"
@@ -172,14 +169,3 @@ def tecla(texto: str, al_apretar=None, clase: str = "teclaBlanca") -> QPushButto
     if al_apretar is not None:
         boton.clicked.connect(al_apretar)
     return boton
-
-
-def linea_divisoria(vertical: bool = False) -> QFrame:
-    """Una rayita gris para separar grupos de botones."""
-    linea = QFrame()
-    linea.setObjectName("lineaDivisoria")
-    if vertical:
-        linea.setFixedSize(1, 30)
-    else:
-        linea.setFixedHeight(1)
-    return linea

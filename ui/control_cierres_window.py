@@ -369,7 +369,7 @@ class DialogoDetalleCierre(VentanaConDetalleDeVenta):
         self.encabezado.setStyleSheet("font-weight: 600;")
 
         self.tabla = crear_tabla(
-            ["Hora", "Vendedor", "Origen", "Total", "Método", "Estado"],
+            ["Hora", "Vendedor", "Total", "Método", "Estado"],
             estirar=1, por_filas=True,
         )
         self.tabla.itemSelectionChanged.connect(self._mostrar_detalle)
@@ -422,15 +422,14 @@ class DialogoDetalleCierre(VentanaConDetalleDeVenta):
             if venta["cargada_por_nombre"]:
                 vendedor += f" (cargó {venta['cargada_por_nombre']})"
             self.tabla.setItem(fila, 1, QTableWidgetItem(vendedor))
-            self.tabla.setItem(fila, 2, QTableWidgetItem(dominio.NOMBRE_ORIGEN_VENTA[venta["origen"]]))
-            self.tabla.setItem(fila, 3, QTableWidgetItem(formato_pesos(venta["total"])))
+            self.tabla.setItem(fila, 2, QTableWidgetItem(formato_pesos(venta["total"])))
             metodos = venta["metodos"].split(",") if venta["metodos"] else []
             texto_metodos = " + ".join(dominio.NOMBRE_METODO_PAGO[metodo] for metodo in metodos)
-            self.tabla.setItem(fila, 4, QTableWidgetItem(texto_metodos))
+            self.tabla.setItem(fila, 3, QTableWidgetItem(texto_metodos))
             item_estado = QTableWidgetItem(venta["estado"])
             if venta["estado"] == dominio.VENTA_ANULADA:
                 item_estado.setForeground(Qt.red)
-            self.tabla.setItem(fila, 5, item_estado)
+            self.tabla.setItem(fila, 4, item_estado)
         self.tabla_detalle.setRowCount(0)
 
     def _texto_del_encabezado(self, resultado) -> str:

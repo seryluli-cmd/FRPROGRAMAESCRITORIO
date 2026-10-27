@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
     QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 
 import dominio
 from ui.piezas_ventana import TONO_AZUL, TONO_VERDE, cabecera_oscura, cifra_destacada
@@ -56,32 +55,6 @@ def detalle_de_la_cabecera(resumen) -> str:
     """La línea de abajo del título en Caja y en Cierre de Turno: "Caja Nº 22 de MATI ·
     Turno Domingo T2" (sin caja, solo el turno)."""
     return f"{titulo_de_la_caja(resumen)}Turno {resumen['turno_actual_label']}"
-
-
-def etiqueta_dato(titulo, valor_texto, destacado=False, color_titulo=None, color_valor=None, negrita_titulo=False):
-    """Un dato suelto: título gris arriba y valor grande abajo (en azul si
-    `destacado`). `color_titulo`/`color_valor` pintan cada etiqueta aparte y
-    `negrita_titulo` pone el título en negrita.
-    Devuelve (layout, etiqueta_del_valor) para poder actualizarla."""
-    contenedor = QVBoxLayout()
-    titulo_lbl = QLabel(titulo)
-    valor_lbl = QLabel(valor_texto)
-    fuente_valor = QFont()
-    fuente_valor.setPointSize(14)
-    fuente_valor.setBold(True)
-    valor_lbl.setFont(fuente_valor)
-    if negrita_titulo:
-        fuente_titulo = QFont()
-        fuente_titulo.setBold(True)
-        titulo_lbl.setFont(fuente_titulo)
-    titulo_lbl.setStyleSheet(f"color: {color_titulo or '#6B7585'};")
-    if color_valor:
-        valor_lbl.setStyleSheet(f"color: {color_valor};")
-    elif destacado:
-        valor_lbl.setStyleSheet("color: #2F6FED;")
-    contenedor.addWidget(titulo_lbl)
-    contenedor.addWidget(valor_lbl)
-    return contenedor, valor_lbl
 
 
 def _marcar(etiqueta: QLabel, propiedad: str, valor):

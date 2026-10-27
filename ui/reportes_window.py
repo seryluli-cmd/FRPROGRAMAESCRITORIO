@@ -11,8 +11,8 @@ Reportes, una pestaña por cada pregunta que se le hace a las ventas:
 - Por Turno: el total de un rango repartido entre Mañana/Tarde/Noche.
 - Totales: Kiosko / Impresiones,
   por turno, día, semana o rango.
-- Ranking de Ventas: qué artículos se vendieron más, con una columna Categoría
-  para distinguir las impresiones (ver reportes_repo.ranking_ventas).
+- Ranking de Ventas: qué artículos se vendieron más (las impresiones también:
+  son un artículo más, ver reportes_repo.ranking_ventas).
 - Por Operador: quién vendió cuánto y, de cada uno, sus ventas con fecha y
   hora (en su propio archivo, ui/reportes_operador.py).
 
@@ -21,7 +21,7 @@ Las usa el Admin o una Empleada con `permiso_reportes`.
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QTableWidgetItem, QHeaderView, QComboBox, QTabWidget, QWidget,
+    QTableWidgetItem, QComboBox, QTabWidget, QWidget,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -278,9 +278,7 @@ class PestañaRanking(QWidget):
         self.etiqueta_titulo.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.etiqueta_titulo.setAlignment(Qt.AlignCenter)
 
-        self.tabla = crear_tabla(["Cantidad", "Categoría", "Código", "Descripción", "Importe"], estirar=3)
-        # La categoría se muestra entera en ventanas angostas.
-        self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tabla = crear_tabla(["Cantidad", "Código", "Descripción", "Importe"], estirar=2)
 
         layout = QVBoxLayout()
         layout.addLayout(filtros)
@@ -305,8 +303,7 @@ class PestañaRanking(QWidget):
             fila = self.tabla.rowCount()
             self.tabla.insertRow(fila)
             self.tabla.setItem(fila, 0, QTableWidgetItem(str(fila_datos["cantidad"])))
-            self.tabla.setItem(fila, 1, QTableWidgetItem(fila_datos["categoria"]))
-            self.tabla.setItem(fila, 2, QTableWidgetItem(fila_datos["codigo"]))
-            self.tabla.setItem(fila, 3, QTableWidgetItem(fila_datos["descripcion"]))
-            self.tabla.setItem(fila, 4, QTableWidgetItem(formato_pesos(fila_datos["importe"])))
-        mostrar_columna_entera(self.tabla, 2)
+            self.tabla.setItem(fila, 1, QTableWidgetItem(fila_datos["codigo"]))
+            self.tabla.setItem(fila, 2, QTableWidgetItem(fila_datos["descripcion"]))
+            self.tabla.setItem(fila, 3, QTableWidgetItem(formato_pesos(fila_datos["importe"])))
+        mostrar_columna_entera(self.tabla, 1)

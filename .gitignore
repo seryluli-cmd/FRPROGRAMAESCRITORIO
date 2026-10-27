@@ -7,5 +7,5 @@ dist/
 *.spec
 !Kiosko.spec
 *.log
-# El .exe armado se copia al lado de data/ para que use la base real; no va a git.
+# El .exe armado se copia al lado de data_fr/ para que use la base real; no va a git.
 *.exe

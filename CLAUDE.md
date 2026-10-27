@@ -256,7 +256,7 @@ abra no alcanza si los tests no pasan.
 | `ui.buscar_articulo.armar_botones_de_busqueda(ventana, ...)` | se arman los botones F5/F6/F7 y sus atajos (Ventas y Compras) |
 | `ui.utils.crear_selector_de_fecha(...)` | se crea un campo de fecha con calendario (usarlo siempre, nunca un `QDateEdit` a mano) |
 | `ui.utils.armar_filtro_por_fechas(...)` · `rango_de_fechas(...)` · `fecha_iso(...)` | se arma la fila Desde/Hasta con "Buscar" y se leen sus fechas como `"YYYY-MM-DD"` |
-| `ui.utils.fila_guardar_cancelar(dialogo, ...)` · `.fila_agregar_quitar(tabla, ...)` | se arman la fila Guardar/Cancelar de un formulario y los botones Agregar/Quitar de una tabla que se edita a mano |
+| `ui.utils.fila_guardar_cancelar(dialogo, ...)` | se arma la fila Guardar/Cancelar de un formulario |
 | `ui.detalle_venta.VentanaConDetalleDeVenta` | lista de ventas + artículos de la elegida (Consulta de Ventas y Detalle de un cierre) |
 | `ui.tarjeta_cierre.TarjetaCierreDeTurno` · `.TablaDeNegocios` | se dibuja el resumen de un Cierre de Turno (A RETIRAR y TOTAL en grande; en la tabla, cada negocio con su efectivo y digital en columnas, lo cobrado y el Cambio Fijo). La tabla es también la de Caja; la tarjeta la usan la pantalla Cierre de Turno (turno en curso) y "Ver Detalle" de Control de Cierres (cualquier cierre ya hecho, también el forzoso). Un cambio de diseño del Cierre de Turno se hace ahí y se ve en las dos |
 | `ui.imprimir.html_del_listado(...)` · `.vista_previa(parent, html, nombre)` | se imprime un listado: HTML en hojas A4 con los títulos repetidos en cada hoja y vista previa (desde ahí se imprime o se guarda en PDF). Lo usan el "Renglón por renglón" del Detalle del Día y Control de Stock |
