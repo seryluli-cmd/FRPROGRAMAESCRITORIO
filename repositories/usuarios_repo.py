@@ -1,0 +1,384 @@
+"""
+usuarios_repo.py
+=================
+"Repositorio" de usuarios: todas las funciones que leen o escriben en la
+tabla `usuarios`, además del login y el historial de logins. El resto del
+programa (pantallas, lógica de login) usa estas funciones en vez de
+escribir SQL directamente, así si algún día cambia cómo se guardan los
+usuarios, solo hay que tocar este archivo.
+"""
+
+import sqlite3
+from datetime import datetime
+import dominio
+from database import conexion_db, hash_clave, verificar_clave
+
+# Permisos que un Admin puede sumarle a una empleada: (columna en
+# `usuarios`, etiqueta para mostrar en la UI).
+#
+# - Sin ningún permiso, una empleada ya puede: Ventas, operar la grilla de
+#   PCs (asignarle un bono a una PC es una venta más, no un privilegio),
+#   Miembros, la PlayStation 5, Caja, Cierre de Turno y Cambiar mi Clave.
+# - Un ADMIN los tiene todos siempre (ver tiene_permiso) y no se le pueden
+#   sacar desde acá.
+# - "Usuarios" (crear/borrar gente, resetear claves) y "Anular Venta" son
+#   exclusivos de ADMIN a propósito: no están en esta lista.
+# - Tener al menos uno de estos permisos es lo que separa a un "encargado"
+#   de una empleada común en ui/main_window.py: ve "Administrar Kiosko".
+# - "Operar PCs y Miembros" (`permiso_control_pcs`) se sacó de esta lista el
+#   2026-10-22 (pedido del dueño: "así no está por estar"): desde el 19/10
+#   PCs, Miembros y la PlayStation 5 los opera cualquiera y la casilla no daba
+#   nada. La columna sigue en la tabla con lo que tenía cada usuario (las
+#   columnas no se borran, regla 6), pero ya no se lee ni se escribe. Si el
+#   dueño quiere volver a repartir quién opera qué, se suma de nuevo acá y se
+#   engancha en playstation_repo.puede_operar o en Miembros.
+PERMISOS_EMPLEADA = [
+    ("permiso_articulos", "Artículos (crear/editar productos y precios)"),
+    ("permiso_compras", "Compras (cargar mercadería / stock)"),
+    ("permiso_consulta_ventas", "Consulta de Ventas (sin poder anular)"),
+    ("permiso_reportes", "Reportes"),
+    ("permiso_control_cierres", "Control de Cierres de Turno"),
+]
+
+
+def tiene_permiso(usuario, clave_permiso: str) -> bool:
+    """
+    True si `usuario` (una fila de la tabla usuarios, por ejemplo la
+    que devuelve el login) puede usar la pantalla asociada a
+    `clave_permiso` (una de las claves de PERMISOS_EMPLEADA). Un ADMIN
+    siempre puede, pase lo que pase en sus columnas permiso_*.
+    """
+    if dominio.es_admin(usuario):
+        return True
+    return bool(usuario[clave_permiso])
+
+
+def _validar_credenciales_y_registrar_sesion(conexion, fila, clave: str):
+    """
+    Núcleo común de autenticar()/autenticar_por_nombre(): valida la
+    clave contra el hash guardado (migrando el formato legacy si hace
+    falta) y, si es correcta, registra la sesión exitosa en `sesiones`
+    — es la pista que usa Control de Cierres de Turno para saber quién
+    podría ser responsable de un turno sin cerrar, incluso si no
+    vendió nada en esa ventana (ver turnos_faltantes_repo._responsables_del_mes).
+    Devuelve la fila del usuario si todo coincide, o None si no.
+    """
+    if not _clave_correcta(conexion, fila, clave):
+        return None
+    _registrar_sesion(conexion, fila["id"])
+    return fila
+
+
+def _clave_correcta(conexion, fila, clave: str) -> bool:
+    """Si `clave` es la de `fila` (None = no hay usuario: False). Si el hash
+    estaba en el formato viejo, sin salt, de paso lo pasa al nuevo."""
+    if fila is None or not verificar_clave(clave, fila["clave_hash"]):
+        return False
+    if "$" not in fila["clave_hash"]:
+        conexion.execute(
+            "UPDATE usuarios SET clave_hash = ? WHERE id = ?",
+            (hash_clave(clave), fila["id"]),
+        )
+    return True
+
+
+def _registrar_sesion(conexion, usuario_id: int, desde_ip: str = None):
+    """Anota un ingreso en `sesiones`. `desde_ip` es la IP de la otra PC cuando
+    el Administrador entra desde otra PC del local (admin_remoto_repo); None =
+    entró en el mostrador."""
+    conexion.execute(
+        "INSERT INTO sesiones (usuario_id, fecha_hora, desde_ip) VALUES (?, ?, ?)",
+        (usuario_id, datetime.now().isoformat(timespec="seconds"), desde_ip),
+    )
+
+
+def _activo_por_nombre(conexion, nombre: str):
+    """El usuario ACTIVO que se llama `nombre` (sin distinguir mayúsculas ni
+    espacios de más, ver autenticar_por_nombre), o None."""
+    objetivo = nombre.strip().lower()
+    return next(
+        (f for f in conexion.execute("SELECT * FROM usuarios WHERE activo = 1")
+         if f["nombre"].strip().lower() == objetivo),
+        None,
+    )
+
+
+def autenticar(usuario_id: int, clave: str):
+    """
+    Intenta loguear a un usuario por su "Usuario Nº" y clave. Devuelve
+    la fila del usuario si coinciden (y está activo), o None si no.
+    Ver autenticar_por_nombre() para el login por nombre que usa la
+    pantalla de ingreso actual — este queda como forma alternativa,
+    hoy solo la usan los tests (TestMigracionHashEnLogin).
+    """
+    with conexion_db() as conexion:
+        fila = conexion.execute(
+            "SELECT * FROM usuarios WHERE id = ? AND activo = 1", (usuario_id,)
+        ).fetchone()
+        return _validar_credenciales_y_registrar_sesion(conexion, fila, clave)
+
+
+def autenticar_por_nombre(nombre: str, clave: str):
+    """
+    Igual que autenticar(), pero buscando por nombre en vez de por
+    "Usuario Nº" — es lo que usa la pantalla de Login. La búsqueda
+    ignora mayúsculas/minúsculas y espacios de más, para que no
+    dependa de que se tipee exactamente igual a como se cargó.
+
+    La comparación se hace en Python (con str.lower()) y no con el
+    LOWER() de SQLite a propósito: SQLite solo pliega mayúsculas ASCII
+    por defecto, así que "MATÍAS" y "Matías" le quedarían distintos
+    (la Í no se convierte a í) — con nombres reales, que casi siempre
+    llevan acentos, eso rompía el login con la variante equivocada.
+
+    Como el nombre no es la clave primaria, en teoría podría haber más
+    de un usuario activo con el mismo nombre y quedar ambiguo — por
+    eso crear_usuario/modificar_usuario rechazan nombres repetidos
+    entre usuarios activos (ver _nombre_en_uso), así que en la
+    práctica esto no debería pasar.
+    """
+    with conexion_db() as conexion:
+        return _validar_credenciales_y_registrar_sesion(conexion, _activo_por_nombre(conexion, nombre), clave)
+
+
+def listar_logins(desde: str, hasta: str, solo_admin: bool = True):
+    """
+    Los logins exitosos entre dos fechas (incluidas ambas puntas,
+    "YYYY-MM-DD"), del más nuevo al más viejo. Es la misma tabla
+    `sesiones` que ya se llena en cada login de cualquier usuario (ver
+    _validar_credenciales_y_registrar_sesion): con `solo_admin` se queda
+    solo con los de rol ADMIN, que es lo que le interesa al dueño para
+    saber cuándo se entró con una cuenta de administrador.
+
+    El rol es el que tiene el usuario HOY, no el que tenía al loguearse:
+    si a alguien le cambian el rol, su historial viejo se ve con el nuevo.
+
+    Cada login trae "desde_ip": la IP de la otra PC si el Administrador entró
+    desde otra PC del local (ver admin_remoto_repo), o None si fue en el mostrador.
+    """
+    consulta = """
+        SELECT sesiones.fecha_hora, sesiones.desde_ip, usuarios.nombre, usuarios.rol
+        FROM sesiones
+        JOIN usuarios ON usuarios.id = sesiones.usuario_id
+        WHERE date(sesiones.fecha_hora) BETWEEN date(?) AND date(?)
+    """
+    parametros = [desde, hasta]
+    if solo_admin:
+        consulta += " AND usuarios.rol = ?"
+        parametros.append(dominio.ROL_ADMIN)
+    consulta += " ORDER BY sesiones.id DESC"
+    with conexion_db() as conexion:
+        return conexion.execute(consulta, parametros).fetchall()
+
+
+def cambiar_clave(usuario_id: int, clave_actual: str, clave_nueva: str):
+    """
+    Cualquier usuario logueado (Admin o Empleada) puede cambiar su
+    propia clave desde acá, pidiendo la clave actual como confirmación
+    — a diferencia de modificar_usuario(), que es para que el Admin le
+    resetee la clave a otra persona sin necesidad de saber la vieja.
+    Levanta ValueError con un mensaje pensado para mostrar tal cual si
+    la clave actual ingresada no coincide.
+    """
+    with conexion_db() as conexion:
+        fila = conexion.execute(
+            "SELECT * FROM usuarios WHERE id = ? AND activo = 1", (usuario_id,)
+        ).fetchone()
+        if fila is None or not verificar_clave(clave_actual, fila["clave_hash"]):
+            raise ValueError("La clave actual no es correcta.")
+
+        conexion.execute(
+            "UPDATE usuarios SET clave_hash = ? WHERE id = ?",
+            (hash_clave(clave_nueva), usuario_id),
+        )
+
+
+def listar_usuarios(incluir_inactivos: bool = False):
+    """Devuelve todos los usuarios, para la pantalla de Administración."""
+    with conexion_db() as conexion:
+        if incluir_inactivos:
+            return conexion.execute("SELECT * FROM usuarios ORDER BY nombre").fetchall()
+        return conexion.execute(
+            "SELECT * FROM usuarios WHERE activo = 1 ORDER BY nombre"
+        ).fetchall()
+
+
+def obtener_usuario(usuario_id: int):
+    """La fila de un usuario (activo o no), o None si no existe."""
+    with conexion_db() as conexion:
+        return conexion.execute(
+            "SELECT * FROM usuarios WHERE id = ?", (usuario_id,)
+        ).fetchone()
+
+
+def usuario_habilitado(usuario_id: int):
+    """
+    La fila ACTUAL del usuario, leída de nuevo de la base, o PermissionError
+    si ya no existe o fue desactivado: quien quedó con una sesión abierta no
+    puede seguir operando. Es para las operaciones que se controlan en el repo
+    y no solo escondiendo el botón, así un permiso quitado o un usuario dado de
+    baja corta el acceso en el acto (PlayStation 5, ORDENAR Stock).
+    """
+    usuario = obtener_usuario(usuario_id)
+    if usuario is None or not usuario["activo"]:
+        raise PermissionError("Ese usuario ya no está habilitado para operar.")
+    return usuario
+
+
+def exigir_admin(usuario_id: int, para: str):
+    """
+    Como usuario_habilitado(), y además tiene que ser Administrador; si no,
+    PermissionError con un mensaje listo para mostrar: "Solo un Administrador
+    puede {para}." (`para`, por ejemplo, "ordenar el stock").
+    Devuelve la fila del usuario.
+    """
+    usuario = usuario_habilitado(usuario_id)
+    if not dominio.es_admin(usuario):
+        raise PermissionError(f"Solo un Administrador puede {para}.")
+    return usuario
+
+
+def _proximo_numero_disponible(conexion) -> int:
+    """
+    Menor "Usuario Nº" que todavía no está ocupado — a propósito NO es
+    simplemente MAX(id)+1, para que borrar un usuario sin historial
+    (ver borrar_usuario) libere su número para el próximo que se cree,
+    en vez de ir siempre para arriba y dejar huecos para siempre.
+    """
+    ocupados = {fila["id"] for fila in conexion.execute("SELECT id FROM usuarios")}
+    candidato = 1
+    while candidato in ocupados:
+        candidato += 1
+    return candidato
+
+
+def _nombre_en_uso(conexion, nombre: str, excluir_id: int = None) -> bool:
+    """
+    Si ya hay otro usuario ACTIVO con este nombre (ignorando
+    mayúsculas/espacios) — el login es por nombre (ver
+    autenticar_por_nombre), así que dos usuarios activos no pueden
+    compartir uno sin quedar ambiguo. Un usuario inactivo con el mismo
+    nombre no cuenta: no puede loguearse, así que no genera ambigüedad.
+
+    Comparación en Python (no con LOWER() de SQLite): mismo motivo que
+    en autenticar_por_nombre, SQLite no pliega bien mayúsculas con
+    acentos.
+    """
+    objetivo = nombre.strip().lower()
+    for fila in conexion.execute("SELECT id, nombre FROM usuarios WHERE activo = 1"):
+        if excluir_id is not None and fila["id"] == excluir_id:
+            continue
+        if fila["nombre"].strip().lower() == objetivo:
+            return True
+    return False
+
+
+def _exigir_nombre_libre(conexion, nombre: str, excluir_id: int = None):
+    """Levanta ValueError (con un mensaje pensado para mostrar tal cual) si
+    otro usuario activo ya se llama así -- ver _nombre_en_uso."""
+    if _nombre_en_uso(conexion, nombre, excluir_id=excluir_id):
+        raise ValueError(
+            f"Ya hay un usuario activo llamado '{nombre.strip()}'. Como se ingresa "
+            "por nombre, no puede haber dos iguales — probá con otro (por ejemplo, "
+            "agregando el apellido)."
+        )
+
+
+def _columnas_y_valores_de_permisos(permisos: dict = None):
+    """
+    (columnas, valores) de TODOS los permisos de PERMISOS_EMPLEADA, listos
+    para un INSERT o un UPDATE: los que no vengan en `permisos` quedan en 0
+    (no conservan lo que tenían antes).
+    """
+    permisos = permisos or {}
+    columnas = [columna for columna, _ in PERMISOS_EMPLEADA]
+    return columnas, [1 if permisos.get(columna) else 0 for columna in columnas]
+
+
+def crear_usuario(nombre: str, clave: str, rol: str, permisos: dict = None):
+    """
+    Crea un nuevo usuario (Admin o Empleada) y devuelve su id (el
+    menor "Usuario Nº" disponible, ver _proximo_numero_disponible).
+    Levanta ValueError si ya hay otro usuario activo con ese nombre.
+
+    `permisos` es un dict {columna: bool} con algunas (o todas, o
+    ninguna) de las claves de PERMISOS_EMPLEADA — las que no se pasen
+    quedan en False. Para un usuario ADMIN da igual lo que se mande acá
+    (ya tiene todo, ver tiene_permiso()), pero igual se guarda tal cual
+    para no perderlo si algún día lo bajan a EMPLEADA.
+    """
+    ahora = datetime.now().isoformat(timespec="seconds")
+    with conexion_db() as conexion:
+        _exigir_nombre_libre(conexion, nombre)
+        nuevo_id = _proximo_numero_disponible(conexion)
+        columnas_permiso, valores_permiso = _columnas_y_valores_de_permisos(permisos)
+        conexion.execute(
+            f"""
+            INSERT INTO usuarios
+                (id, nombre, clave_hash, rol, activo, fecha_creacion, {", ".join(columnas_permiso)})
+            VALUES (?, ?, ?, ?, 1, ?, {", ".join("?" for _ in columnas_permiso)})
+            """,
+            (nuevo_id, nombre, hash_clave(clave), rol, ahora, *valores_permiso),
+        )
+        return nuevo_id
+
+
+def modificar_usuario(usuario_id: int, nombre: str, rol: str, clave: str = None, permisos: dict = None):
+    """
+    Actualiza nombre, rol y permisos de un usuario. Si se pasa una
+    clave nueva (no vacía), también la actualiza; si no, deja la clave
+    como estaba. Levanta ValueError si el nombre nuevo ya lo usa otro
+    usuario activo (ver _nombre_en_uso). `permisos` funciona igual que
+    en crear_usuario (las claves de PERMISOS_EMPLEADA que no se pasen
+    quedan en False, no como estaban antes).
+    """
+    with conexion_db() as conexion:
+        _exigir_nombre_libre(conexion, nombre, excluir_id=usuario_id)
+        columnas_permiso, valores_permiso = _columnas_y_valores_de_permisos(permisos)
+        asignaciones = ["nombre = ?", "rol = ?"]
+        valores = [nombre, rol]
+        if clave:
+            asignaciones.append("clave_hash = ?")
+            valores.append(hash_clave(clave))
+        asignaciones += [f"{columna} = ?" for columna in columnas_permiso]
+        valores += valores_permiso
+        conexion.execute(
+            f"UPDATE usuarios SET {', '.join(asignaciones)} WHERE id = ?", (*valores, usuario_id)
+        )
+
+
+def desactivar_usuario(usuario_id: int):
+    """
+    Soft-delete: marca al usuario como inactivo en vez de borrarlo, para
+    no perder el historial de ventas/compras/cierres que hizo. Deja de
+    poder loguearse, pero su "Usuario Nº" queda reservado para siempre
+    (no lo libera para reusar, a diferencia de borrar_usuario) — lo usa
+    la UI como respaldo cuando borrar_usuario() rechaza el borrado por
+    tener historial.
+    """
+    with conexion_db() as conexion:
+        conexion.execute("UPDATE usuarios SET activo = 0 WHERE id = ?", (usuario_id,))
+
+
+def borrar_usuario(usuario_id: int):
+    """
+    Borra un usuario de verdad (a diferencia de desactivar_usuario, que
+    solo lo desactiva). Libera su "Usuario Nº" para que
+    _proximo_numero_disponible se lo asigne al próximo usuario que se
+    cree, así los números se mantienen correlativos con el tiempo.
+
+    Solo se puede borrar si el usuario nunca vendió, compró, ni cerró
+    un turno: si tiene historial, la clave foránea de esas tablas
+    rechaza el borrado (SQLite lo avisa como IntegrityError) y acá se
+    traduce en un ValueError con un mensaje pensado para mostrar tal
+    cual, sugiriendo desactivar_usuario() en su lugar.
+    """
+    try:
+        with conexion_db() as conexion:
+            conexion.execute("DELETE FROM usuarios WHERE id = ?", (usuario_id,))
+    except sqlite3.IntegrityError:
+        raise ValueError(
+            "Este usuario ya tiene ventas, compras o cierres de turno registrados: "
+            "no se puede borrar sin perder ese historial. Se puede desactivar en su "
+            "lugar (deja de poder loguearse, pero conserva su historial)."
+        )

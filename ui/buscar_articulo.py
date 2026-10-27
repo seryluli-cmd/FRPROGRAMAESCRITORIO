@@ -1,0 +1,164 @@
+"""
+buscar_articulo.py
+====================
+Cuadro de búsqueda de artículos reutilizable, usado tanto en Ventas como
+en Compras. Se abre con los atajos F5 (buscar por código), F6 (por
+descripción) y F7 (por marca) cuando alguien no tiene a mano o no puede
+leer el código de barras. Al elegir un artículo deja su código en
+`codigo_elegido`.
+"""
+
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QTableWidgetItem,
+)
+
+from PySide6.QtGui import QKeySequence, QShortcut
+
+import dominio
+from repositories import articulos_repo
+from ui.utils import (
+    manejar_errores, aplicar_clase, formato_pesos, sin_boton_por_defecto, crear_tabla,
+    mostrar_columna_entera, mostrar_error,
+)
+from ui.ventas_dibujos import icono_de_tecla
+
+
+# Las tres formas de buscar un artículo, con las mismas teclas en Ventas y en
+# Compras: modo -> (tecla, nombre del botón, título del cuadro). Sin abreviar
+# (pedido del dueño, 2026-10-25: decían "F5 Cód." y "F6 Descrip.").
+_BUSQUEDAS = {
+    "codigo": ("F5", "Código", "Buscar por Código (F5)"),
+    "descripcion": ("F6", "Descripción", "Buscar por Descripción (F6)"),
+    "marca": ("F7", "Marca", "Buscar por Marca (F7)"),
+}
+
+
+class DialogoBuscarArticulo(QDialog):
+    def __init__(self, parent, modo: str = "descripcion"):
+        """
+        `modo` define qué campo se busca por defecto: "codigo",
+        "descripcion" o "marca" (equivalentes a F5 / F6 / F7).
+        """
+        super().__init__(parent)
+        self.modo = modo
+        self.codigo_elegido = None
+        self.setWindowTitle(_BUSQUEDAS[modo][2] if modo in _BUSQUEDAS else "Buscar artículo")
+        self.resize(600, 400)
+        self._armar_interfaz()
+
+    def _armar_interfaz(self):
+        self.campo_busqueda = QLineEdit()
+        self.campo_busqueda.textChanged.connect(self._buscar)
+        self.campo_busqueda.returnPressed.connect(self._elegir_seleccion)
+
+        self.tabla = crear_tabla(
+            ["Código", "Descripción", "Marca", "Precio Venta"],
+            estirar=1, por_filas=True,
+        )
+        self.tabla.doubleClicked.connect(self._elegir_seleccion)
+
+        boton_elegir = QPushButton("Seleccionar")
+        aplicar_clase(boton_elegir, "primario")
+        boton_elegir.clicked.connect(self._elegir_seleccion)
+        boton_cancelar = QPushButton("Cancelar")
+        boton_cancelar.clicked.connect(self.reject)
+
+        botones = QHBoxLayout()
+        botones.addStretch()
+        botones.addWidget(boton_elegir)
+        botones.addWidget(boton_cancelar)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Escribí para buscar:"))
+        layout.addWidget(self.campo_busqueda)
+        layout.addWidget(self.tabla)
+        layout.addLayout(botones)
+        self.setLayout(layout)
+        sin_boton_por_defecto(self)
+
+        self.campo_busqueda.setFocus()
+        self._buscar("")
+
+    @manejar_errores
+    def _buscar(self, texto):
+        if self.modo == "codigo":
+            # Por código de menor a mayor, como números (pedido del dueño). El que
+            # tiene ESE código exacto va primero igual: es el que se elige con
+            # Enter. Sin esto, buscar un EAN-8 como 77981133 elegía otro de los que
+            # lo CONTIENEN (el EAN-13 de Manaos, la caja).
+            resultados = sorted(articulos_repo.listar_articulos(texto),
+                                key=lambda articulo: (articulo["codigo"] != texto.strip(),
+                                                      dominio.orden_de_codigo(articulo["codigo"])))
+        elif self.modo == "marca":
+            resultados = articulos_repo.buscar_por_marca(texto) if texto else articulos_repo.listar_articulos("")
+        else:
+            resultados = articulos_repo.buscar_por_descripcion(texto) if texto else articulos_repo.listar_articulos("")
+
+        self.tabla.setRowCount(0)
+        for articulo in resultados[:200]:  # tope razonable para no trabar la grilla
+            fila = self.tabla.rowCount()
+            self.tabla.insertRow(fila)
+            self.tabla.setItem(fila, 0, QTableWidgetItem(articulo["codigo"]))
+            self.tabla.setItem(fila, 1, QTableWidgetItem(articulo["descripcion"]))
+            self.tabla.setItem(fila, 2, QTableWidgetItem(articulo["marca"] or ""))
+            self.tabla.setItem(fila, 3, QTableWidgetItem(formato_pesos(articulo["precio_venta"])))
+        mostrar_columna_entera(self.tabla, 0)
+
+    def _elegir_seleccion(self):
+        fila = self.tabla.currentRow()
+        if fila < 0 and self.tabla.rowCount() > 0:
+            fila = 0
+        if fila < 0:
+            return
+        self.codigo_elegido = self.tabla.item(fila, 0).text()
+        self.accept()
+
+
+def avisar_codigo_no_encontrado(ventana, codigo, agregado=""):
+    """
+    El aviso de Ventas y Compras cuando lo escaneado no es ningún artículo.
+    Dice cuántos dígitos llegaron: si el artículo SÍ está cargado, comparar
+    los dos códigos muestra enseguida si la pistola lee distinto de lo que
+    se tipeó en el alta (le falta o le sobra un dígito, por ejemplo).
+    """
+    largo = f"{len(codigo)} {'dígitos' if codigo.isdigit() else 'caracteres'}"
+    mensaje = f"No hay ningún artículo con el código {codigo} ({largo})."
+    if agregado:
+        mensaje += f"\n{agregado}"
+    mostrar_error(ventana, "Artículo no encontrado", mensaje)
+
+
+def armar_botones_de_busqueda(ventana, al_elegir, tecla_aparte=False):
+    """
+    Los botones F5 (por código), F6 (por descripción) y F7 (por marca) de
+    Ventas y Compras, con sus atajos de teclado en `ventana`. Cada uno abre
+    el cuadro de búsqueda y, si se elige un artículo, llama a
+    `al_elegir(codigo)`. Devuelve los tres botones, en ese orden, para que
+    la pantalla los acomode donde quiera.
+
+    Con `tecla_aparte` (Ventas) la tecla va dibujada en un recuadro adelante
+    del nombre; si no, dice "F5 Código" (Compras).
+    """
+    botones = []
+    for modo, (tecla, nombre, _titulo) in _BUSQUEDAS.items():
+        buscar = _buscador(ventana, modo, al_elegir)
+        if tecla_aparte:
+            boton = QPushButton(nombre)
+            icono, tamano = icono_de_tecla(tecla)
+            boton.setIcon(icono)
+            boton.setIconSize(tamano)
+        else:
+            boton = QPushButton(f"{tecla} {nombre}")
+        boton.clicked.connect(buscar)
+        QShortcut(QKeySequence(tecla), ventana, activated=buscar)
+        botones.append(boton)
+    return botones
+
+
+def _buscador(ventana, modo, al_elegir):
+    """La función (sin argumentos) que abre el cuadro de búsqueda en `modo`."""
+    def buscar():
+        dialogo = DialogoBuscarArticulo(ventana, modo)
+        if dialogo.exec() and dialogo.codigo_elegido:
+            al_elegir(dialogo.codigo_elegido)
+    return buscar

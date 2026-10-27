@@ -1,0 +1,199 @@
+CYBERCONTROL - Guía rápida
+==========================
+
+INICIO
+------
+Si usás el programa desde el código fuente:
+  pip install -r requirements.txt
+  python main.py
+
+En el primer arranque se crea el usuario Administrador con clave 1234.
+Entrá por nombre y cambiá esa clave desde "Clave". El Admin puede crear
+otras cuentas y elegir sus permisos desde "Usuarios".
+
+DATOS Y COPIAS
+--------------
+La información del negocio está en data/kiosko.db, junto al programa.
+No borres ni reemplaces esa carpeta al actualizar el ejecutable.
+El programa guarda solo una copia de la base, sin cerrarse: después de
+cada Cierre de Turno y, si no hubo ninguno, cada 8 horas. Quedan en
+data/backups (todas las de los últimos 3 días y una por día hasta 30 días).
+En Usuarios > Copias de Seguridad el Admin ve la última copia, agrega
+otras carpetas donde se guarda cada copia (por ejemplo D:\BACKUPS o la
+carpeta compartida de otra PC, con su usuario y clave: se los pasa a
+Windows, no quedan en el programa), hace una copia en el momento o guarda
+una suelta en un pendrive.
+
+LA CAJA (cada persona con su caja)
+----------------------------------
+- Al entrar, si no hay ninguna caja abierta, el programa pide contar el
+  Cambio Fijo del cajón y escribirlo. Primero se escribe lo que se contó y
+  recién después el programa dice cuánto tenía que haber y si falta o sobra.
+  Esa caja queda con un número y a tu nombre.
+- 5 minutos antes del fin del turno (13:55, 21:55 y 05:55; los domingos
+  17:55 y 05:55) el botón Cierre de Turno titila en rojo: cerrá la caja,
+  armá el sobre con lo que dice el programa y guardalo en la caja fuerte.
+- Si a los 30 minutos del fin del turno la caja sigue abierta, el programa
+  la cierra solo (cierre forzoso). Si estás en medio de un cobro, espera a
+  que termines.
+- Si tu reemplazo no llegó: cerrá tu caja a horario, volvé a entrar con tu
+  usuario y seguí vendiendo (no hace falta contar de nuevo). Cuando llegue,
+  sale de tu usuario con "Cerrar sesión" y entra con el suyo: el programa le
+  pide contar TODA la plata del cajón y desde ahí la caja es suya; lo que
+  vendiste mientras la esperabas va en su sobre.
+- Si quien estaba antes se fue sin cerrar y su turno ya terminó, el que
+  llega cierra esa caja (queda anotado "cerrada por ... en ausencia de ..."),
+  arma el sobre de la otra persona y después abre la suya.
+- El Administrador no abre caja. Si cobra algo con la caja de una empleada
+  abierta, la venta queda a nombre de ella, en su caja, y se anota que la
+  cargó el Administrador.
+- Lo contado en cada sobre lo carga solo el Administrador, desde Control de
+  Cierres. Cada conteo queda guardado.
+
+VENTAS Y CAJA
+-------------
+- Vender: escaneá artículos, ajustá cantidades y cobrá en efectivo,
+  digital o ambos. El stock puede quedar negativo; luego se corrige
+  al registrar la compra.
+- Cobrar: la ventana muestra Efectivo y Digital, que siempre suman el
+  total. Arranca con todo en Efectivo: si pagan justo, Enter y listo.
+  Si pagan una parte en cada medio, escribí una parte y la otra se
+  completa sola (después Enter). "Todo efectivo" y "Todo digital" ponen
+  todo de un lado. Si pagan con un billete más grande, escribilo en
+  Efectivo o en "Paga con" (sirve también cuando una parte va por
+  digital): muestra el VUELTO mientras escribís y Enter cobra (en
+  Ventas el vuelto sale de nuevo en el cartel de la venta cobrada).
+  Siempre alcanza con un Enter. Es la misma ventana para todo lo que se
+  cobra: kiosko, bonos de PCs, PCSTREAM, PlayStation 5, carga de saldo
+  de un socio y trámites.
+- Impresiones: botón de la barra, al lado de Vender. Escribí cuántas son y
+  Enter: abre la ventana de cobro de siempre (otro Enter cobra). Es el
+  artículo código 4: si cambia el precio en Artículos, el botón ya usa el
+  nuevo.
+- Trámites: cobrá el servicio que hizo el local, no el importe de la
+  boleta del cliente. El Admin administra el catálogo de trámites.
+- Caja: muestra el efectivo esperado del turno y el desglose de ventas.
+- Cierre de Turno: registra cuánto retirar, dejando el Cambio Fijo. Es el
+  resumen que se le manda al dueño: muestra Efectivo, Digital y TOTAL, y
+  por separado Kiosko, Impresiones, Trámites, Alquiler de PCs y
+  PlayStation 5, cada uno con su efectivo y digital (Kiosko sin
+  impresiones ni trámites: los renglones suman el TOTAL, nada se cuenta
+  dos veces).
+- Clave: cada persona puede cambiar su propia contraseña.
+- Cada cierre se anota en el turno y el día de su caja (el que corresponde a
+  la hora en que se abrió: quien abre a las 05:55 abre la Mañana). Si pasaron días sin cerrar, el cierre de hoy
+  queda anotado en el día viejo: Reportes > Resumen del Día lo avisa y tiene
+  un botón para ir a verlo.
+- Reportes > Resumen del Día: cada turno del día (quién lo cerró, cuánto
+  se vendió y si el sobre cuadró) y, abajo, el detalle de TODO lo vendido.
+  "Renglón por renglón" muestra cada cosa tal cual se cobró (hora, turno,
+  operador, código, descripción, cantidad y total): 14 impresiones cobradas
+  juntas son un renglón de 14; 4 cobradas por separado son 4 renglones.
+  "Imprimir" lo muestra como hoja para imprimir (o guardar en PDF eligiendo
+  la impresora "Microsoft Print to PDF"). "Venta por venta" muestra
+  cada venta con su hora, turno, operador y qué se vendió (artículos con
+  cantidades, bonos de PC con la PC, PCSTREAM, PlayStation 5, socios y
+  trámites), lo vendido por producto y cuánto vendió cada operador. Tocá un
+  turno para ver solo ese, o TOTAL DEL DÍA para ver todo.
+- Reportes > Por Operador: cuánto vendió cada persona entre dos fechas y,
+  tocando su nombre, cada una de sus ventas con el día y la hora, qué se
+  vendió y cómo se cobró. Ojo: la venta queda a nombre de quien tenía la
+  sesión abierta (o de la dueña de la caja, si la cobró el Administrador);
+  por eso cada uno tiene que entrar con su propio usuario.
+- En los reportes, el día del local va de 06:00 a 06:00: la Noche entra
+  entera en el día en que empezó, aunque termine a la madrugada siguiente.
+  Por eso, a las 2 de la mañana "Solo Hoy" todavía muestra el día anterior.
+
+PCs, SOCIOS Y PLAYSTATION 5
+----------------------------
+La pantalla principal muestra un monitor por cada PC (y uno para la
+PlayStation 5, la del joystick). El color de la pantalla dice cómo está:
+verde disponible, amarillo en uso, naranja por vencer, azul esperando
+que el cliente prenda la PC, rojo sin conexión, lila sin bloqueo, y rojo
+que titila = hay que mirarla ya. Arriba está la leyenda con los colores.
+El reloj y las monedas indican que corre con un bono; las dos personitas,
+que la abrió un socio (su nombre aparece abajo). Debajo de cada monitor va
+el tiempo que le queda. Clic para elegirla, clic derecho para el control
+remoto (reiniciar, apagar, mensaje, etc.).
+Para venderle tiempo: clic en el monitor, clic en el bono y "Cobrar". Se
+abre la misma ventana de cobro que en Ventas: si pagan justo, Enter y
+listo; si pagan con otro billete, se escribe con cuánto y muestra el vuelto.
+Los bonos de PC, de PCSTREAM, de socios y de PlayStation son catálogos
+separados.
+Las PCs comunes se pueden operar con cualquier usuario logueado.
+Al vencer el tiempo de una PC, el Cliente PC la bloquea. La PlayStation
+avisa en rojo hasta que un operador confirme que la consola quedó libre.
+La PlayStation y Miembros también los opera cualquier usuario logueado.
+Los catálogos y las estaciones se administran desde Configuración ADMIN.
+PCSTREAM es la PC de streaming: va al lado de la PlayStation 5 y se la
+reconoce por el nombre (la estación tiene que llamarse PCSTREAM; con otro
+nombre es una PC común). Tiene sus propios bonos (Configuración ADMIN >
+Gestionar Bonos de PCSTREAM). Los socios no la pueden abrir con su saldo y
+no entra en "Intercambiar de máquina". Lo que se cobra suma en Alquiler de
+PCs; cuánto se usó y se vendió se ve en Reportes > PCSTREAM.
+Al cargarle saldo a un socio con un monto libre, el mínimo es el monto del
+tramo más bajo de la Tarifa por Hora de Socios (Configuración ADMIN). Si
+ese tramo arranca en $0, se puede cargar cualquier monto.
+Cada PC deja anotada su IP la primera vez que se conecta (columna "IP
+asentada" en Configuración ADMIN > Gestionar Estaciones). Si el nombre que
+manda la PC no coincide con ninguna estación (por ejemplo, porque la
+renombraste acá), el programa la reconoce por esa IP. Si cambiás una PC o
+su IP, tocá "Borrar IP": la nueva se anota sola la próxima vez que esa PC
+se conecte con su nombre.
+Una IP repetida en dos estaciones sale en rojo y, mientras siga así,
+ninguna de las dos se reconoce por IP (por el nombre siguen andando).
+El fondo de la pantalla de bloqueo de las PCs (la imagen que se ve
+detrás del nombre de cada PC) se elige en Configuración ADMIN >
+Gestionar Estaciones > "Fondo de pantalla de las PCs...". Las PCs lo
+piden al arrancar; las que ya están prendidas lo toman solas en
+unos segundos. Si no hay fondo, se ve el azul de siempre.
+
+ADMINISTRAR DESDE OTRA PC DEL LOCAL
+-----------------------------------
+El Administrador puede trabajar desde otra PC del local (por ejemplo, una
+PC libre a la que entrás desde tu casa con UltraVNC) mientras en el
+mostrador se sigue atendiendo normal: la operadora no ve nada.
+Se prepara una sola vez, en el mostrador:
+  1. Configuración ADMIN > Entrar desde otra PC: tildá "Permitir que el
+     Administrador entre desde otra PC" y Guardar. (Viene apagado.)
+  2. Compartí en la red la carpeta donde está CyberBios.exe, con contraseña.
+Para entrar, en la otra PC:
+  - Abrí CyberBios.exe DESDE ESA CARPETA COMPARTIDA (por ejemplo
+    \\NOMBRE-DEL-MOSTRADOR\CyberBios\CyberBios.exe; la pantalla del paso 1
+    te dice el nombre del mostrador). Si Windows pregunta si querés
+    ejecutarlo, decile que sí.
+  - Entrá con el usuario Administrador y su clave.
+Desde ahí se puede: Administrar Kiosko completo (artículos y precios,
+compras, consulta y anulación de ventas, reportes, control de cierres y
+sobres, usuarios), Configuración ADMIN (menos Actualizar el Cliente PC) y
+mirar la Caja. Lo que guardes queda guardado
+en el mostrador al instante.
+Vender, cobrar, cerrar el turno, la grilla de PCs y Miembros se hacen
+solo en el mostrador.
+Para que funcione, el programa del mostrador tiene que estar abierto.
+Al terminar, cerrá sesión o cerrá el programa en la otra PC: mientras
+quede abierto, la sesión sigue abierta (si es una PC del cyber, la
+podría usar el próximo cliente).
+Las empleadas no pueden entrar desde otra PC. Cada vez que entrás queda
+anotado en Accesos de Admin, con la PC desde donde entraste. Si alguien
+pone 5 claves mal seguidas desde una PC, esa PC no puede probar más por
+5 minutos; y si hay 20 claves mal en 15 minutos (sumando todas las PCs),
+nadie puede entrar desde otra PC por un rato (en el mostrador sí).
+IMPORTANTE: el .exe del mostrador y el que abrís desde la otra PC tienen
+que ser el mismo (por eso conviene abrirlo siempre desde la carpeta
+compartida). Nunca copies la base (data\kiosko.db) a otra PC para
+trabajar ahí: lo que hagas en la copia no llega al mostrador.
+
+PERMISOS
+--------
+El Admin puede delegar por separado Artículos, Compras, Consulta de
+Ventas, Reportes, Control de Cierres y el acceso a Miembros/PlayStation.
+Anular ventas, Usuarios y Configuración ADMIN quedan para el Admin.
+Una persona sin esos permisos puede vender, cobrar trámites, ver Caja,
+cerrar turno y cambiar su clave. Con el permiso de Control de Cierres una
+empleada ve los cierres, pero cargar lo contado del sobre es solo del Admin.
+
+SI ALGO FALLA
+-------------
+El programa muestra un aviso. El detalle técnico queda en
+data/errores.log; ese archivo ayuda a investigar el problema.
