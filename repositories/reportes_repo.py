@@ -2,9 +2,8 @@
 reportes_repo.py
 ==================
 Consultas para la sección de Reportes: el Resumen (cuánta plata se
-trabajó en un rango de fechas), el desglose Kiosko / Impresiones / Trámites
-/ Alquiler de PCs / PlayStation 5 (por turno, día, semana o el rango completo) y el Ranking
-de Ventas (qué se vende más, de cualquiera de los rubros del programa).
+trabajó en un rango de fechas), el desglose Kiosko / Impresiones
+(por turno, día, semana o el rango completo) y el Ranking de Ventas.
 Son solo consultas SQL con agregación (SUM, GROUP BY), apoyadas en los
 índices que se crean en database.py — por eso van a ser rápidas incluso
 con años de ventas acumuladas.
@@ -25,19 +24,8 @@ from turnos import limites_de_los_dias, sql_dia_del_local
 # Categorías del Ranking de Ventas -- son un rótulo de la pantalla, no un
 # valor que se guarda en la base (por eso viven acá y no en dominio.py,
 # que es para strings que sí viajan hasta una columna). Un artículo de
-# kiosko sale de venta_detalle; los otros no tienen fila ahí (ver
-# ventas_repo.registrar_venta_sin_detalle) y hay que ir a buscarlos a
-# sesion_bonos / movimientos_saldo_miembro / tramites_venta para saber qué
-# se vendió.
+# kiosko sale de venta_detalle.
 CATEGORIA_KIOSKO = "Kiosko"
-CATEGORIA_BONO_PC = "Bono de PC (walk-in)"
-CATEGORIA_BONO_SOCIO = "Bono de Socio"
-CATEGORIA_CARGA_TARIFA_SOCIO = "Carga de saldo de Socio (tarifa por hora)"
-CATEGORIA_TRAMITE = "Trámite"
-CATEGORIA_BONO_PLAYSTATION = "Bono de PlayStation 5"
-CATEGORIA_BONO_PCSTREAM = f"Bono de {dominio.NOMBRE_PCSTREAM}"
-# Lo que se cobra (o devuelve) de una reserva: lo usa el Detalle del Día.
-CATEGORIA_RESERVA = "Reserva"
 
 
 def resumen_ventas(desde: str, hasta: str):
@@ -164,47 +152,21 @@ def _sumar_por_clave(conexion, consulta: str, parametros) -> dict:
 
 
 def resumen_por_origen(desde: str, hasta: str, agrupar_por: str = "rango"):
-    """
-    Desglosa lo facturado en Kiosko, Impresiones, Trámites, Alquiler de PCs y
-    PlayStation 5 (ver dominio.ORIGENES_VENTA) entre dos fechas, agrupado según
-    `agrupar_por`:
-      - "rango" (default): una sola fila con el total del período completo.
-      - "turno": una fila por turno (Mañana/Tarde/Noche), siempre las 3
-        aunque alguno no tenga ventas en el rango -- mismo criterio que
-        resumen_por_turno().
-      - "dia": una fila por día del local (06:00 a 06:00, la Noche entera en
-        el día en que empezó) con al menos una venta.
-      - "semana": una fila por semana (lunes a domingo) con al menos una
-        venta.
-    Cada fila trae "etiqueta" (ya lista para mostrar), "kiosko",
-    "impresiones", "tramites", "pcs", "playstation" y "total" (= kiosko +
-    impresiones + tramites + pcs + playstation). Usa `ventas.total` (no
-    venta_pagos): acá no importa el medio de pago, solo de qué negocio vino
-    cada peso.
-
-    "impresiones" es lo vendido del artículo dominio.CODIGO_ARTICULO_IMPRESIONES
-    (se saca de venta_detalle) y "tramites" lo cobrado por trámites (se saca
-    de tramites_venta, ver tramites_repo). Los dos se cobran por el mostrador
-    como cualquier venta de origen Kiosko, pero acá salen en columna propia:
-    "kiosko" es el resto de las ventas de origen Kiosko, SIN ellos -- así las
-    columnas suman el total y nada se cuenta dos veces.
-    """
+    """Ventas de mercadería e impresiones por período; cada peso cuenta una vez."""
     columna_grupo = _COLUMNA_AGRUPACION[agrupar_por]
     rango = (dominio.VENTA_CONFIRMADA, *limites_de_los_dias(desde, hasta))
-
     with conexion_db() as conexion:
-        filas = conexion.execute(
+        totales = _sumar_por_clave(
+            conexion,
             f"""
-            SELECT {columna_grupo} AS clave, ventas.origen AS origen,
-                   COALESCE(SUM(ventas.total), 0) AS total
+            SELECT {columna_grupo} AS clave, COALESCE(SUM(ventas.total), 0) AS total
             FROM ventas
-            WHERE estado = ? AND fecha >= ? AND fecha < ?
-            GROUP BY clave, ventas.origen
+            WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
+            GROUP BY clave
             """,
             rango,
-        ).fetchall()
-
-        impresiones_por_clave = _sumar_por_clave(
+        )
+        impresiones = _sumar_por_clave(
             conexion,
             f"""
             SELECT {columna_grupo} AS clave, COALESCE(SUM(venta_detalle.subtotal), 0) AS total
@@ -216,194 +178,42 @@ def resumen_por_origen(desde: str, hasta: str, agrupar_por: str = "rango"):
             """,
             (dominio.CODIGO_ARTICULO_IMPRESIONES, *rango),
         )
-
-        tramites_por_clave = _sumar_por_clave(
-            conexion,
-            f"""
-            SELECT {columna_grupo} AS clave, COALESCE(SUM(ventas.total), 0) AS total
-            FROM tramites_venta
-            JOIN ventas ON ventas.id = tramites_venta.venta_id
-            WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-            GROUP BY clave
-            """,
-            rango,
-        )
-
-    totales_por_clave = {}
-    for fila in filas:
-        totales = totales_por_clave.setdefault(
-            fila["clave"], {origen: 0.0 for origen in dominio.ORIGENES_VENTA}
-        )
-        totales[fila["origen"]] = fila["total"] or 0.0
-
     if agrupar_por == "turno":
         claves = list(dominio.TURNOS)
     elif agrupar_por == "rango":
         claves = [1]
     else:
-        claves = sorted(totales_por_clave.keys())
-    for clave in claves:
-        totales_por_clave.setdefault(clave, {origen: 0.0 for origen in dominio.ORIGENES_VENTA})
-
-    resultado = []
-    for clave in claves:
-        totales = totales_por_clave[clave]
-        impresiones = round(impresiones_por_clave.get(clave, 0.0), 2)
-        tramites = round(tramites_por_clave.get(clave, 0.0), 2)
-        kiosko = round(totales[dominio.ORIGEN_KIOSKO] - impresiones - tramites, 2)
-        pcs = totales[dominio.ORIGEN_ALQUILER_PCS]
-        playstation = totales[dominio.ORIGEN_PLAYSTATION]
-        resultado.append({
+        claves = sorted(totales)
+    return [
+        {
             "etiqueta": _etiqueta_agrupacion(clave, agrupar_por),
-            "kiosko": kiosko,
-            "impresiones": impresiones,
-            "tramites": tramites,
-            "pcs": pcs,
-            "playstation": playstation,
-            "total": kiosko + impresiones + tramites + pcs + playstation,
-        })
-    return resultado
+            "kiosko": round(totales.get(clave, 0.0) - impresiones.get(clave, 0.0), 2),
+            "impresiones": round(impresiones.get(clave, 0.0), 2),
+            "total": round(totales.get(clave, 0.0), 2),
+        }
+        for clave in claves
+    ]
 
 
 def ranking_ventas(desde: str, hasta: str, ordenar_por: str = "cantidad"):
-    """
-    Ranking de TODO lo que se vendió entre dos fechas -- artículos de
-    kiosko, bonos de tiempo de walk-ins, bonos de socios, cargas de saldo
-    por tarifa, trámites y bonos de la PlayStation 5 -- con la cantidad
-    total vendida y el importe total facturado de cada uno. `ordenar_por`
-    puede ser "cantidad" o "monto".
-
-    Un artículo de kiosko deja su fila en venta_detalle, pero un bono, una
-    carga de saldo o un trámite se registran sin detalle (ver
-    ventas_repo.registrar_venta_sin_detalle): para saber QUÉ se vendió
-    hay que ir a sesion_bonos (bono de PC), movimientos_saldo_miembro
-    (bono de socio o carga por tarifa, distinguidos por si el movimiento
-    de tipo 'CARGA' trae bono_id o no -- ver
-    miembros_repo.cargar_saldo_por_monto/_por_bono), tramites_venta
-    (trámite, agrupado por el nombre que tenía al cobrarse),
-    sesion_playstation_bonos (bono de la consola) o sesion_pcstream_bonos
-    (bono de la PC de streaming). Las siete fuentes se
-    traen con UNION ALL y se ordenan juntas al final, para que el dueño
-    vea en un solo ranking qué es lo que más funciona de cualquiera de los
-    rubros.
-    """
+    """Artículos vendidos, agrupados por código y descripción cobrados."""
     columna_orden = "cantidad" if ordenar_por == "cantidad" else "importe"
     rango = (dominio.VENTA_CONFIRMADA, *limites_de_los_dias(desde, hasta))
-
     with conexion_db() as conexion:
         return conexion.execute(
             f"""
-            SELECT categoria, codigo, descripcion, cantidad, importe FROM (
-                SELECT
-                    ? AS categoria,
-                    venta_detalle.articulo_codigo AS codigo,
-                    venta_detalle.descripcion AS descripcion,
-                    SUM(venta_detalle.cantidad) AS cantidad,
-                    SUM(venta_detalle.subtotal) AS importe
-                FROM venta_detalle
-                JOIN ventas ON ventas.id = venta_detalle.venta_id
-                WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                GROUP BY venta_detalle.articulo_codigo, venta_detalle.descripcion
-
-                UNION ALL
-
-                SELECT
-                    ? AS categoria,
-                    '' AS codigo,
-                    bonos_tiempo.nombre AS descripcion,
-                    COUNT(*) AS cantidad,
-                    SUM(sesion_bonos.precio) AS importe
-                FROM sesion_bonos
-                JOIN bonos_tiempo ON bonos_tiempo.id = sesion_bonos.bono_id
-                JOIN ventas ON ventas.id = sesion_bonos.venta_id
-                WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                GROUP BY bonos_tiempo.id, bonos_tiempo.nombre
-
-                UNION ALL
-
-                SELECT
-                    ? AS categoria,
-                    '' AS codigo,
-                    bonos_miembro.nombre AS descripcion,
-                    COUNT(*) AS cantidad,
-                    SUM(ventas.total) AS importe
-                FROM movimientos_saldo_miembro
-                JOIN bonos_miembro ON bonos_miembro.id = movimientos_saldo_miembro.bono_id
-                JOIN ventas ON ventas.id = movimientos_saldo_miembro.venta_id
-                WHERE movimientos_saldo_miembro.tipo = ?
-                  AND ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                GROUP BY bonos_miembro.id, bonos_miembro.nombre
-
-                UNION ALL
-
-                SELECT
-                    ? AS categoria,
-                    '' AS codigo,
-                    ? AS descripcion,
-                    COUNT(*) AS cantidad,
-                    SUM(ventas.total) AS importe
-                FROM movimientos_saldo_miembro
-                JOIN ventas ON ventas.id = movimientos_saldo_miembro.venta_id
-                WHERE movimientos_saldo_miembro.tipo = ?
-                  AND movimientos_saldo_miembro.bono_id IS NULL
-                  AND ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                HAVING COUNT(*) > 0
-
-                UNION ALL
-
-                SELECT
-                    ? AS categoria,
-                    '' AS codigo,
-                    tramites_venta.descripcion AS descripcion,
-                    COUNT(*) AS cantidad,
-                    SUM(ventas.total) AS importe
-                FROM tramites_venta
-                JOIN ventas ON ventas.id = tramites_venta.venta_id
-                WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                GROUP BY tramites_venta.tramite_id, tramites_venta.descripcion
-
-                UNION ALL
-
-                SELECT
-                    ? AS categoria,
-                    '' AS codigo,
-                    bonos_playstation.nombre AS descripcion,
-                    COUNT(*) AS cantidad,
-                    SUM(sesion_playstation_bonos.precio) AS importe
-                FROM sesion_playstation_bonos
-                JOIN bonos_playstation ON bonos_playstation.id = sesion_playstation_bonos.bono_id
-                JOIN ventas ON ventas.id = sesion_playstation_bonos.venta_id
-                WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                GROUP BY bonos_playstation.id, bonos_playstation.nombre
-
-                UNION ALL
-
-                SELECT
-                    ? AS categoria,
-                    '' AS codigo,
-                    bonos_pcstream.nombre AS descripcion,
-                    COUNT(*) AS cantidad,
-                    SUM(sesion_pcstream_bonos.precio) AS importe
-                FROM sesion_pcstream_bonos
-                JOIN bonos_pcstream ON bonos_pcstream.id = sesion_pcstream_bonos.bono_id
-                JOIN ventas ON ventas.id = sesion_pcstream_bonos.venta_id
-                WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-                GROUP BY bonos_pcstream.id, bonos_pcstream.nombre
-            )
-            ORDER BY {columna_orden} DESC
+            SELECT ? AS categoria, venta_detalle.articulo_codigo AS codigo,
+                   venta_detalle.descripcion AS descripcion,
+                   SUM(venta_detalle.cantidad) AS cantidad,
+                   SUM(venta_detalle.subtotal) AS importe
+            FROM venta_detalle
+            JOIN ventas ON ventas.id = venta_detalle.venta_id
+            WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
+            GROUP BY venta_detalle.articulo_codigo, venta_detalle.descripcion
+            ORDER BY {columna_orden} DESC, descripcion
             """,
-            (
-                CATEGORIA_KIOSKO, *rango,
-                CATEGORIA_BONO_PC, *rango,
-                CATEGORIA_BONO_SOCIO, dominio.MOVIMIENTO_CARGA, *rango,
-                CATEGORIA_CARGA_TARIFA_SOCIO, CATEGORIA_CARGA_TARIFA_SOCIO,
-                dominio.MOVIMIENTO_CARGA, *rango,
-                CATEGORIA_TRAMITE, *rango,
-                CATEGORIA_BONO_PLAYSTATION, *rango,
-                CATEGORIA_BONO_PCSTREAM, *rango,
-            ),
+            (CATEGORIA_KIOSKO, *rango),
         ).fetchall()
-
 
 # ---------------------------------------------------------------------
 # Por Operador: quién vendió qué y a qué hora
@@ -476,8 +286,7 @@ def ventas_de_operador(usuario_id: int, desde: str, hasta: str):
     (las anuladas también, con su estado, para que se vea que existieron). Cada
     fila trae "id", "fecha" (con la hora, tal como se grabó), "turno", "origen",
     "estado", "total", "efectivo", "digital" y "concepto": qué se vendió, en
-    corto -- los artículos de kiosko ("2 x Coca 500"), el nombre del trámite, o
-    nada para un bono (la pantalla muestra el origen).
+    corto -- los artículos de kiosko ("2 x Coca 500").
     """
     with conexion_db() as conexion:
         return [dict(fila) for fila in conexion.execute(
@@ -488,12 +297,8 @@ def ventas_de_operador(usuario_id: int, desde: str, hasta: str):
                              WHERE venta_id = ventas.id AND metodo = ?), 0) AS efectivo,
                    COALESCE((SELECT SUM(monto) FROM venta_pagos
                              WHERE venta_id = ventas.id AND metodo = ?), 0) AS digital,
-                   COALESCE(
-                       (SELECT 'Trámite: ' || descripcion FROM tramites_venta WHERE venta_id = ventas.id),
-                       (SELECT GROUP_CONCAT(cantidad || ' x ' || descripcion, ', ')
-                        FROM venta_detalle WHERE venta_id = ventas.id),
-                       ''
-                   ) AS concepto
+                    COALESCE((SELECT GROUP_CONCAT(cantidad || ' x ' || descripcion, ', ')
+                              FROM venta_detalle WHERE venta_id = ventas.id), '') AS concepto
             FROM ventas
             WHERE ventas.usuario_id = ?
               AND ventas.fecha >= ? AND ventas.fecha < ?
@@ -501,3 +306,4 @@ def ventas_de_operador(usuario_id: int, desde: str, hasta: str):
             """,
             (dominio.PAGO_EFECTIVO, dominio.PAGO_DIGITAL, usuario_id, *limites_de_los_dias(desde, hasta)),
         )]
+

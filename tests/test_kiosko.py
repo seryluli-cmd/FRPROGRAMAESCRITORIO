@@ -22,10 +22,9 @@ import database
 import dominio
 import turnos
 from repositories import (
-    articulos_repo, compras_repo, config_repo, reportes_repo, tramites_repo, turnos_repo, usuarios_repo,
+    articulos_repo, compras_repo, reportes_repo, turnos_repo, usuarios_repo,
     ventas_repo,
 )
-from control_pcs.repositories import bonos_miembro_repo, miembros_repo, pcs_repo
 from base import BaseConBaseTemporal
 
 
@@ -120,87 +119,10 @@ class TestSubtotalDeLinea(unittest.TestCase):
         self.assertEqual(ventas_repo.total_carrito([]), 0)
 
 
-class TestTarifaHoraParaMonto(unittest.TestCase):
-    """dominio.tarifa_hora_para_monto: qué tarifa $/hora corresponde a un
-    monto cargado, según la tabla de tramos que reemplazó a la tarifa
-    única de Socios (pedido del dueño, 2026-09-30, para poder cobrar
-    distinto según cuánta plata carga el socio de una vez)."""
-
-    def test_usa_el_tramo_mas_alto_que_no_supera_el_monto(self):
-        tramos = [
-            {"monto_minimo": 0, "tarifa_hora": 1000},
-            {"monto_minimo": 5000, "tarifa_hora": 800},
-            {"monto_minimo": 10000, "tarifa_hora": 600},
-        ]
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 4999), 1000)
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 5000), 800)
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 9999), 800)
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 15000), 600)
-
-    def test_no_asume_que_el_tramo_mas_caro_es_el_de_mas_plata(self):
-        # El dueño puede cargar los tramos en cualquier relación de
-        # precios, no necesariamente "cuanto más plata, más barato".
-        tramos = [
-            {"monto_minimo": 0, "tarifa_hora": 800},
-            {"monto_minimo": 5000, "tarifa_hora": 1500},
-        ]
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 100), 800)
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 6000), 1500)
-
-    def test_monto_menor_al_tramo_mas_bajo_usa_igual_esa_tarifa(self):
-        tramos = [{"monto_minimo": 5000, "tarifa_hora": 800}]
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 100), 800)
-
-    def test_no_depende_del_orden_en_que_vienen_los_tramos(self):
-        tramos = [
-            {"monto_minimo": 10000, "tarifa_hora": 600},
-            {"monto_minimo": 0, "tarifa_hora": 1000},
-            {"monto_minimo": 5000, "tarifa_hora": 800},
-        ]
-        self.assertEqual(dominio.tarifa_hora_para_monto(tramos, 7000), 800)
 
 
-class TestCargaMinimaDeSaldo(unittest.TestCase):
-    """dominio.carga_minima_de_saldo: el monto del tramo más bajo es lo mínimo
-    que se puede cargar (pedido del dueño, 2026-10-17)."""
-
-    def test_es_el_monto_del_tramo_mas_bajo_sin_importar_el_orden(self):
-        tramos = [
-            {"monto_minimo": 20000, "tarifa_hora": 900},
-            {"monto_minimo": 13000, "tarifa_hora": 1000},
-        ]
-        self.assertEqual(dominio.carga_minima_de_saldo(tramos), 13000)
-
-    def test_un_tramo_desde_cero_no_pone_minimo(self):
-        tramos = [{"monto_minimo": 0, "tarifa_hora": 1000}, {"monto_minimo": 5000, "tarifa_hora": 800}]
-        self.assertEqual(dominio.carga_minima_de_saldo(tramos), 0)
 
 
-class TestValidarTramosTarifaHoraMiembro(unittest.TestCase):
-    def test_lista_vacia_no_es_valida(self):
-        with self.assertRaises(ValueError):
-            dominio.validar_tramos_tarifa_hora_miembro([])
-
-    def test_monto_minimo_negativo_no_es_valido(self):
-        with self.assertRaises(ValueError):
-            dominio.validar_tramos_tarifa_hora_miembro([{"monto_minimo": -1, "tarifa_hora": 1000}])
-
-    def test_tarifa_cero_o_negativa_no_es_valida(self):
-        with self.assertRaises(ValueError):
-            dominio.validar_tramos_tarifa_hora_miembro([{"monto_minimo": 0, "tarifa_hora": 0}])
-
-    def test_dos_tramos_con_el_mismo_monto_minimo_no_es_valido(self):
-        with self.assertRaises(ValueError):
-            dominio.validar_tramos_tarifa_hora_miembro([
-                {"monto_minimo": 0, "tarifa_hora": 1000},
-                {"monto_minimo": 0, "tarifa_hora": 800},
-            ])
-
-    def test_tramos_validos_no_tira_error(self):
-        dominio.validar_tramos_tarifa_hora_miembro([
-            {"monto_minimo": 0, "tarifa_hora": 1000},
-            {"monto_minimo": 5000, "tarifa_hora": 800},
-        ])
 
 
 class TestEsAdmin(unittest.TestCase):
@@ -466,43 +388,9 @@ class TestPermisosDeEmpleada(BaseConBaseTemporal):
             self.assertFalse(usuarios_repo.tiene_permiso(usuario, columna))
 
 
-class TestMigracionColumnasPermisos(BaseConBaseTemporal):
-    def test_agrega_columnas_permiso_a_una_tabla_usuarios_vieja(self):
-        # Simula una base creada antes de que existieran los permisos
-        # por empleada: la tabla usuarios sin las columnas permiso_*.
-        with database.conexion_db() as conexion:
-            conexion.execute("DROP TABLE usuarios")
-            conexion.execute("""
-                CREATE TABLE usuarios (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nombre          TEXT NOT NULL,
-                    clave_hash      TEXT NOT NULL,
-                    rol             TEXT NOT NULL,
-                    activo          INTEGER NOT NULL DEFAULT 1,
-                    fecha_creacion  TEXT NOT NULL
-                )
-            """)
-            conexion.execute(
-                "INSERT INTO usuarios (nombre, clave_hash, rol, activo, fecha_creacion) VALUES (?, ?, ?, ?, ?)",
-                ("Vieja", "hash", "EMPLEADA", 1, "2026-01-01T00:00:00"),
-            )
-
-            database._migrar_columnas_permisos(conexion)
-
-            columnas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(usuarios)")}
-            for columna, _ in usuarios_repo.PERMISOS_EMPLEADA:
-                self.assertIn(columna, columnas)
-
-            # La fila que ya existía no se pierde, y sus permisos nuevos
-            # arrancan en 0 (no rompe nada, no le da acceso de más a nadie).
-            fila = conexion.execute("SELECT * FROM usuarios WHERE nombre = 'Vieja'").fetchone()
-            for columna, _ in usuarios_repo.PERMISOS_EMPLEADA:
-                self.assertEqual(fila[columna], 0)
-
-
 class TestExigirAdmin(BaseConBaseTemporal):
     """usuarios_repo.exigir_admin: la única forma de pedir "solo un Admin" en un
-    repo (la usan, entre otros, los bonos de la PlayStation 5 y ORDENAR Stock)."""
+    repo (la usa, entre otros, la operación ORDENAR Stock)."""
 
     def test_un_admin_activo_pasa_y_devuelve_su_fila(self):
         admin = usuarios_repo.crear_usuario("Jefa", "1234", dominio.ROL_ADMIN)
@@ -653,137 +541,6 @@ class TestVentasYStock(BaseConBaseTemporal):
         self.assertEqual(venta["total"], 100.0)
 
 
-class TestTramites(BaseConBaseTemporal):
-    """tramites_repo: el catálogo que arma el Admin y el cobro de un trámite
-    con monto libre (una venta más, origen KIOSKO, sin artículo)."""
-
-    def setUp(self):
-        super().setUp()
-        self.usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self.boleta_id = tramites_repo.crear_tramite("Sacar boleta de luz")
-
-    def _cobrar(self, monto=2500.0, tramite_id=None, pagos=None):
-        return tramites_repo.registrar_tramite(
-            self.usuario_id, tramite_id or self.boleta_id, monto,
-            pagos if pagos is not None else [{"metodo": "EFECTIVO", "monto": monto}],
-        )
-
-    # --- catálogo ---
-
-    def test_el_catalogo_se_lista_ordenado_y_sin_los_dados_de_baja(self):
-        tramites_repo.crear_tramite("anses clave")
-        baja_id = tramites_repo.crear_tramite("Pagar patente")
-        tramites_repo.desactivar_tramite(baja_id)
-
-        nombres = [t["nombre"] for t in tramites_repo.listar_tramites()]
-
-        self.assertEqual(nombres, ["anses clave", "Sacar boleta de luz"])
-
-    def test_no_deja_crear_un_tramite_vacio_ni_repetido(self):
-        with self.assertRaises(ValueError):
-            tramites_repo.crear_tramite("   ")
-        # Sin distinguir mayúsculas ni espacios de más.
-        with self.assertRaises(ValueError):
-            tramites_repo.crear_tramite("  SACAR BOLETA DE LUZ ")
-
-    def test_un_nombre_dado_de_baja_se_puede_volver_a_usar(self):
-        tramites_repo.desactivar_tramite(self.boleta_id)
-        nuevo_id = tramites_repo.crear_tramite("Sacar boleta de luz")
-
-        self.assertNotEqual(nuevo_id, self.boleta_id)
-
-    def test_renombrar_a_su_propio_nombre_no_da_error_pero_a_otro_existente_si(self):
-        otro_id = tramites_repo.crear_tramite("Otro trámite")
-        tramites_repo.modificar_tramite(self.boleta_id, "Sacar boleta de LUZ")
-        self.assertEqual(tramites_repo.obtener_tramite(self.boleta_id)["nombre"], "Sacar boleta de LUZ")
-
-        with self.assertRaises(ValueError):
-            tramites_repo.modificar_tramite(otro_id, "sacar boleta de luz")
-
-    # --- cobro ---
-
-    def test_cobrar_un_tramite_graba_una_venta_de_kiosko_sin_detalle(self):
-        venta_id = self._cobrar(2500.0)
-
-        venta, detalle, pagos = ventas_repo.buscar_venta(venta_id)
-        self.assertEqual(venta["total"], 2500.0)
-        self.assertEqual(venta["origen"], dominio.ORIGEN_KIOSKO)
-        self.assertEqual(venta["estado"], dominio.VENTA_CONFIRMADA)
-        self.assertEqual(len(detalle), 0)
-        self.assertEqual([(p["metodo"], p["monto"]) for p in pagos], [("EFECTIVO", 2500.0)])
-        self.assertEqual(tramites_repo.tramite_de_venta(venta_id), "Sacar boleta de luz")
-
-    def test_una_venta_de_kiosko_comun_no_figura_como_tramite(self):
-        articulos_repo.crear_articulo("COD1", "Producto", None, None, 100.0, 50.0, 0)
-        venta_id = ventas_repo.confirmar_venta(
-            self.usuario_id,
-            [{"codigo": "COD1", "descripcion": "Producto", "cantidad": 1, "precio_unitario": 100.0}],
-            [{"metodo": "EFECTIVO", "monto": 100.0}],
-        )
-
-        self.assertIsNone(tramites_repo.tramite_de_venta(venta_id))
-
-    def test_el_monto_es_libre_y_se_redondea_a_dos_decimales(self):
-        venta_id = self._cobrar(1234.5678, pagos=[{"metodo": "DIGITAL", "monto": 1234.5678}])
-
-        self.assertEqual(ventas_repo.buscar_venta(venta_id)[0]["total"], 1234.57)
-
-    def test_un_pago_mixto_se_reparte_en_efectivo_y_digital(self):
-        venta_id = self._cobrar(3000.0, pagos=[
-            {"metodo": "EFECTIVO", "monto": 1000.0}, {"metodo": "DIGITAL", "monto": 2000.0},
-        ])
-
-        pagos = ventas_repo.buscar_venta(venta_id)[2]
-        self.assertEqual({p["metodo"]: p["monto"] for p in pagos}, {"EFECTIVO": 1000.0, "DIGITAL": 2000.0})
-
-    def test_rechaza_monto_cero_o_negativo(self):
-        for monto in (0, -50.0):
-            with self.assertRaises(ValueError):
-                self._cobrar(monto, pagos=[{"metodo": "EFECTIVO", "monto": 100.0}])
-        self.assertEqual(ventas_repo.listar_ventas_recientes(10), [])
-
-    def test_rechaza_pagos_que_no_cubren_el_monto_y_no_graba_nada(self):
-        with self.assertRaises(ValueError):
-            self._cobrar(2500.0, pagos=[{"metodo": "EFECTIVO", "monto": 1000.0}])
-
-        self.assertEqual(ventas_repo.listar_ventas_recientes(10), [])
-
-    def test_rechaza_un_tramite_dado_de_baja_o_inexistente(self):
-        tramites_repo.desactivar_tramite(self.boleta_id)
-
-        with self.assertRaises(ValueError):
-            self._cobrar(100.0)
-        with self.assertRaises(ValueError):
-            self._cobrar(100.0, tramite_id=9999)
-        self.assertEqual(ventas_repo.listar_ventas_recientes(10), [])
-
-    def test_renombrar_el_tramite_no_cambia_el_historial(self):
-        venta_id = self._cobrar(100.0)
-        tramites_repo.modificar_tramite(self.boleta_id, "Boleta de gas")
-
-        self.assertEqual(tramites_repo.tramite_de_venta(venta_id), "Sacar boleta de luz")
-
-    # --- caja y anulación ---
-
-    def test_lo_cobrado_suma_a_la_caja_del_turno_como_kiosko(self):
-        self._cobrar(2500.0)
-        self._cobrar(500.0, pagos=[{"metodo": "DIGITAL", "monto": 500.0}])
-
-        resumen = turnos_repo.resumen_turno_actual()
-
-        self.assertEqual(resumen["ventas_efectivo"], 2500.0)
-        self.assertEqual(resumen["ventas_digital"], 500.0)
-        self.assertEqual(resumen["kiosko_efectivo"], 2500.0)
-        self.assertEqual(resumen["kiosko_digital"], 500.0)
-        self.assertEqual(resumen["pcs_efectivo"] + resumen["pcs_digital"], 0.0)
-
-    def test_anular_la_venta_la_saca_de_la_caja_y_el_trámite_queda_registrado(self):
-        venta_id = self._cobrar(2500.0)
-        ventas_repo.anular_venta(venta_id, self.usuario_id, "se equivocó")
-
-        self.assertEqual(turnos_repo.resumen_turno_actual()["ventas_efectivo"], 0.0)
-        self.assertEqual(ventas_repo.buscar_venta(venta_id)[0]["estado"], dominio.VENTA_ANULADA)
-        self.assertEqual(tramites_repo.tramite_de_venta(venta_id), "Sacar boleta de luz")
 
 
 class TestBorrarArticuloProtegido(BaseConBaseTemporal):
@@ -1100,7 +857,6 @@ class TestResumenDelDia(BaseConBaseTemporal):
         self.assertEqual(tarde["digital"], 30.0)
         self.assertEqual(tarde["total"], 50.0)
         self.assertEqual(tarde["kiosko"], 50.0)
-        self.assertEqual(tarde["pcs"], 0.0)
         self.assertEqual(tarde["responsables"], ["Pedro"])
         self.assertEqual(tarde["cantidad_ventas"], 2)
 
@@ -1186,13 +942,6 @@ class TestResumenDelDia(BaseConBaseTemporal):
                 [{"metodo": metodo, "monto": total}],
             )
 
-    def _cobrar_tramite(self, momento, monto, metodo="EFECTIVO"):
-        tramite_id = tramites_repo.crear_tramite(f"Trámite {momento.isoformat()}")
-        with mock.patch("repositories.tramites_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            return tramites_repo.registrar_tramite(
-                self.lucia_id, tramite_id, monto, [{"metodo": metodo, "monto": monto}]
-            )
 
     def _anular(self, venta_id, momento):
         """Anula la venta como si fuera `momento` (la fecha de anulación es
@@ -1201,71 +950,34 @@ class TestResumenDelDia(BaseConBaseTemporal):
             datetime_mock.now.return_value = momento
             ventas_repo.anular_venta(venta_id, self.admin_id, "Test")
 
-    def test_tramites_sale_aparte_de_kiosko_junto_con_las_impresiones(self):
-        articulos_repo.crear_articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", None, None, 150.0, 0.0, 0)
-        self._cerrar(datetime(2026, 1, 5, 6, 0))
-        self._vender(datetime(2026, 1, 5, 9, 0), 10.0)
-        self._vender_impresiones(datetime(2026, 1, 5, 10, 0), 2)                    # $300 efectivo
-        self._cobrar_tramite(datetime(2026, 1, 5, 11, 0), 2500.0)                   # efectivo
-        self._cobrar_tramite(datetime(2026, 1, 5, 12, 0), 500.0, metodo="DIGITAL")
-        self._cerrar(datetime(2026, 1, 5, 14, 5))
-        self._cobrar_tramite(datetime(2026, 1, 5, 15, 0), 1000.0)                   # Tarde, todavía abierta
-
-        resumen = self._resumen(date(2026, 1, 5), datetime(2026, 1, 5, 16, 0))
-        manana, tarde, noche = resumen["turnos"]
-
-        # Cerrada: el cierre guardó $3.310 como Kiosko; de eso, $300 son
-        # impresiones y $3.000 trámites.
-        self.assertEqual(manana["kiosko"], 10.0)
-        self.assertEqual(manana["impresiones"], 300.0)
-        self.assertEqual(manana["tramites"], 3000.0)
-        self.assertEqual(manana["total"], 3310.0)
-        self.assertEqual(manana["efectivo"], 2810.0)
-        self.assertEqual(manana["digital"], 500.0)
-        # En curso: se ve en vivo, igual que el resto de la plata.
-        self.assertEqual(tarde["estado"], turnos_repo.ESTADO_EN_CURSO)
-        self.assertEqual(tarde["kiosko"], 0.0)
-        self.assertEqual(tarde["tramites"], 1000.0)
-        self.assertEqual(noche["tramites"], 0.0)
-
-        total = resumen["total"]
-        self.assertEqual(total["tramites"], 4000.0)
-        self.assertEqual(total["kiosko"] + total["impresiones"] + total["tramites"] + total["pcs"], total["total"])
 
     def test_una_venta_anulada_despues_del_cierre_sigue_en_su_columna(self):
-        # El cierre es una foto: la venta anulada DESPUÉS sigue sumada en el
-        # importe de Kiosko que guardó. Si acá se la dejara de contar como
-        # impresiones/trámite, esos pesos pasarían a verse como "Kiosko".
+        # El cierre es una foto: la venta anulada después sigue sumada en
+        # Impresiones aunque se anule más tarde.
         articulos_repo.crear_articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", None, None, 150.0, 0.0, 0)
         self._cerrar(datetime(2026, 1, 5, 6, 0))
         venta_impresiones = self._vender_impresiones(datetime(2026, 1, 5, 9, 0), 2)
-        venta_tramite = self._cobrar_tramite(datetime(2026, 1, 5, 10, 0), 2500.0)
         self._cerrar(datetime(2026, 1, 5, 14, 5))
         self._anular(venta_impresiones, datetime(2026, 1, 5, 18, 0))
-        self._anular(venta_tramite, datetime(2026, 1, 5, 18, 5))
 
         manana = self._resumen(date(2026, 1, 5), datetime(2026, 1, 5, 19, 0))["turnos"][0]
 
-        self.assertEqual(manana["total"], 2800.0)
+        self.assertEqual(manana["total"], 300.0)
         self.assertEqual(manana["impresiones"], 300.0)
-        self.assertEqual(manana["tramites"], 2500.0)
         self.assertEqual(manana["kiosko"], 0.0)
-        self.assertEqual(manana["cantidad_anuladas"], 2)
+        self.assertEqual(manana["cantidad_anuladas"], 1)
 
     def test_una_venta_anulada_antes_del_cierre_no_figura_en_ninguna_columna(self):
         articulos_repo.crear_articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", None, None, 150.0, 0.0, 0)
         self._cerrar(datetime(2026, 1, 5, 6, 0))
         venta_impresiones = self._vender_impresiones(datetime(2026, 1, 5, 9, 0), 2)
-        venta_tramite = self._cobrar_tramite(datetime(2026, 1, 5, 10, 0), 2500.0)
         self._anular(venta_impresiones, datetime(2026, 1, 5, 11, 0))
-        self._anular(venta_tramite, datetime(2026, 1, 5, 11, 5))
         self._cerrar(datetime(2026, 1, 5, 14, 5))
 
         manana = self._resumen(date(2026, 1, 5), datetime(2026, 1, 5, 19, 0))["turnos"][0]
 
         self.assertEqual(manana["total"], 0.0)
         self.assertEqual(manana["impresiones"], 0.0)
-        self.assertEqual(manana["tramites"], 0.0)
         self.assertEqual(manana["kiosko"], 0.0)
 
     def test_impresiones_sale_aparte_de_kiosko_en_turnos_cerrados_y_en_curso(self):
@@ -1295,7 +1007,7 @@ class TestResumenDelDia(BaseConBaseTemporal):
 
         total = resumen["total"]
         self.assertEqual(total["impresiones"], 1050.0)
-        self.assertEqual(total["kiosko"] + total["impresiones"] + total["pcs"], total["total"])
+        self.assertEqual(total["kiosko"] + total["impresiones"], total["total"])
 
     def test_el_resumen_del_turno_en_curso_trae_las_impresiones_sin_sacarlas_de_kiosko(self):
         # Cierre de Turno le muestra al dueño cuánto se vendió en Impresiones, pero
@@ -1309,20 +1021,17 @@ class TestResumenDelDia(BaseConBaseTemporal):
         self._vender_impresiones(datetime(2026, 1, 5, 9, 0), 1, metodo="DIGITAL")   # $150 digital
         anulada = self._vender_impresiones(datetime(2026, 1, 5, 9, 30), 4)
         self._anular(anulada, datetime(2026, 1, 5, 9, 40))                          # anulada: no cuenta
-        self._cobrar_tramite(datetime(2026, 1, 5, 9, 45), 2500.0)                   # trámite en efectivo
-
         with mock.patch("repositories.turnos_repo.datetime") as datetime_mock:
             datetime_mock.now.return_value = datetime(2026, 1, 5, 10, 0)
             datetime_mock.fromisoformat = datetime.fromisoformat
             resumen = turnos_repo.resumen_turno_actual()
 
         self.assertEqual(resumen["impresiones"], 450.0)
-        self.assertEqual(resumen["tramites"], 2500.0)
-        self.assertEqual(resumen["kiosko_efectivo"], 2810.0)
+        self.assertEqual(resumen["kiosko_efectivo"], 310.0)
         self.assertEqual(resumen["kiosko_digital"], 150.0)
-        self.assertEqual(resumen["ventas_efectivo"], 2810.0)
-        # El TOTAL es efectivo + digital: ni las impresiones ni los trámites se suman otra vez.
-        self.assertEqual(resumen["ventas_total"], 2960.0)
+        self.assertEqual(resumen["ventas_efectivo"], 310.0)
+        # Impresiones es un desglose de Kiosko: no se suma otra vez.
+        self.assertEqual(resumen["ventas_total"], 460.0)
 
     def test_cuenta_las_ventas_anuladas_aparte_y_no_las_suma_al_total(self):
         self._cerrar(datetime(2026, 1, 5, 6, 0))
@@ -1513,733 +1222,61 @@ class TestResumenPorTurno(BaseConBaseTemporal):
         self.assertEqual(por_turno["NOCHE"]["cantidad_ventas"], 0)
 
 
-class TestResumenPorOrigen(BaseConBaseTemporal):
-    """reportes_repo.resumen_por_origen: desglose Kiosko vs. Alquiler de
-    PCs por turno/día/semana/rango, para la pestaña "Totales" de
-    Reportes."""
-
-    def _preparar_articulo(self, usuario_id):
-        articulos_repo.crear_articulo("COD9", "Producto", None, None, 100.0, 50.0, 0)
-        compras_repo.registrar_compra(usuario_id, [{"codigo": "COD9", "cantidad": 1000, "costo_unitario": 50.0}])
-
-    def _vender_kiosko(self, usuario_id, momento, monto=100.0):
-        with mock.patch("repositories.ventas_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            ventas_repo.confirmar_venta(
-                usuario_id,
-                [{"codigo": "COD9", "descripcion": "Producto", "cantidad": 1, "precio_unitario": monto}],
-                [{"metodo": "EFECTIVO", "monto": monto}],
-            )
-
-    def _preparar_impresiones(self):
-        # El artículo que los reportes muestran como renglón aparte. No hace
-        # falta cargar stock: puede quedar negativo (ver CLAUDE.md).
-        articulos_repo.crear_articulo(
-            dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", None, None, 150.0, 0.0, 0
-        )
-
-    def _vender_impresiones(self, usuario_id, momento, cantidad, con_producto=False):
-        """Vende `cantidad` impresiones a $150 (más un COD9 de $100 si
-        `con_producto`) pagado en efectivo. Devuelve el id de la venta."""
-        lineas = [{"codigo": dominio.CODIGO_ARTICULO_IMPRESIONES, "descripcion": "IMPRESIONES",
-                   "cantidad": cantidad, "precio_unitario": 150.0}]
-        if con_producto:
-            lineas.append({"codigo": "COD9", "descripcion": "Producto", "cantidad": 1, "precio_unitario": 100.0})
-        total = ventas_repo.total_carrito(lineas)
-        with mock.patch("repositories.ventas_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            return ventas_repo.confirmar_venta(usuario_id, lineas, [{"metodo": "EFECTIVO", "monto": total}])
-
-    def _cobrar_tramite(self, usuario_id, momento, monto, tramite_id=None):
-        """Cobra un trámite de `monto` en efectivo en el momento dado (si no
-        se pasa `tramite_id`, crea uno nuevo). Devuelve el id de la venta."""
-        if tramite_id is None:
-            tramite_id = tramites_repo.crear_tramite(f"Trámite {momento.isoformat()}")
-        with mock.patch("repositories.tramites_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            return tramites_repo.registrar_tramite(
-                usuario_id, tramite_id, monto, [{"metodo": "EFECTIVO", "monto": monto}]
-            )
-
-    def _vender_pcs(self, usuario_id, momento, monto=200.0):
-        # Estación y bono nuevos por venta -- evita depender de la lógica
-        # de "extender sesión existente" de asignar_bono, que no viene al
-        # caso acá (solo interesa que la plata quede clasificada ALQUILER_PCS).
-        estacion_id = pcs_repo.crear_estacion(f"PC {momento.isoformat()}")
-        bono_id = pcs_repo.crear_bono(f"Bono {momento.isoformat()}", 60, monto)
-        with mock.patch("control_pcs.repositories.pcs_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            pcs_repo.asignar_bono(estacion_id, bono_id, usuario_id, [{"metodo": "EFECTIVO", "monto": monto}])
-
-    def test_rango_separa_kiosko_de_pcs(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_articulo(usuario_id)
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 100.0)
-        self._vender_pcs(usuario_id, datetime(2026, 1, 5, 9, 0, 0), 3000.0)
-
-        filas = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "rango")
-
-        self.assertEqual(filas, [{"etiqueta": "Total del período", "kiosko": 100.0, "impresiones": 0.0,
-                                  "tramites": 0.0, "pcs": 3000.0, "playstation": 0.0, "total": 3100.0}])
-
-    def test_rango_sin_ventas_devuelve_una_fila_en_cero(self):
-        filas = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "rango")
-
-        self.assertEqual(filas, [{"etiqueta": "Total del período", "kiosko": 0.0, "impresiones": 0.0,
-                                  "tramites": 0.0, "pcs": 0.0, "playstation": 0.0, "total": 0.0}])
-
-    def test_impresiones_sale_aparte_de_kiosko_aunque_se_vendan_en_la_misma_venta(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_articulo(usuario_id)
-        self._preparar_impresiones()
-        self._vender_pcs(usuario_id, datetime(2026, 1, 5, 7, 0, 0), 3000.0)
-        # Una venta con un producto ($100) y 3 impresiones ($450) juntos, y
-        # otra con solo 2 impresiones ($300).
-        self._vender_impresiones(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 3, con_producto=True)
-        self._vender_impresiones(usuario_id, datetime(2026, 1, 5, 9, 0, 0), 2)
-
-        fila = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "rango")[0]
-
-        self.assertEqual(fila["kiosko"], 100.0)
-        self.assertEqual(fila["impresiones"], 750.0)
-        self.assertEqual(fila["pcs"], 3000.0)
-        # Las tres columnas suman lo facturado: nada se cuenta dos veces ni se pierde.
-        self.assertEqual(fila["total"], 3850.0)
-        self.assertEqual(fila["total"], reportes_repo.resumen_ventas("2026-01-05", "2026-01-05")["total"])
-
-    def test_impresiones_se_separa_tambien_por_turno_y_por_dia(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_impresiones()
-        self._vender_impresiones(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 1)    # lunes, Mañana
-        self._vender_impresiones(usuario_id, datetime(2026, 1, 6, 15, 0, 0), 2)   # martes, Tarde
-
-        por_turno = {f["etiqueta"]: f for f in reportes_repo.resumen_por_origen("2026-01-05", "2026-01-06", "turno")}
-        self.assertEqual(por_turno["Mañana"]["impresiones"], 150.0)
-        self.assertEqual(por_turno["Tarde"]["impresiones"], 300.0)
-        self.assertEqual(por_turno["Noche"]["impresiones"], 0.0)
-        self.assertEqual(por_turno["Tarde"]["kiosko"], 0.0)
-
-        por_dia = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-06", "dia")
-        self.assertEqual([f["impresiones"] for f in por_dia], [150.0, 300.0])
-
-    def test_una_venta_anulada_de_impresiones_no_cuenta(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_impresiones()
-        venta_id = self._vender_impresiones(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 4)
-        ventas_repo.anular_venta(venta_id, usuario_id, "Test")
-
-        fila = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "rango")[0]
-
-        self.assertEqual(fila["impresiones"], 0.0)
-        self.assertEqual(fila["total"], 0.0)
-
-    def test_tramites_sale_aparte_de_kiosko_impresiones_y_pcs(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_articulo(usuario_id)
-        self._preparar_impresiones()
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 100.0)
-        self._vender_impresiones(usuario_id, datetime(2026, 1, 5, 9, 0, 0), 2)           # $300
-        self._cobrar_tramite(usuario_id, datetime(2026, 1, 5, 10, 0, 0), 2500.0)
-        self._cobrar_tramite(usuario_id, datetime(2026, 1, 5, 11, 0, 0), 500.0)
-        self._vender_pcs(usuario_id, datetime(2026, 1, 5, 12, 0, 0), 3000.0)
-
-        fila = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "rango")[0]
-
-        self.assertEqual(fila["kiosko"], 100.0)
-        self.assertEqual(fila["impresiones"], 300.0)
-        self.assertEqual(fila["tramites"], 3000.0)
-        self.assertEqual(fila["pcs"], 3000.0)
-        # Las cuatro columnas suman lo facturado: nada se cuenta dos veces ni se pierde.
-        self.assertEqual(fila["total"], 6400.0)
-        self.assertEqual(fila["total"], reportes_repo.resumen_ventas("2026-01-05", "2026-01-05")["total"])
-
-    def test_tramites_se_separa_tambien_por_turno_dia_y_semana(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        boleta_id = tramites_repo.crear_tramite("Sacar boleta de luz")
-        self._cobrar_tramite(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 1000.0, boleta_id)    # lunes, Mañana
-        self._cobrar_tramite(usuario_id, datetime(2026, 1, 6, 15, 0, 0), 2000.0, boleta_id)   # martes, Tarde
-        self._cobrar_tramite(usuario_id, datetime(2026, 1, 12, 8, 0, 0), 4000.0, boleta_id)   # lunes siguiente
-
-        por_turno = {f["etiqueta"]: f for f in reportes_repo.resumen_por_origen("2026-01-05", "2026-01-06", "turno")}
-        self.assertEqual(por_turno["Mañana"]["tramites"], 1000.0)
-        self.assertEqual(por_turno["Tarde"]["tramites"], 2000.0)
-        self.assertEqual(por_turno["Noche"]["tramites"], 0.0)
-        self.assertEqual(por_turno["Mañana"]["kiosko"], 0.0)
-
-        por_dia = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-06", "dia")
-        self.assertEqual([f["tramites"] for f in por_dia], [1000.0, 2000.0])
-
-        por_semana = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-12", "semana")
-        self.assertEqual([f["tramites"] for f in por_semana], [3000.0, 4000.0])
-
-    def test_un_tramite_anulado_no_cuenta(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        venta_id = self._cobrar_tramite(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 2500.0)
-        ventas_repo.anular_venta(venta_id, usuario_id, "Test")
-
-        fila = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "rango")[0]
-
-        self.assertEqual(fila["tramites"], 0.0)
-        self.assertEqual(fila["kiosko"], 0.0)
-        self.assertEqual(fila["total"], 0.0)
-
-    def test_turno_siempre_devuelve_los_tres_aunque_falten_ventas(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_articulo(usuario_id)
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 100.0)  # Mañana
-
-        filas = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-05", "turno")
-        por_turno = {f["etiqueta"]: f for f in filas}
-
-        self.assertEqual(set(por_turno.keys()), {"Mañana", "Tarde", "Noche"})
-        self.assertEqual(por_turno["Mañana"]["kiosko"], 100.0)
-        self.assertEqual(por_turno["Tarde"]["total"], 0.0)
-        self.assertEqual(por_turno["Noche"]["total"], 0.0)
-
-    def test_dia_una_fila_por_cada_dia_con_ventas(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_articulo(usuario_id)
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 100.0)
-        self._vender_pcs(usuario_id, datetime(2026, 1, 6, 9, 0, 0), 3000.0)
-
-        filas = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-06", "dia")
-
-        self.assertEqual([f["etiqueta"] for f in filas], ["05/01/2026", "06/01/2026"])
-        self.assertEqual(filas[0]["kiosko"], 100.0)
-        self.assertEqual(filas[0]["pcs"], 0.0)
-        self.assertEqual(filas[1]["pcs"], 3000.0)
-
-    def test_semana_junta_lunes_a_domingo_y_corta_en_el_lunes_siguiente(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        self._preparar_articulo(usuario_id)
-        # 2026-01-05 es lunes; 2026-01-11 es domingo de la misma semana;
-        # 2026-01-12 ya es lunes de la semana siguiente.
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 5, 8, 0, 0), 100.0)
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 11, 8, 0, 0), 50.0)
-        self._vender_kiosko(usuario_id, datetime(2026, 1, 12, 8, 0, 0), 25.0)
-
-        filas = reportes_repo.resumen_por_origen("2026-01-05", "2026-01-12", "semana")
-
-        self.assertEqual(len(filas), 2)
-        self.assertEqual(filas[0]["etiqueta"], "Semana del 05/01 al 11/01/2026")
-        self.assertEqual(filas[0]["kiosko"], 150.0)
-        self.assertEqual(filas[1]["etiqueta"], "Semana del 12/01 al 18/01/2026")
-        self.assertEqual(filas[1]["kiosko"], 25.0)
 
 
 class TestRankingVentas(BaseConBaseTemporal):
-    """reportes_repo.ranking_ventas: el Ranking de Ventas tiene que traer
-    las CINCO fuentes de venta del programa (artículo de kiosko, bono de
-    PC walk-in, bono de socio, carga de saldo por tarifa, trámite), no solo
-    los artículos -- pedido explícito del dueño (2026-09-30) para poder ver
-    en un solo lugar qué es lo que más funciona de cada negocio."""
+    """El ranking de artículos cuenta solo ventas confirmadas de Kiosko."""
 
     def setUp(self):
         super().setUp()
         self.usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        # El día del LOCAL de las ventas que graba cada prueba (ahora mismo), no el
-        # calendario: de 00:00 a 06:00 todavía es el día anterior (ver
-        # turnos.HORA_CAMBIO_DE_DIA) y con date.today() el ranking salía vacío.
         self.hoy = turnos.dia_en_que_empezo_el_turno(datetime.now()).isoformat()
 
     def _ranking(self, ordenar_por="cantidad"):
-        return {f["descripcion"]: f for f in reportes_repo.ranking_ventas(self.hoy, self.hoy, ordenar_por)}
+        return reportes_repo.ranking_ventas(self.hoy, self.hoy, ordenar_por)
 
-    def test_incluye_articulo_de_kiosko(self):
-        articulos_repo.crear_articulo("COD9", "Producto", None, None, 100.0, 50.0, 0)
-        compras_repo.registrar_compra(self.usuario_id, [{"codigo": "COD9", "cantidad": 10, "costo_unitario": 50.0}])
-        ventas_repo.confirmar_venta(
+    def _articulo(self, codigo, nombre, cantidad=10):
+        articulos_repo.crear_articulo(codigo, nombre, None, None, 100.0, 50.0, 0)
+        compras_repo.registrar_compra(
             self.usuario_id,
-            [{"codigo": "COD9", "descripcion": "Producto", "cantidad": 3, "precio_unitario": 100.0}],
-            [{"metodo": "EFECTIVO", "monto": 300.0}],
+            [{"codigo": codigo, "cantidad": cantidad, "costo_unitario": 50.0}],
         )
 
-        fila = self._ranking()["Producto"]
+    def _vender(self, codigo, nombre, cantidad):
+        return ventas_repo.confirmar_venta(
+            self.usuario_id,
+            [{"codigo": codigo, "descripcion": nombre, "cantidad": cantidad, "precio_unitario": 100.0}],
+            [{"metodo": "EFECTIVO", "monto": cantidad * 100.0}],
+        )
 
+    def test_incluye_articulo_de_kiosko(self):
+        self._articulo("COD9", "Producto")
+        self._vender("COD9", "Producto", 3)
+
+        fila = next(f for f in self._ranking() if f["descripcion"] == "Producto")
         self.assertEqual(fila["categoria"], reportes_repo.CATEGORIA_KIOSKO)
         self.assertEqual(fila["codigo"], "COD9")
         self.assertEqual(fila["cantidad"], 3)
         self.assertEqual(fila["importe"], 300.0)
 
-    def test_incluye_bono_de_pc_walkin(self):
-        estacion_id = pcs_repo.crear_estacion("PC 1")
-        bono_id = pcs_repo.crear_bono("3 hs", 180, 5000.0)
-        pcs_repo.asignar_bono(estacion_id, bono_id, self.usuario_id, [{"metodo": "EFECTIVO", "monto": 5000.0}])
+    def test_ordena_articulos_por_cantidad(self):
+        self._articulo("COD9", "Producto")
+        self._articulo("COD8", "Otro")
+        self._vender("COD9", "Producto", 5)
+        self._vender("COD8", "Otro", 1)
 
-        fila = self._ranking()["3 hs"]
-
-        self.assertEqual(fila["categoria"], reportes_repo.CATEGORIA_BONO_PC)
-        self.assertEqual(fila["cantidad"], 1)
-        self.assertEqual(fila["importe"], 5000.0)
-
-    def test_incluye_bono_de_socio(self):
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-        bono_id = bonos_miembro_repo.crear_bono("Combo Socio", 120, 2000.0)
-        miembros_repo.cargar_saldo_por_bono(miembro_id, bono_id, [{"metodo": "EFECTIVO", "monto": 2000.0}], self.usuario_id)
-
-        fila = self._ranking()["Combo Socio"]
-
-        self.assertEqual(fila["categoria"], reportes_repo.CATEGORIA_BONO_SOCIO)
-        self.assertEqual(fila["cantidad"], 1)
-        self.assertEqual(fila["importe"], 2000.0)
-
-    def test_incluye_carga_por_tarifa_de_socio(self):
-        # Tarifa por defecto (sin configurar): $1000/hora -- ver
-        # config_repo.obtener_tarifa_hora_miembro.
-        miembro_id = miembros_repo.crear_miembro("ana", "clave123", "Ana", "30333444", "1155556666")
-        miembros_repo.cargar_saldo_por_monto(miembro_id, 1000.0, [{"metodo": "EFECTIVO", "monto": 1000.0}], self.usuario_id)
-
-        fila = self._ranking()[reportes_repo.CATEGORIA_CARGA_TARIFA_SOCIO]
-
-        self.assertEqual(fila["categoria"], reportes_repo.CATEGORIA_CARGA_TARIFA_SOCIO)
-        self.assertEqual(fila["cantidad"], 1)
-        self.assertEqual(fila["importe"], 1000.0)
-
-    def _cobrar_tramite(self, tramite_id, monto):
-        return tramites_repo.registrar_tramite(
-            self.usuario_id, tramite_id, monto, [{"metodo": "EFECTIVO", "monto": monto}]
-        )
-
-    def test_incluye_tramites_con_su_cantidad_y_su_importe(self):
-        boleta_id = tramites_repo.crear_tramite("Sacar boleta de luz")
-        turno_id = tramites_repo.crear_tramite("Sacar turno online")
-        self._cobrar_tramite(boleta_id, 500.0)
-        self._cobrar_tramite(boleta_id, 700.0)
-        self._cobrar_tramite(turno_id, 1000.0)
-
-        ranking = self._ranking()
-
-        self.assertEqual(ranking["Sacar boleta de luz"]["categoria"], reportes_repo.CATEGORIA_TRAMITE)
-        self.assertEqual(ranking["Sacar boleta de luz"]["cantidad"], 2)
-        self.assertEqual(ranking["Sacar boleta de luz"]["importe"], 1200.0)
-        self.assertEqual(ranking["Sacar turno online"]["cantidad"], 1)
-        self.assertEqual(ranking["Sacar turno online"]["importe"], 1000.0)
-
-    def test_un_tramite_renombrado_se_lista_con_el_nombre_que_tenia_al_cobrarse(self):
-        boleta_id = tramites_repo.crear_tramite("Boleta de luz")
-        self._cobrar_tramite(boleta_id, 500.0)
-        tramites_repo.modificar_tramite(boleta_id, "Sacar boleta de luz")
-        self._cobrar_tramite(boleta_id, 700.0)
-
-        ranking = self._ranking()
-
-        self.assertEqual(ranking["Boleta de luz"]["importe"], 500.0)
-        self.assertEqual(ranking["Sacar boleta de luz"]["importe"], 700.0)
-
-    def test_un_tramite_anulado_no_figura_en_el_ranking(self):
-        boleta_id = tramites_repo.crear_tramite("Sacar boleta de luz")
-        venta_id = self._cobrar_tramite(boleta_id, 500.0)
-        ventas_repo.anular_venta(venta_id, self.usuario_id, "Test")
-
-        self.assertEqual(reportes_repo.ranking_ventas(self.hoy, self.hoy), [])
-
-    def test_no_confunde_bono_de_pc_con_bono_de_socio_del_mismo_nombre(self):
-        # Los dos catálogos son independientes (ver dominio.py) -- un
-        # mismo nombre de bono en cada uno no puede pisarse en el ranking.
-        estacion_id = pcs_repo.crear_estacion("PC 1")
-        bono_pc_id = pcs_repo.crear_bono("Combo", 180, 5000.0)
-        pcs_repo.asignar_bono(estacion_id, bono_pc_id, self.usuario_id, [{"metodo": "EFECTIVO", "monto": 5000.0}])
-
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-        bono_socio_id = bonos_miembro_repo.crear_bono("Combo", 120, 2000.0)
-        miembros_repo.cargar_saldo_por_bono(miembro_id, bono_socio_id, [{"metodo": "EFECTIVO", "monto": 2000.0}], self.usuario_id)
-
-        filas = [f for f in reportes_repo.ranking_ventas(self.hoy, self.hoy) if f["descripcion"] == "Combo"]
-
-        self.assertEqual(len(filas), 2)
-        categorias = {f["categoria"] for f in filas}
-        self.assertEqual(categorias, {reportes_repo.CATEGORIA_BONO_PC, reportes_repo.CATEGORIA_BONO_SOCIO})
-
-    def test_ordena_todas_las_categorias_juntas_por_cantidad(self):
-        articulos_repo.crear_articulo("COD9", "Producto", None, None, 100.0, 50.0, 0)
-        compras_repo.registrar_compra(self.usuario_id, [{"codigo": "COD9", "cantidad": 10, "costo_unitario": 50.0}])
-        for _ in range(5):
-            ventas_repo.confirmar_venta(
-                self.usuario_id,
-                [{"codigo": "COD9", "descripcion": "Producto", "cantidad": 1, "precio_unitario": 100.0}],
-                [{"metodo": "EFECTIVO", "monto": 100.0}],
-            )
-
-        estacion_id = pcs_repo.crear_estacion("PC 1")
-        bono_id = pcs_repo.crear_bono("3 hs", 180, 5000.0)
-        pcs_repo.asignar_bono(estacion_id, bono_id, self.usuario_id, [{"metodo": "EFECTIVO", "monto": 5000.0}])
-
-        filas = reportes_repo.ranking_ventas(self.hoy, self.hoy, "cantidad")
-
-        self.assertEqual(filas[0]["descripcion"], "Producto")
+        filas = self._ranking()
+        self.assertEqual([f["descripcion"] for f in filas], ["Producto", "Otro"])
         self.assertEqual(filas[0]["cantidad"], 5)
 
-    def test_no_incluye_cargas_anuladas_ni_fuera_de_rango(self):
-        miembro_id = miembros_repo.crear_miembro("ana", "clave123", "Ana", "30333444", "1155556666")
-        miembros_repo.cargar_saldo_por_monto(miembro_id, 1000.0, [{"metodo": "EFECTIVO", "monto": 1000.0}], self.usuario_id)
+    def test_no_incluye_ventas_anuladas_ni_fuera_de_rango(self):
+        self._articulo("COD9", "Producto")
+        venta_id = self._vender("COD9", "Producto", 1)
+        ventas_repo.anular_venta(venta_id, self.usuario_id, "Test")
 
-        filas = reportes_repo.ranking_ventas("2000-01-01", "2000-01-01")
+        self.assertEqual(self._ranking(), [])
+        self.assertEqual(reportes_repo.ranking_ventas("2000-01-01", "2000-01-01"), [])
 
-        self.assertEqual(filas, [])
-
-
-class TestMigracionOrigenEnVentas(BaseConBaseTemporal):
-    def test_agrega_columna_origen_y_reclasifica_ventas_viejas_de_pcs(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        estacion_id = pcs_repo.crear_estacion("PC 1")
-        bono_id = pcs_repo.crear_bono("1 hora", 60, 3000)
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        with database.conexion_db() as conexion:
-            # Ventas armadas a mano (sin pasar por los repos) para no
-            # depender de que "origen" ya exista al insertarlas -- después
-            # se le saca la columna a la tabla para simular una base de
-            # antes de que existiera, y recién ahí se corre la migración.
-            venta_kiosko = conexion.execute(
-                "INSERT INTO ventas (fecha, usuario_id, turno, total, estado) VALUES (?, ?, ?, ?, 'CONFIRMADA')",
-                ("2026-01-01T10:00:00", usuario_id, "MAÑANA", 500),
-            ).lastrowid
-            venta_bono = conexion.execute(
-                "INSERT INTO ventas (fecha, usuario_id, turno, total, estado) VALUES (?, ?, ?, ?, 'CONFIRMADA')",
-                ("2026-01-01T10:00:00", usuario_id, "MAÑANA", 3000),
-            ).lastrowid
-            sesion_id = conexion.execute(
-                "INSERT INTO sesiones_pc (estacion_id, fecha_inicio, fecha_fin_prevista, estado) "
-                "VALUES (?, ?, ?, 'ACTIVA')",
-                (estacion_id, "2026-01-01T10:00:00", "2026-01-01T11:00:00"),
-            ).lastrowid
-            conexion.execute(
-                "INSERT INTO sesion_bonos (sesion_id, bono_id, minutos, precio, venta_id) VALUES (?, ?, ?, ?, ?)",
-                (sesion_id, bono_id, 60, 3000, venta_bono),
-            )
-            venta_carga = conexion.execute(
-                "INSERT INTO ventas (fecha, usuario_id, turno, total, estado) VALUES (?, ?, ?, ?, 'CONFIRMADA')",
-                ("2026-01-01T10:00:00", usuario_id, "MAÑANA", 1000),
-            ).lastrowid
-            conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro (miembro_id, tipo, minutos, fecha, venta_id) "
-                "VALUES (?, 'CARGA', ?, ?, ?)",
-                (miembro_id, 60, "2026-01-01T10:00:00", venta_carga),
-            )
-
-            # Recién ahora se simula la base "vieja": se le saca la columna
-            # que inicializar_base_de_datos() ya le había puesto, y se
-            # corre la migración directo, como en TestMigracionColumnasPermisos.
-            conexion.execute("ALTER TABLE ventas DROP COLUMN origen")
-
-            database._migrar_columna_origen_en_ventas(conexion)
-
-            self.assertEqual(
-                conexion.execute("SELECT origen FROM ventas WHERE id = ?", (venta_kiosko,)).fetchone()["origen"],
-                "KIOSKO",
-            )
-            self.assertEqual(
-                conexion.execute("SELECT origen FROM ventas WHERE id = ?", (venta_bono,)).fetchone()["origen"],
-                "ALQUILER_PCS",
-            )
-            self.assertEqual(
-                conexion.execute("SELECT origen FROM ventas WHERE id = ?", (venta_carga,)).fetchone()["origen"],
-                "ALQUILER_PCS",
-            )
-
-
-class TestMigracionReferenciaBonoEnMovimientosSaldoMiembro(BaseConBaseTemporal):
-    def test_reconstruye_la_tabla_con_la_referencia_nueva_sin_perder_filas(self):
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        with database.conexion_db() as conexion:
-            # Se simula una base "vieja" (de antes de que existiera
-            # bonos_miembro, 2026-09-28): se recrea la tabla a mano con
-            # la referencia original a bonos_tiempo, y se le mete una
-            # fila real -- igual que TestMigracionOrigenEnVentas simula
-            # la base de antes saliéndose de columnas nuevas.
-            conexion.execute("DROP TABLE movimientos_saldo_miembro")
-            conexion.execute("""
-                CREATE TABLE movimientos_saldo_miembro (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    miembro_id  INTEGER NOT NULL REFERENCES miembros(id),
-                    tipo        TEXT NOT NULL CHECK (tipo IN ('CARGA', 'CONSUMO', 'REINTEGRO')),
-                    minutos     INTEGER NOT NULL,
-                    fecha       TEXT NOT NULL,
-                    venta_id    INTEGER REFERENCES ventas(id),
-                    bono_id     INTEGER REFERENCES bonos_tiempo(id),
-                    sesion_id   INTEGER REFERENCES sesiones_pc(id)
-                )
-            """)
-            movimiento_id = conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro (miembro_id, tipo, minutos, fecha) "
-                "VALUES (?, 'CONSUMO', ?, ?)",
-                (miembro_id, 60, "2026-01-01T10:00:00"),
-            ).lastrowid
-
-            database._migrar_referencia_bono_en_movimientos_saldo_miembro(conexion)
-
-            definicion = conexion.execute(
-                "SELECT sql FROM sqlite_master WHERE name = 'movimientos_saldo_miembro'"
-            ).fetchone()["sql"]
-            self.assertIn("bonos_miembro(id)", definicion)
-            self.assertNotIn("bonos_tiempo(id)", definicion)
-
-            fila = conexion.execute(
-                "SELECT * FROM movimientos_saldo_miembro WHERE id = ?", (movimiento_id,)
-            ).fetchone()
-            self.assertEqual(fila["miembro_id"], miembro_id)
-            self.assertEqual(fila["minutos"], 60)
-
-    def test_cargar_un_bono_de_socios_con_id_que_no_existe_en_bonos_tiempo_ya_no_rompe(self):
-        # Reproduce el escenario real que motivó el fix: un bono de
-        # socios cuyo id no coincide con ningún walk-in -- antes de la
-        # migración esto rompía con "FOREIGN KEY constraint failed"
-        # porque bono_id seguía apuntando a bonos_tiempo en cualquier
-        # base ya existente. BaseConBaseTemporal ya corre
-        # inicializar_base_de_datos() (con la migración incluida) en su
-        # setUp, así que este test cubre el caso de una base NUEVA
-        # (nunca migrada a mano) para que no se rompa al revés.
-        operador_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        # Solo 1 bono común (bonos_tiempo, id 1) contra 3 de socios
-        # (bonos_miembro, ids 1-3) -- el tercero (id 3) no tiene ningún
-        # id equivalente en bonos_tiempo.
-        pcs_repo.crear_bono("1 hora (común)", 60, 3000)
-        bonos_miembro_repo.crear_bono("1 hora (socios)", 60, 3000)
-        bonos_miembro_repo.crear_bono("2 horas (socios)", 120, 6000)
-        bono_id = bonos_miembro_repo.crear_bono("3 horas (socios)", 180, 9000)
-
-        miembros_repo.cargar_saldo_por_bono(
-            miembro_id, bono_id, [{"metodo": "EFECTIVO", "monto": 9000}], operador_id
-        )
-
-        self.assertEqual(miembros_repo.obtener_miembro(miembro_id)["saldo_minutos"], 180)
-
-    def test_no_rompe_si_el_bono_id_heredado_no_existe_en_bonos_miembro(self):
-        # Reproduce el otro escenario real (además del de arriba): bajo el
-        # esquema viejo, bono_id apuntaba a bonos_tiempo y una CARGA con
-        # bono_id=1 era perfectamente válida ahí. Migrar esa fila tal cual
-        # a la tabla nueva (bono_id -> bonos_miembro) rompía con FK si
-        # bonos_miembro nunca tuvo un bono con ese mismo id -- antes esto
-        # cortaba la migración ENTERA a mitad de copiar.
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-        bono_tiempo_id = pcs_repo.crear_bono("1 hora", 60, 3000)
-
-        with database.conexion_db() as conexion:
-            conexion.execute("DROP TABLE movimientos_saldo_miembro")
-            conexion.execute("""
-                CREATE TABLE movimientos_saldo_miembro (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    miembro_id  INTEGER NOT NULL REFERENCES miembros(id),
-                    tipo        TEXT NOT NULL CHECK (tipo IN ('CARGA', 'CONSUMO', 'REINTEGRO')),
-                    minutos     INTEGER NOT NULL,
-                    fecha       TEXT NOT NULL,
-                    venta_id    INTEGER REFERENCES ventas(id),
-                    bono_id     INTEGER REFERENCES bonos_tiempo(id),
-                    sesion_id   INTEGER REFERENCES sesiones_pc(id)
-                )
-            """)
-            movimiento_id = conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro (miembro_id, tipo, minutos, fecha, bono_id) "
-                "VALUES (?, 'CARGA', ?, ?, ?)",
-                (miembro_id, 60, "2026-01-01T10:00:00", bono_tiempo_id),
-            ).lastrowid
-
-            # bonos_miembro nunca tuvo ningún bono creado: el id heredado
-            # no existe ahí, aunque sí era válido en bonos_tiempo.
-            self.assertIsNone(bonos_miembro_repo.obtener_bono(bono_tiempo_id))
-
-            database._migrar_referencia_bono_en_movimientos_saldo_miembro(conexion)
-
-            fila = conexion.execute(
-                "SELECT * FROM movimientos_saldo_miembro WHERE id = ?", (movimiento_id,)
-            ).fetchone()
-            self.assertEqual(fila["bono_id"], bono_tiempo_id)
-
-    def test_recupera_movimientos_de_una_tabla_viejo_dejada_por_un_corte_anterior(self):
-        # Simula el escenario del corte de luz: la tabla nueva ya quedó con
-        # el esquema correcto (recreada de cero por el propio
-        # CREATE TABLE IF NOT EXISTS del arranque siguiente) pero VACÍA,
-        # mientras el historial real quedó atrapado en "..._viejo" porque
-        # el programa se cerró antes de terminar de copiarlo la vez
-        # anterior. Antes, ver la tabla nueva con el esquema ya correcto
-        # bastaba para dar la migración por terminada, perdiendo ese
-        # historial para siempre (invisible, nunca más migrado).
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        with database.conexion_db() as conexion:
-            conexion.execute("ALTER TABLE movimientos_saldo_miembro RENAME TO movimientos_saldo_miembro_viejo")
-            movimiento_id = conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro_viejo (miembro_id, tipo, minutos, fecha) "
-                "VALUES (?, 'CONSUMO', ?, ?)",
-                (miembro_id, 45, "2026-01-01T10:00:00"),
-            ).lastrowid
-            conexion.execute("""
-                CREATE TABLE movimientos_saldo_miembro (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    miembro_id  INTEGER NOT NULL REFERENCES miembros(id),
-                    tipo        TEXT NOT NULL CHECK (tipo IN ('CARGA', 'CONSUMO', 'REINTEGRO')),
-                    minutos     INTEGER NOT NULL,
-                    fecha       TEXT NOT NULL,
-                    venta_id    INTEGER REFERENCES ventas(id),
-                    bono_id     INTEGER REFERENCES bonos_miembro(id),
-                    sesion_id   INTEGER REFERENCES sesiones_pc(id)
-                )
-            """)
-
-            database._migrar_referencia_bono_en_movimientos_saldo_miembro(conexion)
-
-            fila = conexion.execute(
-                "SELECT * FROM movimientos_saldo_miembro WHERE id = ?", (movimiento_id,)
-            ).fetchone()
-            self.assertIsNotNone(fila)
-            self.assertEqual(fila["minutos"], 45)
-            tabla_vieja = conexion.execute(
-                "SELECT name FROM sqlite_master WHERE name = 'movimientos_saldo_miembro_viejo'"
-            ).fetchone()
-            self.assertIsNone(tabla_vieja)
-
-
-class TestMigracionCheckTipoEnMovimientosSaldoMiembro(BaseConBaseTemporal):
-    def test_agrega_anulacion_al_check_sin_perder_filas(self):
-        # Simula una base "vieja" (de antes de que existiera ANULACION,
-        # 2026-09-29): recrea la tabla a mano con el CHECK original (solo
-        # CARGA/CONSUMO/REINTEGRO) y una fila real, igual que
-        # TestMigracionReferenciaBonoEnMovimientosSaldoMiembro simula la
-        # base de antes de bonos_miembro.
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        with database.conexion_db() as conexion:
-            conexion.execute("DROP TABLE movimientos_saldo_miembro")
-            conexion.execute("""
-                CREATE TABLE movimientos_saldo_miembro (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    miembro_id  INTEGER NOT NULL REFERENCES miembros(id),
-                    tipo        TEXT NOT NULL CHECK (tipo IN ('CARGA', 'CONSUMO', 'REINTEGRO')),
-                    minutos     INTEGER NOT NULL,
-                    fecha       TEXT NOT NULL,
-                    venta_id    INTEGER REFERENCES ventas(id),
-                    bono_id     INTEGER REFERENCES bonos_miembro(id),
-                    sesion_id   INTEGER REFERENCES sesiones_pc(id)
-                )
-            """)
-            movimiento_id = conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro (miembro_id, tipo, minutos, fecha) "
-                "VALUES (?, 'CONSUMO', ?, ?)",
-                (miembro_id, 60, "2026-01-01T10:00:00"),
-            ).lastrowid
-
-            database._migrar_check_tipo_en_movimientos_saldo_miembro(conexion)
-
-            # El CHECK viejo hubiera rechazado esto con
-            # "CHECK constraint failed" -- si no rompe, ya se migró.
-            conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro (miembro_id, tipo, minutos, fecha, venta_id) "
-                "VALUES (?, 'ANULACION', ?, ?, ?)",
-                (miembro_id, 30, "2026-01-01T10:05:00", None),
-            )
-
-            fila = conexion.execute(
-                "SELECT * FROM movimientos_saldo_miembro WHERE id = ?", (movimiento_id,)
-            ).fetchone()
-            self.assertEqual(fila["minutos"], 60)
-
-    def test_un_tipo_nuevo_se_agrega_solo_en_una_base_ya_migrada(self):
-        # La migración mira TODOS los tipos de _TIPOS_MOVIMIENTO_SALDO, no solo
-        # el último que se sumó: si algún día aparece un tipo nuevo, las bases
-        # que ya estaban al día se reconstruyen solas al arrancar.
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        with mock.patch.object(database, "_TIPOS_MOVIMIENTO_SALDO", database._TIPOS_MOVIMIENTO_SALDO + ("NUEVO",)):
-            with database.conexion_db() as conexion:
-                database._migrar_check_tipo_en_movimientos_saldo_miembro(conexion)
-                conexion.execute(
-                    "INSERT INTO movimientos_saldo_miembro (miembro_id, tipo, minutos, fecha) "
-                    "VALUES (?, 'NUEVO', ?, ?)",
-                    (miembro_id, 5, "2026-01-01T10:00:00"),
-                )
-
-    def test_recupera_movimientos_de_una_tabla_viejo_dejada_por_un_corte_anterior(self):
-        # Mismo escenario de corte de luz que la migración hermana (ver
-        # TestMigracionReferenciaBonoEnMovimientosSaldoMiembro): la tabla
-        # nueva ya quedó con el CHECK correcto (recreada de cero por el
-        # CREATE TABLE IF NOT EXISTS del arranque siguiente) pero VACÍA,
-        # mientras el historial real quedó atrapado en "..._viejo".
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-
-        with database.conexion_db() as conexion:
-            conexion.execute("ALTER TABLE movimientos_saldo_miembro RENAME TO movimientos_saldo_miembro_viejo")
-            movimiento_id = conexion.execute(
-                "INSERT INTO movimientos_saldo_miembro_viejo (miembro_id, tipo, minutos, fecha) "
-                "VALUES (?, 'CONSUMO', ?, ?)",
-                (miembro_id, 45, "2026-01-01T10:00:00"),
-            ).lastrowid
-            # Con los tipos de HOY, como la recrea el arranque: escrita a mano,
-            # quedó vieja el día que se sumó IMPORTACION (2026-10-19).
-            conexion.execute(database._sql_tabla_movimientos_saldo_miembro(
-                database._TIPOS_MOVIMIENTO_SALDO, "bonos_miembro(id)"
-            ))
-
-            database._migrar_check_tipo_en_movimientos_saldo_miembro(conexion)
-
-            fila = conexion.execute(
-                "SELECT * FROM movimientos_saldo_miembro WHERE id = ?", (movimiento_id,)
-            ).fetchone()
-            self.assertIsNotNone(fila)
-            self.assertEqual(fila["minutos"], 45)
-            tabla_vieja = conexion.execute(
-                "SELECT name FROM sqlite_master WHERE name = 'movimientos_saldo_miembro_viejo'"
-            ).fetchone()
-            self.assertIsNone(tabla_vieja)
-
-
-class TestDesglosePorOrigenEnCierreDeTurno(BaseConBaseTemporal):
-    def test_cierre_de_turno_separa_kiosko_de_alquiler_de_pcs(self):
-        usuario_id = usuarios_repo.crear_usuario("Test", "1234", "ADMIN")
-        articulos_repo.crear_articulo("COD9", "Producto", None, None, 100.0, 50.0, 5)
-        compras_repo.registrar_compra(usuario_id, [{"codigo": "COD9", "cantidad": 5, "costo_unitario": 50.0}])
-        estacion_id = pcs_repo.crear_estacion("PC 1")
-        bono_id = pcs_repo.crear_bono("1 hora", 60, 3000)
-        miembro_id = miembros_repo.crear_miembro("juan", "clave123", "Juan", "30111222", "1155554444")
-        config_repo.guardar_tramos_tarifa_hora_miembro([{"monto_minimo": 0, "tarifa_hora": 1000}])
-        momento = datetime(2026, 1, 5, 10, 0, 0)
-
-        # Una venta de kiosko en efectivo.
-        with mock.patch("repositories.ventas_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            ventas_repo.confirmar_venta(
-                usuario_id,
-                [{"codigo": "COD9", "descripcion": "Producto", "cantidad": 1, "precio_unitario": 100.0}],
-                [{"metodo": "EFECTIVO", "monto": 100.0}],
-            )
-
-        # Un bono de PC pagado en digital.
-        with mock.patch("control_pcs.repositories.pcs_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            datetime_mock.fromisoformat = datetime.fromisoformat
-            pcs_repo.asignar_bono(estacion_id, bono_id, usuario_id, [{"metodo": "DIGITAL", "monto": 3000}])
-
-        # Una carga de saldo de Miembro en efectivo.
-        with mock.patch("control_pcs.repositories.miembros_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = momento
-            miembros_repo.cargar_saldo_por_monto(
-                miembro_id, 2000, [{"metodo": "EFECTIVO", "monto": 2000}], usuario_id
-            )
-
-        resumen = turnos_repo.resumen_turno_actual()
-        self.assertEqual(resumen["kiosko_efectivo"], 100.0)
-        self.assertEqual(resumen["kiosko_digital"], 0.0)
-        self.assertEqual(resumen["pcs_efectivo"], 2000.0)
-        self.assertEqual(resumen["pcs_digital"], 3000.0)
-        self.assertEqual(resumen["ventas_efectivo"], 2100.0)
-        self.assertEqual(resumen["ventas_digital"], 3000.0)
-
-        cierre = turnos_repo.cerrar_turno(usuario_id)
-        self.assertEqual(cierre["kiosko_efectivo"], 100.0)
-        self.assertEqual(cierre["kiosko_digital"], 0.0)
-        self.assertEqual(cierre["pcs_efectivo"], 2000.0)
-        self.assertEqual(cierre["pcs_digital"], 3000.0)
-
-        # El desglose tiene que quedar guardado en cierres_turno, no solo
-        # devuelto una vez -- es lo que le permite al dueño auditar turno
-        # por turno más adelante, no solo mirar el número de "ahora".
-        guardado = turnos_repo.listar_cierres()[0]
-        self.assertEqual(guardado["kiosko_efectivo"], 100.0)
-        self.assertEqual(guardado["kiosko_digital"], 0.0)
-        self.assertEqual(guardado["pcs_efectivo"], 2000.0)
-        self.assertEqual(guardado["pcs_digital"], 3000.0)
 
 
 if __name__ == "__main__":

@@ -3,11 +3,10 @@ tests/test_detalle_dia.py
 ==========================
 El detalle de lo vendido en un día (Reportes > Resumen del Día, pedido del
 dueño 2026-10-18; repositories/detalle_dia_repo.py y ui/reportes_detalle_dia.py):
-cada venta con su hora, turno, operador y qué se vendió (kiosko, trámite, bono
-de PC con la PC donde estaba al venderlo, PCSTREAM, PlayStation 5, socios), lo
-vendido por producto y por operador, que el detalle de cada turno sume lo
-mismo que su fila del Resumen del Día, y el listado renglón por renglón que se
-imprime (ui/imprimir.py).
+cada venta con su hora, turno, operador y qué se vendió, lo vendido por producto
+y por operador, que el detalle de cada turno sume lo mismo que su fila del
+Resumen del Día, y el listado renglón por renglón que se imprime
+(ui/imprimir.py).
 
 Se ejecutan con:
 
@@ -26,12 +25,8 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
-from control_pcs.repositories import (  # noqa: E402
-    bonos_miembro_repo, miembros_repo, pcs_repo, pcstream_repo, playstation_repo,
-)
 from repositories import (  # noqa: E402
-    articulos_repo, detalle_dia_repo, relevo_repo, reportes_repo, tramites_repo, turnos_repo, usuarios_repo,
-    ventas_repo,
+    articulos_repo, detalle_dia_repo, relevo_repo, reportes_repo, turnos_repo, usuarios_repo, ventas_repo,
 )
 from ui import imprimir  # noqa: E402
 from ui.reportes_detalle_dia import _COLUMNAS_RENGLONES, _renglones  # noqa: E402
@@ -51,9 +46,10 @@ def _digital(monto):
 
 
 class _UnDiaConDeTodo(BaseConBaseTemporal):
-    """Lucía abre su caja y vende de todo; el Administrador cobra algo con la caja
-    de ella abierta; se anula una venta antes del cierre; se cierra el turno; se
-    anula otra DESPUÉS del cierre; y Gaby vende algo en el turno siguiente."""
+    """Lucía abre su caja y vende en efectivo y en digital; el Administrador cobra
+    algo con la caja de ella abierta; se anula una venta antes del cierre; se cierra
+    el turno; se anula otra DESPUÉS del cierre; y Gaby vende algo en el turno
+    siguiente."""
 
     def setUp(self):
         super().setUp()
@@ -64,36 +60,16 @@ class _UnDiaConDeTodo(BaseConBaseTemporal):
         self.gaby_id = usuarios_repo.crear_usuario("GABY", "4321", dominio.ROL_EMPLEADA)
         articulos_repo.crear_articulo("COCA", "Coca 500", None, None, 1000.0, 500.0, 0)
         articulos_repo.crear_articulo("AGUA", "Agua 500", None, None, 800.0, 400.0, 0)
-        self.pc1 = pcs_repo.crear_estacion("PC1")
-        self.pc2 = pcs_repo.crear_estacion("PC2")
-        self.pcstream = pcs_repo.crear_estacion(dominio.NOMBRE_PCSTREAM)
-        bono_pc = pcs_repo.crear_bono("3 horas", 180, 3000.0)
-        bono_stream = pcstream_repo.crear_bono("1 hora", 60, 2000.0)
-        bono_ps5 = playstation_repo.crear_bono(self.admin_id, "Media hora", 30, 1500.0)
-        bono_socio = bonos_miembro_repo.crear_bono("Pack 5 h", 300, 4000.0)
-        tramite = tramites_repo.crear_tramite("Boleta de luz")
-        socio = miembros_repo.crear_miembro("juan", "1111", nombre="Juan")
+        articulos_repo.crear_articulo("ALFAJOR", "Alfajor", None, None, 800.0, 400.0, 0)
 
         relevo_repo.abrir_caja(self.lucia_id, cambio_contado=50000.0)
         self.v_kiosko = self._vender(self.lucia_id, 2)
-        self.v_tramite = tramites_repo.registrar_tramite(self.lucia_id, tramite, 500.0, _digital(500.0))
-        self.v_pc = pcs_repo.asignar_bono(self.pc1, bono_pc, self.lucia_id, _efectivo(3000.0))
-        pcs_repo.trasladar_sesion(self.pc1, self.pc2, self.lucia_id)  # después de venderlo
-        with conexion_db() as conexion:
-            # Un minuto después de la venta, como en la vida real (son dos clics de
-            # una persona). El reloj de Windows avanza de a saltos de ~0,5 ms: hechos
-            # uno atrás del otro, la venta y el traslado quedaban la mitad de las veces
-            # con la MISMA hora, el traslado no era "posterior" a la venta y el bono
-            # salía en la PC2 (medido el 2026-10-19: 8 de 15 corridas).
-            vendido = conexion.execute("SELECT fecha FROM ventas WHERE id = ?", (self.v_pc,)).fetchone()["fecha"]
-            conexion.execute(
-                "UPDATE traslados_sesion SET fecha = ?",
-                ((datetime.fromisoformat(vendido) + timedelta(minutes=1)).isoformat(timespec="microseconds"),),
-            )
-        self.v_stream = pcs_repo.asignar_bono(self.pcstream, bono_stream, self.lucia_id, _digital(2000.0))
-        self.v_ps5 = playstation_repo.vender_bono(self.lucia_id, bono_ps5, _efectivo(1500.0))
-        self.v_carga = miembros_repo.cargar_saldo_por_monto(socio, 3000.0, _efectivo(3000.0), self.lucia_id)["venta_id"]
-        self.v_pack = miembros_repo.cargar_saldo_por_bono(socio, bono_socio, _digital(4000.0), self.lucia_id)["venta_id"]
+        # Un artículo que Gaby no vende después: su venta, si cae en el mismo turno
+        # (cerrar antes de hora), no tiene que mezclarse con esta en "por producto".
+        self.v_alfajor = ventas_repo.confirmar_venta(
+            self.lucia_id, [{"codigo": "ALFAJOR", "descripcion": "Alfajor", "cantidad": 1, "precio_unitario": 800.0}],
+            _digital(800.0),
+        )
         self.v_admin = self._vender(self.admin_id, 1)  # queda a nombre de Lucía
         self.v_anulada_antes = self._vender(self.lucia_id, 3)
         ventas_repo.anular_venta(self.v_anulada_antes, self.admin_id, "mal cobrada")
@@ -132,26 +108,18 @@ class TestCadaVentaDiceQueSeVendio(_UnDiaConDeTodo):
         detalle = detalle_dia_repo.detalle_del_dia(self.dia)
         esperado = {
             self.v_kiosko: (reportes_repo.CATEGORIA_KIOSKO, "2 x Coca 500"),
-            self.v_tramite: (reportes_repo.CATEGORIA_TRAMITE, "Trámite: Boleta de luz"),
-            # La PC donde estaba al venderlo, aunque después se la cambió a la PC2.
-            self.v_pc: (reportes_repo.CATEGORIA_BONO_PC, "PC1 · 3 horas (3 h)"),
-            self.v_stream: (reportes_repo.CATEGORIA_BONO_PCSTREAM, f"{dominio.NOMBRE_PCSTREAM} · 1 hora (1 h)"),
-            self.v_ps5: (reportes_repo.CATEGORIA_BONO_PLAYSTATION, f"{dominio.NOMBRE_PLAYSTATION} · Media hora (30 min)"),
-            self.v_pack: (reportes_repo.CATEGORIA_BONO_SOCIO, "Socio Juan · Pack 5 h (5 h)"),
+            self.v_alfajor: (reportes_repo.CATEGORIA_KIOSKO, "1 x Alfajor"),
         }
         for venta_id, (rubro, texto) in esperado.items():
             venta = self._venta(detalle, venta_id)
             self.assertEqual((venta["rubro"], venta["detalle"]), (rubro, texto))
-        carga = self._venta(detalle, self.v_carga)
-        self.assertEqual(carga["rubro"], reportes_repo.CATEGORIA_CARGA_TARIFA_SOCIO)
-        self.assertTrue(carga["detalle"].startswith("Socio Juan · carga de saldo ("))
 
     def test_operador_turno_hora_y_medio_de_pago(self):
         detalle = detalle_dia_repo.detalle_del_dia(self.dia)
-        tramite = self._venta(detalle, self.v_tramite)
-        self.assertEqual((tramite["operador"], tramite["cargada_por"]), ("LUCIA", None))
-        self.assertEqual((tramite["efectivo"], tramite["digital"], tramite["total"]), (0.0, 500.0, 500.0))
-        self.assertEqual(tramite["turno"], turnos_repo.listar_cierres()[0]["turno"])
+        alfajor = self._venta(detalle, self.v_alfajor)
+        self.assertEqual((alfajor["operador"], alfajor["cargada_por"]), ("LUCIA", None))
+        self.assertEqual((alfajor["efectivo"], alfajor["digital"], alfajor["total"]), (0.0, 800.0, 800.0))
+        self.assertEqual(alfajor["turno"], turnos_repo.listar_cierres()[0]["turno"])
         # Lo cobrado por el Administrador con la caja de Lucía queda a nombre de ella.
         admin = self._venta(detalle, self.v_admin)
         self.assertEqual((admin["operador"], admin["cargada_por"]), ("LUCIA", "Administrador"))
@@ -203,8 +171,7 @@ class TestElDetalleSumaLoMismoQueLosTurnos(_UnDiaConDeTodo):
         productos = {(p["rubro"], p["producto"]): (p["cantidad"], p["importe"]) for p in cerrado["por_producto"]}
         # 2 Cocas de Lucía; las 3 anuladas y la del Administrador (anulada después) no cuentan.
         self.assertEqual(productos[(reportes_repo.CATEGORIA_KIOSKO, "Coca 500")], (2, 2000.0))
-        self.assertEqual(productos[(reportes_repo.CATEGORIA_BONO_PC, "3 horas")], (1, 3000.0))
-        self.assertEqual(productos[(reportes_repo.CATEGORIA_BONO_PLAYSTATION, "Media hora")], (1, 1500.0))
+        self.assertEqual(productos[(reportes_repo.CATEGORIA_KIOSKO, "Alfajor")], (1, 800.0))
         self.assertEqual(sum(importe for _, importe in productos.values()), cerrado["totales"]["total"])
 
         operadores = {o["operador"]: o for o in cerrado["por_operador"]}
@@ -239,7 +206,7 @@ class TestPantallaDelDetalle(_UnDiaConDeTodo):
         self.assertTrue(panel.titulo.text().startswith(cerrado["etiqueta"]))
         self.assertEqual(panel.tabla_ventas.rowCount(), len(cerrado["ventas"]))
         textos = [panel.tabla_ventas.item(fila, 5).text() for fila in range(panel.tabla_ventas.rowCount())]
-        self.assertIn("PC1 · 3 horas (3 h)", textos)
+        self.assertIn("1 x Alfajor", textos)
         estados = [panel.tabla_ventas.item(fila, 9).text() for fila in range(panel.tabla_ventas.rowCount())]
         self.assertIn("ANULADA después del cierre", estados)
         self.assertEqual(panel.tabla_operadores.item(0, 0).text(), "LUCIA")
@@ -260,8 +227,6 @@ class TestRenglonPorRenglon(BaseConBaseTemporal):
         self.lucia_id = usuarios_repo.crear_usuario("LUCIA", "4321", dominio.ROL_EMPLEADA)
         articulos_repo.crear_articulo("4", "IMPRESION", None, None, 150.0, 0.0, 0)
         articulos_repo.crear_articulo("7790895000232", "COCA LATA", None, None, 2700.0, 1500.0, 0)
-        pc1 = pcs_repo.crear_estacion("PC1")
-        bono = pcs_repo.crear_bono("1 hora", 60, 1000.0)
 
         relevo_repo.abrir_caja(self.lucia_id, cambio_contado=5000.0)
         self.juntas = self._vender(self.lucia_id, ("4", "IMPRESION", 14, 150.0))
@@ -270,7 +235,6 @@ class TestRenglonPorRenglon(BaseConBaseTemporal):
         self.mezcla = self._vender(
             self.lucia_id, ("7790895000232", "COCA LATA", 2, 2700.0), ("4", "IMPRESION", 3, 150.0),
         )
-        self.bono = pcs_repo.asignar_bono(pc1, bono, self.lucia_id, _efectivo(1000.0))
         self.anulada = self._vender(self.lucia_id, ("4", "IMPRESION", 5, 150.0))
         ventas_repo.anular_venta(self.anulada, self.admin_id, "mal cobrada")
         with conexion_db() as conexion:
@@ -311,15 +275,10 @@ class TestRenglonPorRenglon(BaseConBaseTemporal):
             {"codigo": "4", "descripcion": "IMPRESION", "cantidad": 3, "importe": 450.0},
         ])
 
-    def test_un_bono_es_un_renglon_sin_codigo_con_la_pc(self):
-        self.assertEqual(self._lineas(self.bono), [
-            {"codigo": "", "descripcion": "PC1 · 1 hora (1 h)", "cantidad": 1, "importe": 1000.0},
-        ])
-
     def test_los_totales_no_cuentan_las_anuladas(self):
         totales = detalle_dia_repo.detalle_del_dia(self.dia)["totales"]
-        self.assertEqual(totales["unidades"], 14 + 4 + 2 + 3 + 1)
-        self.assertEqual(totales["total"], 2100.0 + 600.0 + 5400.0 + 450.0 + 1000.0)
+        self.assertEqual(totales["unidades"], 14 + 4 + 2 + 3)
+        self.assertEqual(totales["total"], 2100.0 + 600.0 + 5400.0 + 450.0)
 
     def _panel(self):
         pestaña = PestañaResumenDelDia()
@@ -330,12 +289,12 @@ class TestRenglonPorRenglon(BaseConBaseTemporal):
     def test_la_pantalla_muestra_cada_renglon_y_el_total(self):
         panel = self._panel()
         tabla = panel.tabla_renglones
-        # 1 + 4 + 2 + 1 + la anulada (en rojo), y la fila del TOTAL.
-        self.assertEqual(tabla.rowCount(), 10)
+        # 1 + 4 + 2 + la anulada (en rojo), y la fila del TOTAL.
+        self.assertEqual(tabla.rowCount(), 9)
         self.assertEqual(panel.pestañas.tabText(0), "Renglón por renglón")
-        ultima = [tabla.item(9, columna).text() for columna in range(tabla.columnCount())]
-        self.assertEqual(ultima, ["TOTAL", "", "", "", "", "", "24", formato_pesos(9550.0), ""])
-        anulada = next(fila for fila in range(9) if int(tabla.item(fila, 3).text()) == self.anulada)
+        ultima = [tabla.item(8, columna).text() for columna in range(tabla.columnCount())]
+        self.assertEqual(ultima, ["TOTAL", "", "", "", "", "", "23", formato_pesos(8550.0), ""])
+        anulada = next(fila for fila in range(8) if int(tabla.item(fila, 3).text()) == self.anulada)
         self.assertEqual(tabla.item(anulada, 8).text(), "ANULADA")
         self.assertTrue(panel.boton_imprimir.isEnabled())
 
@@ -346,7 +305,7 @@ class TestRenglonPorRenglon(BaseConBaseTemporal):
         self.assertIn(f"Ventas del {datetime.fromisoformat(self.dia).strftime('%d/%m/%Y')} · Todo el día", html)
         self.assertEqual(html.count(">IMPRESION<"), 1 + 4 + 1 + 1)
         self.assertEqual(html.count(imprimir._COLOR_ANULADA), len(_COLUMNAS_RENGLONES))  # la anulada, en rojo
-        self.assertIn(f">{formato_pesos(9550.0)}<", html)
+        self.assertIn(f">{formato_pesos(8550.0)}<", html)
 
         with mock.patch("ui.reportes_detalle_dia.imprimir.vista_previa") as vista_previa:
             panel.boton_imprimir.click()

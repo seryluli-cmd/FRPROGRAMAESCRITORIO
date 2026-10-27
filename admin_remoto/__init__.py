@@ -1,16 +1,16 @@
 """
 admin_remoto
 =============
-Administrar CyberBIOS desde otra PC del local mientras el mostrador sigue
+Administrar FRKiosko desde otra PC del local mientras el mostrador sigue
 atendiendo (pedido del dueño, 2026-10-18: entra desde su casa por UltraVNC a
 una PC libre del local, abre el programa por la red y administra sin molestar
 a la operadora).
 
 Cómo funciona, en una línea: la copia que se abre en la otra PC no tiene base
 propia; cada vez que una pantalla llama a un repo, la llamada viaja al
-CyberBIOS del mostrador (el mismo servidor de red de las PCs, puerto 8899,
-rutas /admin/...), que la hace con SU base y devuelve el resultado. La base
-sigue siendo un solo archivo que toca un solo programa.
+kiosko del mostrador (rutas /admin/...), que la hace con SU base
+y devuelve el resultado. La base sigue siendo un solo archivo que toca un
+solo programa.
 
 - `modo`: decide si esta copia es la del mostrador o una "copia remota" (el
   .exe abierto desde la carpeta compartida del mostrador).

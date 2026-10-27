@@ -52,7 +52,7 @@ class LoginWindow(QWidget):
         self._armar_interfaz()
 
     def _armar_interfaz(self):
-        self.setWindowTitle("CyberBIOS - Ingreso")
+        self.setWindowTitle("FRKiosko - Ingreso")
         self.setFixedSize(400, 420)
         # Fondo gris claro detrás de la tarjeta blanca, para que la
         # tarjeta se destaque en vez de que todo sea un único blanco liso.
@@ -76,7 +76,7 @@ class LoginWindow(QWidget):
             icono.setPixmap(imagen.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         icono.setAlignment(Qt.AlignCenter)
 
-        titulo = QLabel("CyberBIOS")
+        titulo = QLabel("FRKiosko")
         titulo.setStyleSheet("font-size: 21px; font-weight: 700; color: #1F2430;")
         titulo.setAlignment(Qt.AlignCenter)
 

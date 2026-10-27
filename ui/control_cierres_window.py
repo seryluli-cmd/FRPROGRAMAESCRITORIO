@@ -159,7 +159,7 @@ class ControlCierresWindow(QDialog):
 
         self.tabla = crear_tabla(
             ["Fecha", "Turno", "Caja", "Responsable", "Apertura", "Cierre", "Cambio Fijo", "Ventas Ef.",
-             "Kiosko", "Alquiler PCs", "PlayStation 5", "A Retirar", "Contado", "Diferencia"],
+             "Kiosko", "A Retirar", "Contado", "Diferencia"],
             estirar=3, por_filas=True,
         )
         self.tabla.doubleClicked.connect(self._ver_detalle)
@@ -216,8 +216,6 @@ class ControlCierresWindow(QDialog):
                 QTableWidgetItem(formato_pesos(cierre["fondo_cambio"])),
                 QTableWidgetItem(formato_pesos(cierre["ventas_efectivo"])),
                 QTableWidgetItem(formato_pesos(cierre["kiosko_efectivo"] + cierre["kiosko_digital"])),
-                QTableWidgetItem(formato_pesos(cierre["pcs_efectivo"] + cierre["pcs_digital"])),
-                QTableWidgetItem(formato_pesos(cierre["playstation_efectivo"] + cierre["playstation_digital"])),
                 QTableWidgetItem(formato_pesos(cierre["monto_a_retirar"])),
             ]
             contado = cierre["monto_contado"]
@@ -341,9 +339,7 @@ class DialogoDetalleCierre(VentanaConDetalleDeVenta):
     A la derecha, la lista de ventas que cayeron dentro de ese turno, para
     que el Admin pueda ver venta por venta cómo se llegó al total del sobre.
     Mismo patrón maestro-detalle que ConsultaVentasWindow: al seleccionar una
-    venta, abajo aparecen sus artículos -- una venta sin detalle real (bono de
-    PC, bono de la PlayStation 5, carga de saldo de Miembro) simplemente deja
-    esa tabla vacía, no hace falta un caso especial.
+    venta, abajo aparecen sus artículos.
     """
 
     def __init__(self, cierre, parent=None):
@@ -391,7 +387,7 @@ class DialogoDetalleCierre(VentanaConDetalleDeVenta):
         columna_ventas.addWidget(QLabel("Ventas del turno:"))
         columna_ventas.addWidget(self.tabla)
         columna_ventas.addWidget(QLabel(
-            "Artículos de la venta seleccionada (vacío si es bono de PC, de PlayStation o carga de saldo):"
+            "Artículos de la venta seleccionada:"
         ))
         columna_ventas.addWidget(self.tabla_detalle)
 
@@ -457,10 +453,6 @@ class DialogoDetalleCierre(VentanaConDetalleDeVenta):
                     f"(tenía que haber {formato_pesos(relevo['monto_esperado'])}: "
                     f"{texto_de_la_diferencia(relevo['diferencia'])})"
                 )
-        # Lo de la Cuenta de la PC que quedó fiado en este turno al cerrarlo (2026-10-25).
-        for fiado in resultado.get("fiado_sin_cobrar", []):
-            a_nombre = f", {fiado['nombre']}" if fiado["nombre"] else ""
-            lineas.append(f"💳 Fiado sin cobrar al cerrar: {formato_pesos(fiado['monto'])} ({fiado['estacion']}{a_nombre})")
         for verificacion in resultado["verificaciones"]:
             lineas.append(
                 f"Sobre contado el {verificacion['fecha'][8:10]}/{verificacion['fecha'][5:7]} "

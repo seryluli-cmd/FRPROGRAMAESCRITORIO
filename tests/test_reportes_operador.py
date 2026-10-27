@@ -23,7 +23,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
-from repositories import articulos_repo, reportes_repo, tramites_repo, usuarios_repo, ventas_repo  # noqa: E402
+from repositories import articulos_repo, reportes_repo, usuarios_repo, ventas_repo  # noqa: E402
 from turnos import dia_en_que_empezo_el_turno, etiqueta_turno  # noqa: E402
 from ui.reportes_operador import PestañaPorOperador  # noqa: E402
 from ui.reportes_window import ReportesWindow  # noqa: E402
@@ -52,6 +52,7 @@ class _ConVentas(BaseConBaseTemporal):
         self.toby_id = usuarios_repo.crear_usuario("TOBY", "1234", dominio.ROL_EMPLEADA)
         self.nair_id = usuarios_repo.crear_usuario("Nair", "1234", dominio.ROL_EMPLEADA)
         articulos_repo.crear_articulo("COCA", "Coca 500", None, None, 1000.0, 500.0, 0)
+        articulos_repo.crear_articulo("GAL", "Galletas", None, None, 500.0, 250.0, 0)
 
     def _vender(self, usuario_id, cantidad, pagos, cuando):
         """Una venta de kiosko de `cantidad` Cocas, grabada en el momento `cuando`."""
@@ -117,18 +118,19 @@ class TestResumenPorOperador(_ConVentas):
 class TestVentasDeOperador(_ConVentas):
     def test_trae_cada_venta_con_su_hora_concepto_y_estado(self):
         self._vender(self.toby_id, 2, [{"metodo": _EFECTIVO, "monto": 2000.0}], datetime(2026, 10, 16, 9, 15))
-        tramite_id = tramites_repo.crear_tramite("Boleta de luz")
-        venta_tramite = tramites_repo.registrar_tramite(
-            self.toby_id, tramite_id, 500.0, [{"metodo": _DIGITAL, "monto": 500.0}]
+        venta_galletas = ventas_repo.confirmar_venta(
+            self.toby_id,
+            [{"codigo": "GAL", "descripcion": "Galletas", "cantidad": 1, "precio_unitario": 500.0}],
+            [{"metodo": _DIGITAL, "monto": 500.0}],
         )
-        self._mover(venta_tramite, datetime(2026, 10, 16, 8, 0))
+        self._mover(venta_galletas, datetime(2026, 10, 16, 8, 0))
         anulada = self._vender(self.toby_id, 1, [{"metodo": _EFECTIVO, "monto": 1000.0}], datetime(2026, 10, 16, 11, 0))
         ventas_repo.anular_venta(anulada, self.admin_id, "prueba")
         self._vender(self.nair_id, 1, [{"metodo": _EFECTIVO, "monto": 1000.0}], datetime(2026, 10, 16, 10, 0))
 
         ventas = reportes_repo.ventas_de_operador(self.toby_id, "2026-10-16", "2026-10-16")
 
-        self.assertEqual([v["concepto"] for v in ventas], ["Trámite: Boleta de luz", "2 x Coca 500", "1 x Coca 500"])
+        self.assertEqual([v["concepto"] for v in ventas], ["1 x Galletas", "2 x Coca 500", "1 x Coca 500"])
         self.assertEqual(ventas[0]["digital"], 500.0)
         self.assertEqual(ventas[1]["efectivo"], 2000.0)
         self.assertEqual(ventas[2]["estado"], dominio.VENTA_ANULADA)

@@ -2,7 +2,7 @@
 database_esquema_envios.py
 ===========================
 La cola de los Cierres de Turno que se mandan a la app de gastos del dueño (la
-PWA "Gastos — CyberBIOS"; pedido del dueño, 2026-10-26; reglas en
+PWA "Gestión Central"; pedido del dueño, 2026-10-26; reglas en
 repositories/envio_pwa_repo.py). En su propio archivo porque
 database_esquema.py ya pasó las 600 líneas (CLAUDE.md, regla 12); la crea
 database_esquema.inicializar_base_de_datos con CREATE TABLE IF NOT EXISTS: una

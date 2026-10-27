@@ -1,8 +1,8 @@
 """
 tests/test_envio_pwa.py
 =========================
-El envío de cada Cierre de Turno a la app de gastos del dueño (la PWA "Gastos —
-CyberBIOS"; repositories/envio_pwa_repo.py y ui/envio_pwa_dialogo.py, pedido del
+El envío de cada Cierre de Turno a la app de gastos del dueño (la PWA "Gestión
+Central"; repositories/envio_pwa_repo.py y ui/envio_pwa_dialogo.py, pedido del
 dueño 2026-10-26): qué viaja y a nombre de quién (la responsable de la caja, el
 forzoso marcado, el turno con el nombre de allá), que el cierre quede en la cola
 solo con el envío prendido y en la misma transacción, que un cierre se mande una
@@ -177,7 +177,7 @@ class TestLoQueViaja(_BaseDeEnvios):
 
         esperado = {
             "importe": 1600.0, "efectivo": 1000.0, "digital": 600.0, "turno": "mañana", "registradoPor": "TOBY",
-            "fecha": LUNES, "creadoEn": _a_las(14, 0), "origen": "cybercontrol", "cierreId": cierre["id"],
+            "fecha": LUNES, "creadoEn": _a_las(14, 0), "origen": "frkiosko", "cierreId": cierre["id"],
             "caja": cierre["caja_numero"], "forzoso": False, "enAusencia": False, "cerradoPor": "TOBY",
         }
         self.assertEqual({clave: datos[clave] for clave in esperado}, esperado)
@@ -196,7 +196,6 @@ class TestLoQueViaja(_BaseDeEnvios):
         self.assertEqual(por_clave["kiosko_solo"], (1000.0, 600.0))
         self.assertEqual({clave: montos for clave, montos in por_clave.items() if clave != "kiosko_solo"},
                          {clave: (0.0, 0.0) for clave in por_clave if clave != "kiosko_solo"})
-        self.assertEqual(detalle["reservasPorTipo"], [])
         self.assertEqual(datetime.fromisoformat(detalle["hasta"]), _a_las(14, 0))
 
     def test_el_desglose_viaja_como_mapa_de_firestore(self):
@@ -210,7 +209,6 @@ class TestLoQueViaja(_BaseDeEnvios):
         kiosko = detalle["negocios"]["arrayValue"]["values"][0]["mapValue"]["fields"]
         self.assertEqual((kiosko["nombre"], kiosko["efectivo"], kiosko["digital"]),
                          ({"stringValue": "Kiosko"}, {"integerValue": "1000"}, {"integerValue": "600"}))
-        self.assertEqual(detalle["reservasPorTipo"], {"arrayValue": {"values": []}})
         self.assertEqual(campos["enAusencia"], {"booleanValue": False})
         # json.dumps lo tiene que poder escribir entero (es lo que viaja).
         json.dumps(campos)
@@ -254,10 +252,10 @@ class TestLoQueViaja(_BaseDeEnvios):
 
         self.assertEqual(campos["importe"], {"integerValue": "1600"})
         self.assertEqual(campos["efectivo"], {"integerValue": "1000"})
-        self.assertEqual(campos["negocio"], {"stringValue": "cyberbios"})
+        self.assertEqual(campos["negocio"], {"stringValue": "gestionfr"})
         self.assertEqual(campos["turno"], {"stringValue": "mañana"})
         self.assertEqual(campos["registradoPor"], {"stringValue": "TOBY"})
-        self.assertEqual(campos["origen"], {"stringValue": "cybercontrol"})
+        self.assertEqual(campos["origen"], {"stringValue": "frkiosko"})
         self.assertEqual(campos["forzoso"], {"booleanValue": False})
         self.assertEqual(campos["caja"], {"integerValue": str(cierre["caja_numero"])})
         self.assertEqual(campos["cierreId"], {"integerValue": str(cierre["id"])})
@@ -294,7 +292,7 @@ class TestLaCola(_BaseDeEnvios):
         fila = self._fila(cierre["id"])
 
         self.assertEqual((fila["estado"], fila["intentos"], fila["documento_id"]),
-                         (dominio.ENVIO_PENDIENTE, 0, f"cybercontrol-{cierre['id']}-2026-01-05"))
+                         (dominio.ENVIO_PENDIENTE, 0, f"frkiosko-{cierre['id']}-2026-01-05"))
 
     def test_el_forzoso_y_el_de_en_ausencia_tambien_quedan_en_la_cola(self):
         envio_pwa_repo.activar(self.admin_id, True)
@@ -369,7 +367,7 @@ class TestLaCola(_BaseDeEnvios):
         self.assertEqual((resultado, de_nuevo), ({"enviados": 1, "con_error": 0}, {"enviados": 0, "con_error": 0}))
         self.assertEqual(len(self.app.patches()), 1)
         _, url, cuerpo, cabeceras = self.app.patches()[0]
-        self.assertEqual(url, f"{envio_pwa_repo.URL_FIRESTORE}/facturacion/cybercontrol-{cierre['id']}-2026-01-05")
+        self.assertEqual(url, f"{envio_pwa_repo.URL_FIRESTORE}/facturacion/frkiosko-{cierre['id']}-2026-01-05")
         self.assertEqual(cabeceras["Authorization"], "Bearer token-1")
         self.assertEqual(json.loads(cuerpo)["fields"]["registradoPor"], {"stringValue": "TOBY"})
         fila = self._fila(cierre["id"])
@@ -803,7 +801,7 @@ class TestMandarCierreAMano(_BaseDeEnvios):
     manda a pedido; al mismo documento, así no se duplica."""
 
     def _url(self, cierre):
-        return f"{envio_pwa_repo.URL_FIRESTORE}/facturacion/cybercontrol-{cierre['id']}-2026-01-05"
+        return f"{envio_pwa_repo.URL_FIRESTORE}/facturacion/frkiosko-{cierre['id']}-2026-01-05"
 
     def test_un_cierre_hecho_con_el_envio_apagado_se_manda_a_pedido(self):
         self._turno_de_toby()

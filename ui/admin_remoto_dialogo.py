@@ -47,14 +47,14 @@ class DialogoEntrarDesdeOtraPC(QDialog):
             "mientras acá se sigue atendiendo normal. Los datos son siempre los de esta PC: la otra "
             "no tiene base propia.<br><br>"
             "<b>Cómo se entra:</b><ol>"
-            "<li>Compartí en la red la carpeta donde está CyberBios.exe (con contraseña).</li>"
-            "<li>En la otra PC, abrí CyberBios.exe <b>desde esa carpeta compartida</b>. Si la "
-            "carpeta se comparte con el nombre CyberBios, es:<br>"
-            f"<b>\\\\{nombre}\\CyberBios\\CyberBios.exe</b></li>"
+            "<li>Compartí en la red la carpeta donde está FRKiosko.exe (con contraseña).</li>"
+            "<li>En la otra PC, abrí FRKiosko.exe <b>desde esa carpeta compartida</b>. Si la "
+            "carpeta se comparte con el nombre FRKiosko, es:<br>"
+            f"<b>\\\\{nombre}\\FRKiosko\\FRKiosko.exe</b></li>"
             "<li>Entrá con el usuario Administrador y su clave.</li></ol>"
             f"Esta PC es <b>{nombre}</b> (IP {ips_texto}). Este programa tiene que estar abierto acá.<br><br>"
-            "Las empleadas no pueden entrar desde otra PC. Vender, cobrar, cerrar el turno y atender las "
-            "PCs se sigue haciendo solo acá."
+            "Las empleadas no pueden entrar desde otra PC. Vender, cobrar y cerrar el turno "
+            "se sigue haciendo solo acá."
         )
         explicacion.setWordWrap(True)
 

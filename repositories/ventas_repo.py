@@ -40,9 +40,7 @@ def total_carrito(lineas: list) -> float:
 
 def _insertar_cabecera_venta(conexion, ahora: datetime, usuario_id: int, total: float, origen: str) -> int:
     """
-    Graba la cabecera de una venta CONFIRMADA y devuelve su id. Único lugar
-    donde se hace el INSERT INTO ventas: tanto confirmar_venta (kiosko) como
-    registrar_venta_sin_detalle (bonos y cargas de saldo) pasan por acá. El
+    Graba la cabecera de una venta CONFIRMADA y devuelve su id. El
     turno sale de la hora de la venta (turnos.calcular_turno), no de quién
     la hace.
 
@@ -109,15 +107,13 @@ def confirmar_venta(usuario_id: int, lineas: list, pagos: list) -> int:
         return _grabar_venta_kiosko(conexion, usuario_id, lineas, pagos)
 
 
-def _grabar_venta_kiosko(conexion, usuario_id: int, lineas: list, pagos: list, descontar_stock: bool = True) -> int:
+def _grabar_venta_kiosko(conexion, usuario_id: int, lineas: list, pagos: list) -> int:
     """
     Núcleo de confirmar_venta sobre una conexión YA ABIERTA: lo usa también
     impresiones_repo.cobrar_impresiones, que lee el precio del artículo en la
     misma transacción en que graba la venta. Único lugar donde se hace el
     INSERT INTO venta_detalle y se descuenta el stock por una venta.
 
-    `descontar_stock` en False es solo para el cobro de la Cuenta de la PC
-    (cuentas_pc_repo.cobrar): esos artículos ya bajaron el stock al anotarlos.
     """
     venta_id = _insertar_cabecera_venta(
         conexion, datetime.now(), usuario_id, total_carrito(lineas), dominio.ORIGEN_KIOSKO
@@ -135,11 +131,10 @@ def _grabar_venta_kiosko(conexion, usuario_id: int, lineas: list, pagos: list, d
         )
         # Restamos el stock. Se permite que quede en negativo (ver
         # database.py / articulos_repo.py para la explicación completa).
-        if descontar_stock:
-            conexion.execute(
-                "UPDATE articulos SET stock = stock - ? WHERE codigo = ?",
-                (linea["cantidad"], linea["codigo"]),
-            )
+        conexion.execute(
+            "UPDATE articulos SET stock = stock - ? WHERE codigo = ?",
+            (linea["cantidad"], linea["codigo"]),
+        )
 
     _insertar_pagos(conexion, venta_id, pagos)
     return venta_id
@@ -147,11 +142,7 @@ def _grabar_venta_kiosko(conexion, usuario_id: int, lineas: list, pagos: list, d
 
 def _anular_venta(conexion, venta_id: int, usuario_admin_id: int, motivo: str):
     """
-    Núcleo de anular_venta que opera sobre una conexión YA ABIERTA -- lo
-    necesita control_pcs.repositories.miembros_repo.anular_carga para que
-    anular una venta que había cargado saldo de un socio, y revertir esa
-    carga (ver ahí), queden en la MISMA transacción: o se anulan y
-    revierten juntas, o no se anula nada.
+    Núcleo de anular_venta que opera sobre una conexión ya abierta.
     """
     venta = conexion.execute("SELECT * FROM ventas WHERE id = ?", (venta_id,)).fetchone()
     if venta is None:
@@ -187,11 +178,6 @@ def anular_venta(venta_id: int, usuario_admin_id: int, motivo: str):
     venta NUNCA se borra de la base, solo cambia su estado a ANULADA,
     para no perder el rastro.
 
-    Si la venta había cargado saldo a un socio (control_pcs, "Cargar
-    Saldo"), usar control_pcs.repositories.miembros_repo.anular_carga en
-    su lugar -- esta función solo sabe de ventas/stock, y anular una
-    carga sin revertir el saldo le dejaría al socio minutos que ya nadie
-    cobró (ver ese repo).
     """
     with conexion_db() as conexion:
         _anular_venta(conexion, venta_id, usuario_admin_id, motivo)
@@ -211,41 +197,6 @@ def buscar_venta(venta_id: int):
             "SELECT * FROM venta_pagos WHERE venta_id = ?", (venta_id,)
         ).fetchall()
         return venta, detalle, pagos
-
-
-def registrar_venta_sin_detalle(
-    conexion, usuario_id: int, monto: float, pagos: list, origen: str, ahora: datetime
-) -> int:
-    """
-    Cabecera de venta compartida para lo que se cobra sin un artículo real
-    de por medio -- un bono de PC o una carga de saldo de Miembro (ver
-    control_pcs/repositories/pcs_repo.asignar_bono y
-    control_pcs/repositories/miembros_repo._registrar_carga). No hay fila
-    de venta_detalle porque esa tabla exige un articulo_codigo real.
-
-    `monto` es el total real de la operación (precio del bono, o el monto
-    cargado de saldo) y es lo que se graba en `ventas.total`, tal cual,
-    sin importar lo que haya circulado en `pagos` -- mismo criterio que
-    confirmar_venta(), donde el total sale del carrito y no de la suma de
-    los pagos (un pago en Efectivo puede superar el total si hay vuelto
-    de por medio). `pagos` es una lista de {"metodo", "monto"} -- puede
-    traer más de una fila para un cobro Mixto (Efectivo + Digital), ver
-    ui/dialogo_pago.DialogoPago, reutilizado tal cual para este caso.
-
-    A diferencia de confirmar_venta(), recibe una conexión YA ABIERTA: el
-    que llama a esta función ya está adentro de su propio `with
-    conexion_db()` (por ejemplo, junto con el INSERT de sesion_bonos o el
-    UPDATE del saldo del socio), y todo tiene que quedar en la misma
-    transacción. Es el único lugar que arma una venta sin detalle.
-
-    También recibe `ahora` en vez de llamar a su propio `datetime.now()`:
-    el llamador ya calculó un `ahora` para el resto de la operación (la
-    sesión de PC, el movimiento de saldo) y tiene que ser exactamente el
-    mismo instante en los dos lados, no uno un poco después del otro.
-    """
-    venta_id = _insertar_cabecera_venta(conexion, ahora, usuario_id, monto, origen)
-    _insertar_pagos(conexion, venta_id, pagos)
-    return venta_id
 
 
 def listar_ventas_recientes(limite: int = 50):

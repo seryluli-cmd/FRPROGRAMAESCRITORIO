@@ -37,21 +37,13 @@ def manejar_errores(func):
     - Un ValueError (los errores "de negocio", como intentar borrar un
       artículo que ya tiene ventas) se muestra tal cual, con su mensaje
       pensado para leerse directamente. Un PermissionError ("no tenés
-      permiso para esto", ver playstation_repo) también: es un rechazo de
+      permiso para esto") también: es un rechazo de
       negocio con su mensaje listo, no una falla del programa.
     - Cualquier otro error inesperado se guarda en el log de errores y
       se le muestra a la usuaria un cartel genérico, en vez de que la
       aplicación se rompa o quede en un estado raro.
-    - Un RuntimeError de "objeto C++ ya borrado" (libshiboken) es un caso
-      aparte: pasa cuando el refresco automático de 5s de Control de PCs
-      (`PanelControlPcs._refrescar`) dispara justo mientras esa pantalla
-      se está cerrando (logout o cierre del programa) y toca un widget
-      que ya no existe. Ahí no hay a quién mostrarle un cartel -- el
-      padre puede estar tan destruido como lo que falló, e intentarlo
-      igual repetía el mismo error y se escapaba sin control (ver
-      data/errores.log, 2026-09-28: "PanelActividad already deleted"
-      seguido de "PanelControlPcs already deleted" al querer avisarle a
-      esa misma ventana). Se registra en el log y se ignora en silencio.
+    - Un RuntimeError de "objeto C++ ya borrado" (libshiboken) se registra
+      sin intentar mostrar un segundo cartel sobre el widget ya destruido.
     """
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -71,12 +63,8 @@ def manejar_errores(func):
 
 def solo_en_el_mostrador(func):
     """
-    Decorador para lo que vende, cobra o atiende una PC (Vender, Cobrar un bono,
-    Finalizar Sesión, Reiniciar...). En la copia para administrar desde otra PC
-    (admin_remoto/) la pantalla se ve igual que en el mostrador (pedido del dueño,
-    2026-10-24: "quiero que se vea tal cual"), pero eso lo hace la operadora en el
-    mostrador: el botón está, y al apretarlo avisa y no hace nada. En el
-    mostrador no cambia nada.
+    Decorador para los cobros y cierres de turno. En la copia para administrar
+    desde otra PC, el botón avisa que la operación se hace en el mostrador.
     """
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -88,12 +76,11 @@ def solo_en_el_mostrador(func):
 
 
 def avisar_que_es_en_el_mostrador(padre):
-    """El aviso de `solo_en_el_mostrador` (también para el menú del clic derecho de
-    una PC, que elige qué hacer recién después de abrirse)."""
+    """El aviso de `solo_en_el_mostrador`."""
     mostrar_info(
         padre, "Se hace en el mostrador",
-        "Esto se hace en el mostrador.\n\nDesde esta PC ves todo como en el mostrador, pero vender, "
-        "cobrar y atender las PCs lo hace la operadora allá.",
+        "Esto se hace en el mostrador.\n\nDesde esta PC podés consultar y administrar el kiosko. "
+        "Los cobros y el cierre de turno los hace la operadora allá.",
     )
 
 
@@ -106,7 +93,7 @@ def _mostrar_error_seguro(padre, error):
         mostrar_error(
             padre, "Ocurrió un error inesperado",
             "Algo falló y la acción no se pudo completar.\n"
-            "El detalle quedó guardado en data/errores.log para revisarlo después.\n\n"
+            "El detalle quedó guardado en data_fr/errores.log para revisarlo después.\n\n"
             f"({error.__class__.__name__}: {error})"
         )
     except RuntimeError:
@@ -208,13 +195,8 @@ def formato_tiempo(segundos: int, con_segundos: bool = False) -> str:
     """
     Convierte segundos en un texto legible ("2h 05m" o "45m 12s"). Con
     `con_segundos` también muestra los segundos pasada la hora ("2h 05m 31s"):
-    es lo que usa la cuenta regresiva de la PlayStation 5, que se redibuja
-    cada segundo y tiene que verse correr. Vive acá (y no en control_pcs/)
-    porque tanto control_pcs/ui/pcs_window.py como
-    control_pcs/ui/miembros_window.py lo necesitan, y ui/utils.py ya es el
-    módulo compartido genérico que ambos lados de la app usan (ver
-    CLAUDE.md) — puesto en cualquiera de los dos, el otro tendría que
-    importarlo cruzado.
+    lo usaba la cuenta regresiva de las PCs en CYBERCONTROL, de donde salió
+    este programa; queda para cualquier pantalla que muestre un tiempo.
     """
     horas, resto = divmod(segundos, 3600)
     minutos, seg = divmod(resto, 60)

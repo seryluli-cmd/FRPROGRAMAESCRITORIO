@@ -16,9 +16,9 @@ mostrador) que revisa cada SEGUNDOS_ENTRE_REVISIONES. No depende de que haya
 alguien logueado ni de Qt, y nunca frena una venta: la copia usa la Online Backup
 API de SQLite (database._backup_consistente).
 
-Dónde: en data/backups y, además, en las OTRAS CARPETAS que elija el Admin. El
+Dónde: en data_fr/backups y, además, en las OTRAS CARPETAS que elija el Admin. El
 dueño eligió dos: una carpeta compartida de otra PC del local (con usuario y clave)
-y otro disco de la misma PC. Cada copia nueva se copia de data/backups a cada una.
+y otro disco de la misma PC. Cada copia nueva se copia de data_fr/backups a cada una.
 Si una no está (la otra PC apagada, el disco desconectado), la copia llega sola
 apenas vuelve: en cada revisión se mira que la última esté en todas.
 
@@ -176,7 +176,7 @@ def explicar_error(error: OSError, carpeta: str) -> str:
 # ---------------------------------------------------------------------------
 
 def carpeta_local() -> str:
-    """data/backups. Se resuelve en cada llamada (no al importar) para respetar
+    """data_fr/backups. Se resuelve en cada llamada (no al importar) para respetar
     la base temporal de los tests."""
     return os.path.join(database.DATA_DIR, "backups")
 
@@ -298,7 +298,7 @@ def _que_conteste(carpeta: str):
 
 
 def _probar_que_se_puede_guardar(carpeta: str):
-    prueba = os.path.join(carpeta, f"prueba_cyberbios{_SUFIJO_A_MEDIAS}")
+    prueba = os.path.join(carpeta, f"prueba_frkiosko{_SUFIJO_A_MEDIAS}")
     try:
         _que_conteste(carpeta)
         os.listdir(carpeta)  # da la razón verdadera (sin red, usuario o clave mal...)
@@ -352,7 +352,7 @@ def _borrar_las_que_sobran(carpeta: str):
 # ---------------------------------------------------------------------------
 
 def _copiar_en_esta_pc(ahora: datetime) -> str:
-    """Una copia nueva en data/backups. Se graba con otro nombre y se renombra
+    """Una copia nueva en data_fr/backups. Se graba con otro nombre y se renombra
     al final: si algo falla a mitad de camino, no queda un .db a medias que
     parezca la última copia (y que se lleve a las otras carpetas)."""
     carpeta = carpeta_local()

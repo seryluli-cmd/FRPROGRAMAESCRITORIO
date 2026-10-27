@@ -8,7 +8,7 @@ de barras de adentro del campo de escaneo y el renglón del carrito con el códi
 y el precio por unidad chiquitos debajo del producto.
 
 Se dibujan con QPainter: un emoji puede salir como un rectángulo en el Windows
-del mostrador (pasó con el copo de nieve de DESCONGELAR).
+del mostrador (pasó en CYBERCONTROL con el copo de nieve de DESCONGELAR).
 """
 
 from PySide6.QtCore import QRectF, QSize, Qt

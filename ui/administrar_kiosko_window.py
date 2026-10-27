@@ -15,6 +15,7 @@ from ui.articulos_window import ArticulosWindow
 from ui.caja_window import ControlCierresWindow
 from ui.compras_window import ComprasWindow
 from ui.consulta_ventas_window import ConsultaVentasWindow
+from ui.control_stock_window import VentanaControlStock
 from ui.piezas_ventana import (
     TONO_AZUL, TONO_GRIS, agregar_pastilla, bloquear_tarjeta, cabecera_oscura, tarjeta_de_menu, tecla,
     titulo_de_seccion,
@@ -59,6 +60,7 @@ class AdministrarKioskoWindow(QDialog):
             ("Mercadería", [
                 ("permiso_articulos", "📦", "Artículos", "Precios, stock, rubros y marcas", self._abrir_articulos),
                 ("permiso_compras", "🚚", "Compras", "La mercadería que entra al kiosko", self._abrir_compras),
+                (None, "📋", "Control de Stock", "Lista para contar los artículos e imprimirla", self._abrir_control_stock),
             ]),
             ("Ventas", [
                 ("permiso_consulta_ventas", "🔍",
@@ -107,6 +109,9 @@ class AdministrarKioskoWindow(QDialog):
 
     def _abrir_compras(self):
         ComprasWindow(self.usuario, self).exec()
+
+    def _abrir_control_stock(self):
+        VentanaControlStock(self.usuario["id"], self).exec()
 
     def _abrir_consulta_ventas(self):
         ConsultaVentasWindow(self.usuario, self).exec()

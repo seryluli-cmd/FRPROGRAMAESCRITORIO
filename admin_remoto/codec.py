@@ -7,7 +7,7 @@ repo, y lo que el repo le devuelve) entre la copia remota y el mostrador.
 JSON solo sabe de textos, números, listas y diccionarios con claves de texto.
 Los repos devuelven más cosas: filas de SQLite (que se leen por nombre Y por
 posición), tuplas (`buscar_venta` devuelve tres cosas), conjuntos, fechas,
-diccionarios con claves que no son texto e imágenes (el fondo de las PCs). Cada
+diccionarios con claves que no son texto y datos binarios. Cada
 una viaja como un diccionario de UNA sola clave que empieza con "__" (por
 ejemplo {"__t": [...]} es una tupla) y del otro lado se rearma igual.
 

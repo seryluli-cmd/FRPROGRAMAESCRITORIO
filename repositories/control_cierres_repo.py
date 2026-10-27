@@ -19,8 +19,7 @@ from datetime import datetime
 
 from database import conexion_db
 from repositories import cajas_repo, usuarios_repo
-from control_pcs.repositories import deudas_pc_repo
-from repositories.turnos_ventas_repo import _aparte_por_metodo, _resumen_de_reservas, _separar_de_kiosko
+from repositories.turnos_ventas_repo import _aparte_por_metodo, _separar_de_kiosko
 from turnos import etiqueta_turno, fin_del_turno
 
 
@@ -122,8 +121,7 @@ def _resumen_del_cierre(conexion, cierre, desde: str, caja: dict) -> dict:
 
     Casi todo sale tal cual de lo guardado en el cierre (efectivo, digital y cada
     negocio): son los mismos números con que se cerró. Lo único que se recalcula
-    es cuánto de Kiosko fue impresiones y trámites, y cuánto de Alquiler de PCs y
-    PlayStation 5 fueron reservas (no se guarda aparte), con las ventas de su
+    es cuánto de Kiosko fue impresiones (no se guarda aparte), con las ventas de su
     ventana contadas como estaban al cerrar (ver
     turnos_ventas_repo._condicion_vigente).
     """
@@ -132,7 +130,6 @@ def _resumen_del_cierre(conexion, cierre, desde: str, caja: dict) -> dict:
     return {
         **guardado,
         **_separar_de_kiosko(guardado, por_metodo),
-        **_resumen_de_reservas(conexion, guardado, desde, cierre["fecha_cierre"], cierre_grabado=True),
         "turno_actual": cierre["turno"],
         "turno_actual_label": etiqueta_turno(cierre["fecha"], cierre["turno"]),
         "ventas_total": round(cierre["ventas_efectivo"] + cierre["ventas_digital"], 2),
@@ -186,8 +183,7 @@ def detalle_cierre(cierre_id: int):
     a nombre de la responsable. Además devuelve "caja" (ver _datos_de_la_caja),
     "verificaciones" (todos los conteos del sobre, del primero al último) y
     "resumen": el cierre como lo mostraba la pantalla Cierre de Turno (ver
-    _resumen_del_cierre). Y "fiado_sin_cobrar": lo de la Cuenta de la PC que se
-    anotó en ese turno y no se había cobrado al cerrar (deudas_pc_repo).
+    _resumen_del_cierre).
     """
     with conexion_db() as conexion:
         cierre = _cierre_o_error(conexion, cierre_id)
@@ -222,11 +218,10 @@ def detalle_cierre(cierre_id: int):
             (cierre_id,),
         ).fetchall()
         resumen = _resumen_del_cierre(conexion, cierre, desde, caja)
-        fiado_sin_cobrar = deudas_pc_repo.fiado_del_cierre(conexion, cierre_id)
 
     return {
         "cierre": cierre, "desde": desde, "ventas": ventas, "caja": caja, "verificaciones": verificaciones,
-        "resumen": resumen, "fiado_sin_cobrar": fiado_sin_cobrar,
+        "resumen": resumen,
     }
 
 

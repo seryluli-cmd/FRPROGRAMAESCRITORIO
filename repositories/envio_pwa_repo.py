@@ -1,12 +1,12 @@
 """
 envio_pwa_repo.py
 ==================
-Mandar cada Cierre de Turno a la app de gastos del dueño -- la PWA "Gastos —
-CyberBIOS" (cyberbios.netlify.app, repo CYBERBIOS WEB) -- para que quede asentado
+Mandar cada Cierre de Turno a la app de gastos del dueño -- la PWA "Gestión
+Central" (fradministracion.netlify.app, repo FRWEB) -- para que quede asentado
 allá como el cierre de caja de ese turno, a nombre de la responsable de la caja,
-sin que nadie lo cargue a mano desde el celular (pedido del dueño, 2026-10-26;
-la propuesta está en PROPUESTA_CIERRE_A_PWA_CYBERBIOS.md, en la carpeta de los
-proyectos).
+sin que nadie lo cargue a mano desde el celular (pedido del dueño, 2026-10-26,
+hecho primero en CYBERCONTROL; la propuesta está en
+PROPUESTA_CIERRE_A_PWA_CYBERBIOS.md, en la carpeta de los proyectos).
 
 Cómo se habla con la app: igual que un celular. La PWA guarda sus datos en
 Firestore (Firebase) y entra con un "login anónimo" usando la clave PÚBLICA que
@@ -18,8 +18,7 @@ siempre el mismo usuario anónimo allá y no crea uno por envío) y un PATCH por
 cierre a la colección `facturacion`. No se expone nada nuevo: esa clave ya es
 pública y las reglas ya son esas. Si algún día se endurecen, estos envíos
 empiezan a fallar con "permiso denegado" y habrá que pasar a una cuenta de
-servicio de Firebase (una llave secreta fuera de este repo, como la de la firma
-del Cliente PC).
+servicio de Firebase (una llave secreta fuera de este repo).
 
 Reglas:
 - El cierre NUNCA espera a internet. `encolar` deja una fila en `envios_pwa` en
@@ -68,13 +67,15 @@ from repositories import control_cierres_repo, usuarios_repo
 from turnos import etiqueta_turno, turno_para_la_app_de_gastos
 
 # La app de gastos: su proyecto de Firebase y la clave PÚBLICA con que entra cada
-# celular (CYBERBIOS WEB/state.js, DEFAULT_FIREBASE_CONFIG). No es un secreto: así
+# celular (FRWEB/state.js, DEFAULT_FIREBASE_CONFIG). No es un secreto: así
 # funcionan las apps web de Firebase; lo que protege son las reglas de Firestore.
-CLAVE_PUBLICA_FIREBASE = "AIzaSyCnTWkffUqTQDLg2pvy_SU79rX7uZ4rlqM"
-PROYECTO_FIREBASE = "controlinterno-659c4"
-NEGOCIO = "cyberbios"        # NEGOCIOS[0].id de la app: el campo `negocio` de cada cierre
+# Ojo: es OTRO proyecto que el de CYBERCONTROL (controlinterno-659c4, la app
+# "Gastos — CyberBIOS"): los cierres de este kiosko van a la app de FR.
+CLAVE_PUBLICA_FIREBASE = "AIzaSyBE5i2QK0HD2bKQ-ctfYycam9QC_McmxNs"
+PROYECTO_FIREBASE = "frkioskos"
+NEGOCIO = "gestionfr"        # NEGOCIOS[0].id de la app: el campo `negocio` de cada cierre
 COLECCION = "facturacion"    # donde la app guarda los cierres
-ORIGEN = "cybercontrol"      # el campo `origen` que distingue los cierres que llegaron de acá
+ORIGEN = "frkiosko"          # el campo `origen` que distingue los cierres que llegaron de acá
 URL_FIRESTORE = (f"https://firestore.googleapis.com/v1/projects/{PROYECTO_FIREBASE}"
                  "/databases/(default)/documents")
 URL_LOGIN = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={CLAVE_PUBLICA_FIREBASE}"
@@ -205,8 +206,8 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
     enAusencia, cerradoPor y "detalle": el resumen tal como lo muestra la tarjeta
     del Cierre de Turno (pedido del dueño, 2026-10-26: tocar el cierre en la app
     y ver lo mismo que en el programa): el Cambio Fijo, lo que había que retirar,
-    cada negocio de dominio.NEGOCIOS_DEL_CIERRE con su efectivo y su digital, qué
-    fueron los pagos de reservas y de qué hora a qué hora va el turno. Sale de
+    cada negocio de dominio.NEGOCIOS_DEL_CIERRE con su efectivo y su digital, y de
+    qué hora a qué hora va el turno. Sale de
     control_cierres_repo._resumen_del_cierre, el mismo que usa Control de Cierres.
     """
     cierre = conexion.execute(
@@ -251,10 +252,6 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
                     "digital": round(resumen[f"{clave}_digital"], 2),
                 }
                 for clave, nombre in dominio.NEGOCIOS_DEL_CIERRE
-            ],
-            "reservasPorTipo": [
-                {"clase": pago["clase"], "cantidad": pago["cantidad"], "monto": round(pago["monto"], 2)}
-                for pago in resumen["reservas_por_tipo"]
             ],
             "desde": resumen["desde"],
             "hasta": resumen["hasta"],

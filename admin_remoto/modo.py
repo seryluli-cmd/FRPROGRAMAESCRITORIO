@@ -4,15 +4,15 @@ modo.py
 ¿Esta copia del programa es la del MOSTRADOR (la que tiene la base y atiende) o
 una COPIA REMOTA (el Administrador administrando desde otra PC del local)?
 
-Se decide solo, sin configurar nada: el dueño abre el CyberBios.exe desde la
-carpeta compartida del mostrador (\\\\MOSTRADOR\\CyberBios\\CyberBios.exe, o una
+Se decide solo, sin configurar nada: el dueño abre el FRKiosko.exe desde la
+carpeta compartida del mostrador (\\\\MOSTRADOR\\FRKiosko\\FRKiosko.exe, o una
 unidad de red como Z:). Un programa abierto desde la red es una copia remota y
 le habla al programa de la PC de donde vino el archivo. Esto además lo protege
 de lo peor que podría pasar: que la copia de la otra PC abriera por la red el
 mismo archivo de la base que está usando el mostrador.
 
 Para probar (o con una copia del .exe en la otra PC), se puede decir a mano a
-qué PC hablarle: CyberBios.exe --mostrador 192.168.0.10
+qué PC hablarle: FRKiosko.exe --mostrador 192.168.0.10
 
 No usa Qt ni la base: lo pregunta main.py antes de abrir nada, y las pantallas
 (con es_copia_remota) para lo que solo se hace en el mostrador: unas cosas se
@@ -25,7 +25,7 @@ import sys
 
 OPCION_MOSTRADOR = "--mostrador"
 
-# GetDriveTypeW: una unidad de red (Z: apuntando a \\MOSTRADOR\CyberBios).
+# GetDriveTypeW: una unidad de red (Z: apuntando a \\MOSTRADOR\FRKiosko).
 _UNIDAD_DE_RED = 4
 
 _mostrador_en_uso = None  # la PC del mostrador, si esta es una copia remota (ver activar)
@@ -50,7 +50,7 @@ def direccion_del_mostrador(argv=None, carpeta_del_programa=None):
 
 def pc_de_la_carpeta(carpeta: str):
     """La PC dueña de una carpeta compartida ("MOSTRADOR" para
-    \\\\MOSTRADOR\\CyberBios o para una unidad de red Z: que apunta ahí), o None
+    \\\\MOSTRADOR\\FRKiosko o para una unidad de red Z: que apunta ahí), o None
     si la carpeta es de esta misma PC."""
     ruta = _ruta_de_red(carpeta)
     if ruta is None:
@@ -101,8 +101,8 @@ def desactivar():
 
 
 def es_copia_remota() -> bool:
-    """True en la copia de la otra PC: lo que solo se hace en el mostrador
-    (vender, cerrar turno, atender las PCs...) avisa o no aparece."""
+    """True en la copia de la otra PC: las operaciones del mostrador
+    (vender o cerrar turno) avisan o no aparecen."""
     return _mostrador_en_uso is not None
 
 

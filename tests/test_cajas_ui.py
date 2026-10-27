@@ -22,7 +22,7 @@ from PySide6.QtWidgets import QApplication, QDialog  # noqa: E402
 
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
-from repositories import relevo_repo, turnos_repo, usuarios_repo, ventas_repo  # noqa: E402
+from repositories import articulos_repo, relevo_repo, turnos_repo, usuarios_repo, ventas_repo  # noqa: E402
 from ui import ingreso_caja  # noqa: E402
 from ui.caja_window import CierreTurnoWindow  # noqa: E402
 from ui.control_cierres_window import DialogoDetalleCierre  # noqa: E402
@@ -141,7 +141,6 @@ class TestVentanaPrincipalConCaja(BaseConBaseTemporal):
     def _ventana(self, usuario, al_cerrar_sesion=lambda: None):
         ventana = MainWindow(usuario, al_cerrar_sesion)
         self.addCleanup(ventana.deleteLater)
-        self.addCleanup(ventana.panel_pcs.detener_actualizacion)
         return ventana
 
     def test_se_ve_la_caja_y_el_boton_titila_en_rojo_cuando_toca_cerrar(self):
@@ -211,11 +210,15 @@ class TestDetalleDeUnCierreHecho(BaseConBaseTemporal):
         self.lucia = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Lucia", "1234", dominio.ROL_EMPLEADA))
         self.gaby = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Gaby", "1234", dominio.ROL_EMPLEADA))
         relevo_repo.abrir_caja(self.lucia["id"], 50000.0, _HACE_TIEMPO)
+        articulos_repo.crear_articulo("COCA", "Coca 500", None, None, 3000.0, 1500.0, 0)
+        venta_id = ventas_repo.confirmar_venta(
+            self.lucia["id"], [{"codigo": "COCA", "descripcion": "Coca 500", "cantidad": 1, "precio_unitario": 3000.0}],
+            [{"metodo": dominio.PAGO_EFECTIVO, "monto": 3000.0}],
+        )
+        # La venta a la hora de esa caja vieja, para que caiga en su cierre.
         with conexion_db() as conexion:
-            ventas_repo.registrar_venta_sin_detalle(
-                conexion, self.lucia["id"], 3000.0, [{"metodo": dominio.PAGO_EFECTIVO, "monto": 3000.0}],
-                dominio.ORIGEN_ALQUILER_PCS, _HACE_TIEMPO.replace(hour=9),
-            )
+            conexion.execute("UPDATE ventas SET fecha = ? WHERE id = ?",
+                             (_HACE_TIEMPO.replace(hour=9).isoformat(timespec="seconds"), venta_id))
 
     def _detalle(self):
         dialogo = DialogoDetalleCierre(turnos_repo.listar_cierres()[0])
@@ -233,7 +236,7 @@ class TestDetalleDeUnCierreHecho(BaseConBaseTemporal):
         self.assertIs(type(tarjeta), type(cierre_de_turno.tarjeta))
         self.assertEqual(tarjeta.cabecera.detalle.text(), "Caja Nº 1 de Lucia · Turno Mañana")
         self.assertEqual(tarjeta.valor_fondo.text(), "$ 50.000")
-        renglon = tarjeta.renglon("pcs_solo")
+        renglon = tarjeta.renglon("kiosko_solo")
         self.assertEqual((renglon.efectivo.text(), renglon.digital.text()), ("$ 3.000", "$ 0"))
         self.assertEqual(tarjeta.valor_total.text(), "$ 3.000")
         self.assertEqual(tarjeta.valor_retirar.text(), "$ 3.000")

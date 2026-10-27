@@ -3,7 +3,7 @@ ui/envio_pwa_dialogo.py
 =======================
 La pantalla "Cierres a la app de gastos" (Configuración ADMIN; solo Admin y solo
 en el mostrador): prender o apagar que cada Cierre de Turno se asiente solo en la
-app de gastos del dueño (la PWA "Gastos — CyberBIOS"), ver cómo van los envíos,
+app de gastos del dueño (la PWA "Gestión Central"), ver cómo van los envíos,
 probar la conexión (y qué usuarios de acá no están escritos igual allá) y
 reintentar ya los que fallaron. Las reglas viven en repositories/envio_pwa_repo.py.
 """
@@ -58,7 +58,7 @@ class DialogoEnvioPwa(QDialog):
 
     def _armar_interfaz(self):
         self.cabecera = cabecera_oscura(
-            "📲", "Cierres a la app de gastos", "Cada Cierre de Turno se asienta solo en Gastos — CyberBIOS"
+            "📲", "Cierres a la app de gastos", "Cada Cierre de Turno se asienta solo en Gestión Central"
         )
         self.pastilla = agregar_pastilla(self.cabecera, "APAGADO", TONO_GRIS)
 

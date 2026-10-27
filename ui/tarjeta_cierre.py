@@ -20,8 +20,6 @@ digital en columnas. La tabla (TablaDeNegocios) la comparte con la pantalla Caja
 Los datos son los mismos de antes: cambia solo cómo se ven.
 """
 
-from datetime import datetime
-
 from PySide6.QtWidgets import (
     QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
 )
@@ -38,53 +36,12 @@ NOTA_AL_CERRAR = (
     "fijo en el cajón para que arranque el próximo turno."
 )
 
-# Cómo se nombra cada pago de reserva en el renglón de abajo de "Reservas", en
-# singular y en plural (las claves son dominio.CLASES_PAGO_RESERVA).
-_NOMBRES_DE_PAGO_DE_RESERVA = {
-    dominio.CLASE_PAGO_RESERVA_SENA: ("seña", "señas"),
-    dominio.CLASE_PAGO_RESERVA_TOTAL: ("pago total", "pagos totales"),
-    dominio.PAGO_RESERVA_RESTO: ("resto", "restos"),
-    dominio.PAGO_RESERVA_DEVOLUCION: ("devolución", "devoluciones"),
-}
-
-# Los renglones de la tabla, en este orden: (clave, dibujito, nombre). Las claves y los
-# nombres son dominio.NEGOCIOS_DEL_CIERRE (los mismos que viajan a la app de gastos del
-# dueño, envio_pwa_repo): primero lo del kiosko, después lo de las PCs y la consola. Los
-# dibujitos son los de los botones de la barra.
-_DIBUJITOS = ("🛒", "🖨️", "📄", "🖥️", "🎮", "📅")
+# Los renglones y nombres vienen de dominio.NEGOCIOS_DEL_CIERRE.
+_DIBUJITOS = ("🛒", "🖨️")
 NEGOCIOS = tuple(
     (clave, dibujito, nombre)
     for (clave, nombre), dibujito in zip(dominio.NEGOCIOS_DEL_CIERRE, _DIBUJITOS, strict=True)
 )
-
-
-def texto_pagos_de_reservas(por_tipo: list) -> str:
-    """"1 seña ($ 5.000,00) · 1 resto ($ 3.000,00)": qué fueron los pagos de
-    reservas del turno (resumen["reservas_por_tipo"]); vacío si no hubo."""
-    partes = []
-    for pago in por_tipo:
-        singular, plural = _NOMBRES_DE_PAGO_DE_RESERVA[pago["clase"]]
-        # Con espacio duro: el renglón es angosto y "$" quedaba solo al final de una línea.
-        monto = formato_pesos(pago["monto"]).replace(" ", " ")
-        partes.append(f"{pago['cantidad']} {singular if pago['cantidad'] == 1 else plural} ({monto})")
-    return " · ".join(partes)
-
-
-def texto_reservas_sin_cobro(reservas: list) -> str:
-    """El aviso de las reservas que se habilitaron en el turno ya pagadas de otro
-    (resumen["reservas_sin_cobro"]): no suman nada acá y así se entiende por qué
-    se abrió un equipo sin plata. Vacío si no hubo."""
-    if not reservas:
-        return ""
-    renglones = []
-    for reserva in reservas:
-        pagada = ""
-        if reserva["pagada_el"]:
-            pagada = f", ya pagada el {datetime.fromisoformat(reserva['pagada_el']):%d/%m %H:%M}"
-            if reserva["pagada_a"]:
-                pagada += f" ({reserva['pagada_a']})"
-        renglones.append(f"reserva Nº {reserva['numero']} ({reserva['cliente']}) en {reserva['lugar']}{pagada}")
-    return f"📅 Habilitada sin cobro en este turno: {'; '.join(renglones)}. Acá suma $ 0."
 
 
 def titulo_de_la_caja(resumen) -> str:
@@ -104,7 +61,7 @@ def detalle_de_la_cabecera(resumen) -> str:
 def etiqueta_dato(titulo, valor_texto, destacado=False, color_titulo=None, color_valor=None, negrita_titulo=False):
     """Un dato suelto: título gris arriba y valor grande abajo (en azul si
     `destacado`). `color_titulo`/`color_valor` pintan cada etiqueta aparte y
-    `negrita_titulo` pone el título en negrita. Lo usan los avisos de Reservas.
+    `negrita_titulo` pone el título en negrita.
     Devuelve (layout, etiqueta_del_valor) para poder actualizarla."""
     contenedor = QVBoxLayout()
     titulo_lbl = QLabel(titulo)
@@ -217,14 +174,6 @@ class TablaDeNegocios(QFrame):
             grilla.addWidget(_linea("lineaRenglon"), fila, 0, 1, 4)
             self.renglones[clave] = RenglonDeNegocio(grilla, fila + 1, icono, nombre)
             fila += 2
-        # Debajo de "Reservas", qué fueron (señas, restos...).
-        self.detalle_reservas = QLabel()
-        self.detalle_reservas.setObjectName("detalleNegocio")
-        self.detalle_reservas.setWordWrap(True)
-        self.detalle_reservas.hide()
-        grilla.addWidget(self.detalle_reservas, fila, 1, 1, 3)
-        fila += 1
-
         grilla.addWidget(_linea("lineaTotal"), fila, 0, 1, 4)
         cobrado = QLabel("Cobrado")
         cobrado.setObjectName("nombreTotal")
@@ -253,8 +202,6 @@ class TablaDeNegocios(QFrame):
         """Llena la tabla con un resumen con las claves de turnos_repo.resumen_turno_actual."""
         for clave, _icono, _nombre in NEGOCIOS:
             self.renglones[clave].poner(resumen[f"{clave}_efectivo"], resumen[f"{clave}_digital"])
-        self.detalle_reservas.setText(texto_pagos_de_reservas(resumen["reservas_por_tipo"]))
-        self.detalle_reservas.setVisible(bool(self.detalle_reservas.text()))
         self.valor_efectivo.setText(formato_pesos(resumen["ventas_efectivo"]))
         self.valor_digital.setText(formato_pesos(resumen["ventas_digital"]))
         self.valor_cambio.setText(formato_pesos(resumen["cambio_inicial"]))
@@ -291,14 +238,6 @@ class TarjetaCierreDeTurno(QWidget):
         self.valor_efectivo = self.tabla.valor_efectivo
         self.valor_digital = self.tabla.valor_digital
         self.valor_fondo = self.tabla.valor_cambio
-        self.detalle_reservas = self.tabla.detalle_reservas
-
-        # Las reservas que se habilitaron ya pagadas de otro turno (no suman acá).
-        self.nota_reservas = QLabel()
-        self.nota_reservas.setObjectName("notaReservas")
-        self.nota_reservas.setWordWrap(True)
-        self.nota_reservas.hide()
-
         self.nota = QLabel()
         self.nota.setObjectName("notaCierre")
         self.nota.setWordWrap(True)
@@ -310,7 +249,6 @@ class TarjetaCierreDeTurno(QWidget):
         layout.addWidget(self.cabecera)
         layout.addLayout(cifras)
         layout.addWidget(self.tabla)
-        layout.addWidget(self.nota_reservas)
         layout.addWidget(self.nota)
         self.setLayout(layout)
 
@@ -326,8 +264,6 @@ class TarjetaCierreDeTurno(QWidget):
         self.valor_retirar.setText(formato_pesos(resumen["ventas_efectivo"]))
         self.valor_total.setText(formato_pesos(resumen["ventas_total"]))
         self.tabla.mostrar(resumen)
-        self.nota_reservas.setText(texto_reservas_sin_cobro(resumen["reservas_sin_cobro"]))
-        self.nota_reservas.setVisible(bool(self.nota_reservas.text()))
 
     def poner_nota(self, texto: str, alerta: bool = False):
         """La nota de abajo, en un recuadro gris, o rojo si `alerta` (un cierre

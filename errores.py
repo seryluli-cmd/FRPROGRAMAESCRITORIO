@@ -11,7 +11,7 @@ _LOG_LOCK = threading.Lock()
 
 
 def registrar_error(excepcion: Exception, contexto: str = None):
-    """Guarda una traza en data/errores.log sin depender de Qt.
+    """Guarda una traza en data_fr/errores.log sin depender de Qt.
 
     La ruta se resuelve al escribir para respetar la base temporal de los tests.
     El contexto debe describir la operación, nunca incluir claves ni pedidos.

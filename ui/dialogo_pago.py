@@ -18,9 +18,8 @@ queda en la caja) es dominio.cuenta_del_cobro; esta pantalla solo la muestra.
 
 Está separado de ventas_window.py a propósito: una arma el carrito y esta
 cobra, así se puede tocar la forma de cobrar sin riesgo de romper el
-escaneo, y al revés (ver CLAUDE.md, regla 12). Todo lo demás que se cobra
-lo reutiliza vía `cobrar` (más abajo): los bonos de Control de PCs, la carga
-de saldo de un socio y los trámites.
+escaneo, y al revés (ver CLAUDE.md, regla 12). Cualquier otra pantalla que cobre
+lo reutiliza vía `cobrar` (más abajo).
 """
 
 from PySide6.QtWidgets import (
@@ -309,11 +308,11 @@ def cobrar(parent, monto):
     """
     Abre este cuadro de cobro por `monto` y devuelve los pagos (netos de
     vuelto, listos para mandarle al repo), o None si se canceló (el llamador
-    no debe seguir). Así se cobra todo lo que no es una venta de kiosko,
-    igual que una venta de kiosko: un bono en Control de PCs -- PC, PCSTREAM
-    y PlayStation 5 --, la carga de saldo de un socio y un trámite (pedido
-    del dueño, 2026-10-18: antes se elegía el medio en un combo de cada
-    pantalla, y esta ventana solo se abría con "Mixto").
+    no debe seguir). Así se cobra cualquier cosa que no sea una venta de kiosko,
+    igual que una venta de kiosko (pedido del dueño, 2026-10-18: antes se elegía
+    el medio en un combo de cada pantalla, y esta ventana solo se abría con
+    "Mixto"). Hoy ninguna pantalla del kiosko la necesita; queda para la
+    próxima que cobre.
     """
     dialogo = DialogoPago(parent, monto)
     if not dialogo.exec():

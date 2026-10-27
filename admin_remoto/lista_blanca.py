@@ -5,21 +5,12 @@ Las ÚNICAS funciones de los repos que se pueden pedir desde otra PC. Cualquier
 otra cosa que llegue al mostrador se rechaza, aunque venga con la clave del
 Administrador: nada de "cualquier cosa por la red".
 
-Son las que usan las pantallas de administración (pedido del dueño,
-2026-10-18: "hago las modificaciones que quiera hacer, o miro reportes"):
-Administrar Kiosko entero (Artículos, Compras, Consulta de Ventas con anular,
-Reportes, Control de Cierres con la carga del sobre, Usuarios), Configuración
-ADMIN (estaciones, los cuatro catálogos de bonos, tarifa de socios, trámites,
-accesos de admin, fondo y filtro de palabras de las PCs) y Caja para mirar.
-Y, para MIRAR, la pantalla principal igual que en el mostrador (pedido del
-dueño, 2026-10-24: "quiero que se vea tal cual"): la grilla de PCs en vivo,
-Actividad reciente, las reservas de hoy, CONTROL DE STOCK y lo que debe cada PC
-(la Cuenta de la PC, 2026-10-25: se mira, pero anotar y cobrar es del mostrador).
+Son las que usan las pantallas de administración del kiosko: Artículos,
+Compras, Consulta de Ventas con anulación, Reportes, Control de Cierres con la
+carga del sobre, Usuarios, CONTROL DE STOCK y Caja para mirar.
 
-Lo que NO está, a propósito, y sigue solo en el mostrador: vender y cobrar
-(Ventas, Trámites, bonos de PCs, carga de saldo), abrir/cerrar cajas y turnos,
-atender las PCs (finalizar, reiniciar, mensajes...) y Actualizar el Cliente PC.
-En la otra PC esos botones están, pero avisan (ui.utils.solo_en_el_mostrador).
+Vender y cobrar, abrir/cerrar cajas y turnos siguen solo en el mostrador.
+En la otra PC esos botones avisan (ui.utils.solo_en_el_mostrador).
 
 `ACTOR` dice, para cada función que recibe "quién lo hace", cuál es ese
 parámetro: el mostrador lo completa SIEMPRE con el Administrador que entró, sin
@@ -37,12 +28,7 @@ import inspect
 
 from repositories import (
     articulos_repo, compras_repo, config_repo, detalle_dia_repo, envio_pwa_repo, relevo_repo, reportes_repo,
-    tramites_repo, turnos_repo, usuarios_repo, ventas_repo,
-)
-from control_pcs.repositories import (
-    accesos_admin_pc_repo, bonos_miembro_repo, clientes_repo, cuentas_pc_repo, filtro_palabras_repo, fondo_repo,
-    miembros_repo, pcs_repo, pcstream_repo, playstation_repo, reservas_horario_repo, reservas_repo,
-    socios_bonos_repo,
+    turnos_repo, usuarios_repo, ventas_repo,
 )
 
 # Sube si cambia CÓMO se hablan las dos copias (no la lista): las dos tienen que
@@ -57,30 +43,14 @@ _MODULOS = {
     "envio_pwa_repo": envio_pwa_repo,
     "relevo_repo": relevo_repo,
     "reportes_repo": reportes_repo,
-    "tramites_repo": tramites_repo,
     "turnos_repo": turnos_repo,
     "usuarios_repo": usuarios_repo,
     "ventas_repo": ventas_repo,
-    "accesos_admin_pc_repo": accesos_admin_pc_repo,
-    "bonos_miembro_repo": bonos_miembro_repo,
-    "clientes_repo": clientes_repo,
-    "cuentas_pc_repo": cuentas_pc_repo,
-    "filtro_palabras_repo": filtro_palabras_repo,
-    "fondo_repo": fondo_repo,
-    "miembros_repo": miembros_repo,
-    "pcs_repo": pcs_repo,
-    "pcstream_repo": pcstream_repo,
-    "playstation_repo": playstation_repo,
-    "reservas_horario_repo": reservas_horario_repo,
-    "reservas_repo": reservas_repo,
-    "socios_bonos_repo": socios_bonos_repo,
 }
 
-_CATALOGO_DE_BONOS = ("listar_bonos", "crear_bono", "modificar_bono", "desactivar_bono")
-
 FUNCIONES = {
-    # Administrar Kiosko > Artículos (y la búsqueda F5/F6/F7 de Compras), con
-    # ORDENAR Stock
+    # Administrar Kiosko > Artículos (y la búsqueda F5/F6/F7 de Compras),
+    # con ORDENAR Stock.
     "articulos_repo": (
         "listar_articulos", "buscar_por_codigo", "buscar_por_descripcion", "buscar_por_marca",
         "crear_articulo", "modificar_articulo", "borrar_articulo", "obtener_movimientos",
@@ -88,15 +58,13 @@ FUNCIONES = {
         "listar_marcas_con_cantidad", "buscar_marca_por_nombre",
         "crear_marca", "renombrar_marca", "juntar_marcas", "borrar_marca",
         "comprobar_clave_para_ordenar_stock", "ajustar_stock", "cambiar_codigo",
-        # CONTROL DE STOCK, el botón de debajo de la grilla (solo mira)
+        # CONTROL DE STOCK (solo mira).
         "listar_para_control_de_stock",
     ),
     # Compras
     "compras_repo": ("proximo_numero_compra", "registrar_compra"),
     # Consulta de Ventas / Anular (y el detalle de una venta)
     "ventas_repo": ("listar_ventas_recientes", "buscar_venta", "anular_venta"),
-    "miembros_repo": ("anular_carga",),
-    "tramites_repo": ("tramite_de_venta", "listar_tramites", "crear_tramite", "modificar_tramite", "desactivar_tramite"),
     # Reportes
     "reportes_repo": (
         "resumen_ventas", "ranking_ventas", "resumen_por_origen", "resumen_por_turno",
@@ -119,33 +87,7 @@ FUNCIONES = {
         "listar_usuarios", "obtener_usuario", "crear_usuario", "modificar_usuario", "desactivar_usuario",
         "borrar_usuario", "cambiar_clave", "listar_logins",
     ),
-    "config_repo": (
-        "obtener_fondo_cambio", "actualizar_fondo_cambio",
-        "obtener_tramos_tarifa_hora_miembro", "guardar_tramos_tarifa_hora_miembro",
-    ),
-    # Configuración ADMIN > Gestionar Estaciones (con fondo y filtro de las PCs)
-    # (y la grilla de PCs de la pantalla principal, con Actividad reciente)
-    "pcs_repo": (
-        "listar_estaciones", "ips_asentadas_repetidas", "crear_estacion", "renombrar_estacion",
-        "desactivar_estacion", "borrar_ip_asentada", "estado_estaciones", "actividad_reciente",
-    ) + _CATALOGO_DE_BONOS,
-    "clientes_repo": ("establecer_clave_admin_pcs",),
-    "fondo_repo": ("obtener", "guardar_jpeg", "quitar"),
-    "filtro_palabras_repo": ("obtener", "guardar", "listar_recientes"),
-    "accesos_admin_pc_repo": ("listar_eventos",),
-    # Los catálogos de bonos (y Reportes > PCSTREAM)
-    "pcstream_repo": ("uso_por_dia",) + _CATALOGO_DE_BONOS,
-    # Reportes > PCs: Socios y Bonos
-    "socios_bonos_repo": ("comparar",),
-    # La consola en la grilla (estado) y su catálogo
-    "playstation_repo": ("estado",) + _CATALOGO_DE_BONOS,
-    "bonos_miembro_repo": _CATALOGO_DE_BONOS,
-    # Las reservas en la grilla y el número del botón Reservas (solo leen)
-    "reservas_horario_repo": ("reservas_para_la_grilla",),
-    "reservas_repo": ("reservas_de_hoy",),
-    # La Cuenta de la PC: mirar lo que debe una PC (anotar y cobrar, solo en el
-    # mostrador) y Configuración ADMIN > Reglas de Cuenta de PC
-    "cuentas_pc_repo": ("cuentas_de_la_estacion", "obtener_reglas", "guardar_reglas"),
+    "config_repo": ("obtener_fondo_cambio", "actualizar_fondo_cambio"),
 }
 
 # (repo, función) -> el parámetro que dice quién lo hace (ver el comentario del módulo).
@@ -160,15 +102,10 @@ ACTOR = {
     ("articulos_repo", "borrar_marca"): "usuario_id",
     ("compras_repo", "registrar_compra"): "usuario_id",
     ("ventas_repo", "anular_venta"): "usuario_admin_id",
-    ("miembros_repo", "anular_carga"): "usuario_admin_id",
     ("turnos_repo", "verificar_cierre"): "usuario_admin_id",
     ("envio_pwa_repo", "mandar_cierre"): "usuario_id",
     # Cambiar la clave PROPIA (a otra persona se la cambia modificar_usuario).
     ("usuarios_repo", "cambiar_clave"): "usuario_id",
-    ("playstation_repo", "crear_bono"): "usuario_id",
-    ("playstation_repo", "modificar_bono"): "usuario_id",
-    ("playstation_repo", "desactivar_bono"): "usuario_id",
-    ("cuentas_pc_repo", "guardar_reglas"): "usuario_id",
 }
 
 

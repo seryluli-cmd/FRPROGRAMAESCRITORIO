@@ -7,7 +7,7 @@ lista de ventas arriba y, abajo, los artículos de la venta que se elija.
 
 from PySide6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem
 
-from repositories import tramites_repo, ventas_repo
+from repositories import ventas_repo
 from ui.utils import formato_pesos, manejar_errores, crear_tabla, mostrar_columna_entera
 
 
@@ -21,9 +21,7 @@ class VentanaConDetalleDeVenta(QDialog):
     """
     Base de las pantallas con una lista de ventas (`self.tabla`, con las
     ventas en `self.ventas`, en el mismo orden) y, abajo, los artículos de la
-    venta elegida (`self.tabla_detalle`). Una venta sin artículos de por
-    medio (un bono de PC, una carga de saldo de socio) deja esa tabla vacía;
-    un trámite deja una sola fila con su nombre.
+    venta elegida (`self.tabla_detalle`).
 
     La subclase arma sus tablas, crea `self.tabla_detalle` con
     `crear_tabla_detalle_venta()` y conecta
@@ -48,11 +46,6 @@ class VentanaConDetalleDeVenta(QDialog):
             (linea["articulo_codigo"], linea["descripcion"], str(linea["cantidad"]), linea["subtotal"])
             for linea in detalle
         ]
-        # Un trámite se cobra sin artículo de por medio (no hay detalle), pero
-        # sí hay que poder ver de qué se trató.
-        tramite = tramites_repo.tramite_de_venta(venta["id"])
-        if tramite is not None:
-            lineas.append(("", f"Trámite: {tramite}", "1", venta["total"]))
         for codigo, descripcion, cantidad, subtotal in lineas:
             fila = self.tabla_detalle.rowCount()
             self.tabla_detalle.insertRow(fila)

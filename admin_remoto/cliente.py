@@ -2,11 +2,11 @@
 cliente.py
 ===========
 Lo que hace la COPIA REMOTA (el programa abierto en otra PC del local para
-administrar, ver modo.py): hablarle al CyberBIOS del mostrador y hacer que las
+administrar, ver modo.py): hablarle al FRKiosko del mostrador y hacer que las
 pantallas, sin enterarse, le pidan todo a él.
 
-`instalar(conexion)` reemplaza cada función de la lista blanca, en su módulo de
-repositories/ o control_pcs/repositories/, por un "representante" que manda la
+`instalar(conexion)` reemplaza cada función de la lista blanca en su módulo de
+repositories/ por un "representante" que manda la
 llamada al mostrador y devuelve lo que contesta. Las pantallas siguen llamando a
 `articulos_repo.modificar_articulo(...)` como siempre: por eso ninguna pantalla
 puede importar una función de un repo suelta (`from repositories.x import f`),
@@ -40,8 +40,8 @@ ESPERA_LLAMADA_SEGUNDOS = 60
 ESPERA_HOLA_SEGUNDOS = 6
 # Cuánto se espera para CONECTAR con el mostrador (en la red del local tarda
 # milisegundos). Con el programa del mostrador cerrado, Windows no rechaza: no
-# contesta nada, y cada pedido esperaba la espera entera. Con la grilla de PCs,
-# que pide cada 5 segundos, la ventana quedaba trabada.
+# contesta nada, y cada pedido esperaba la espera entera. Esto evita una
+# espera larga al abrir pantallas o consultar datos desde la copia remota.
 ESPERA_CONECTAR_SEGUNDOS = 2
 
 
@@ -70,7 +70,7 @@ _abrir = urllib.request.build_opener(urllib.request.ProxyHandler({}), _Manejador
 
 
 class SinConexion(ValueError):
-    """No se pudo hablar con el CyberBIOS del mostrador."""
+    """No se pudo hablar con el FRKiosko del mostrador."""
 
 
 class _ErrorDelMostrador(Exception):
@@ -83,7 +83,7 @@ class _ErrorDelMostrador(Exception):
 
 
 class ConexionConElMostrador:
-    """La charla con el CyberBIOS de una PC del local (su nombre o su IP)."""
+    """La charla con el FRKiosko de una PC del local (su nombre o su IP)."""
 
     def __init__(self, mostrador: str, puerto: int = PUERTO, huella: str = None):
         self.mostrador = mostrador
@@ -108,7 +108,7 @@ class ConexionConElMostrador:
             contenido = error.read()
         except (urllib.error.URLError, OSError) as error:
             raise SinConexion(
-                f"No encuentro el CyberBIOS del mostrador ({self.mostrador}). Fijate que esa PC esté "
+                f"No encuentro el FRKiosko del mostrador ({self.mostrador}). Fijate que esa PC esté "
                 "prendida, con el programa abierto, y que esta PC tenga red."
             ) from error
         try:
@@ -192,7 +192,7 @@ def _carpeta_local() -> str:
     """Dónde guarda sus cosas (solo el log de errores) la copia remota: una
     carpeta de ESTA PC, nunca la compartida del mostrador."""
     base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
-    return os.path.join(base, "CyberBIOS", "administracion_remota")
+    return os.path.join(base, "FRKiosko", "administracion_remota")
 
 
 def _base_cerrada(*_args, **_kwargs):
@@ -288,7 +288,7 @@ def conectar(mostrador: str, puerto: int = PUERTO, huella: str = None) -> Conexi
     respuesta = conexion.hola()
     if not respuesta.get("misma_version"):
         raise PermissionError(
-            f"El CyberBios.exe de esta PC no es el mismo que el del mostrador ({mostrador}).\n\n"
+            f"El FRKiosko.exe de esta PC no es el mismo que el del mostrador ({mostrador}).\n\n"
             "Abrí el programa desde la carpeta compartida del mostrador, o copiá en esta PC "
             "el mismo .exe que usa el mostrador."
         )

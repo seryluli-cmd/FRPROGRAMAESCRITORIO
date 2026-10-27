@@ -140,8 +140,8 @@ def sql_dia_del_local(columna: str) -> str:
 
 def turno_para_la_app_de_gastos(fecha, turno: str) -> str:
     """
-    El nombre con que la app de gastos del dueño (la PWA "Gastos — CyberBIOS",
-    repo CYBERBIOS WEB; campo `turno` de su colección `facturacion`) llama a un
+    El nombre con que la app de gastos del dueño (la PWA "Gestión Central",
+    repo FRWEB; campo `turno` de su colección `facturacion`) llama a un
     turno de acá: "mañana", "tarde" o "noche" y, los domingos, "t1" (MAÑANA,
     06-18) o "t2" (NOCHE, 18-06): allá tampoco existe la Tarde ese día. Las dos
     apps tienen el mismo calendario, así que solo cambia el nombre; lo usa

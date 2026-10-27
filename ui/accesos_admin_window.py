@@ -5,11 +5,8 @@ accesos_admin_window.py
 una cuenta de administrador y cuándo. Exclusiva de ADMIN, igual que el
 resto de Configuración ADMIN.
 
-Tiene dos pestañas: los logins en CYBERCONTROL (los lee de la tabla
-`sesiones`, que se llena con cada login, vía usuarios_repo.listar_logins; dice
-si fue en el mostrador o desde otra PC del local, con su IP)
-y lo que pasó en el panel admin de las PCs cliente (quién cerró el Cliente
-PC y dejó una PC sin bloqueo, ver control_pcs/ui/accesos_admin_pc_tab.py).
+Muestra los logins en el Kiosko (tabla `sesiones`), tanto del mostrador
+como de la copia para administrar desde otra PC del local.
 """
 
 from datetime import datetime
@@ -20,7 +17,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QDate
 
 from repositories import usuarios_repo
-from control_pcs.ui.accesos_admin_pc_tab import PestañaAccesosAdminPc
 from ui.utils import (
     armar_filtro_por_fechas, manejar_errores, sin_boton_por_defecto, crear_tabla,
     mostrar_columna_entera, rango_de_fechas,
@@ -28,7 +24,7 @@ from ui.utils import (
 
 
 class AccesosAdminWindow(QDialog):
-    """Contenedor de las dos pestañas de accesos de admin."""
+    """Registro de accesos con usuario y contraseña."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -36,8 +32,7 @@ class AccesosAdminWindow(QDialog):
         self.resize(820, 520)
 
         pestañas = QTabWidget()
-        pestañas.addTab(PestañaLoginsAdmin(), "Logins en CYBERCONTROL")
-        pestañas.addTab(PestañaAccesosAdminPc(), "Admin en PCs cliente")
+        pestañas.addTab(PestañaLoginsAdmin(), "Logins en Kiosko")
 
         layout = QVBoxLayout()
         layout.addWidget(pestañas)
@@ -46,7 +41,7 @@ class AccesosAdminWindow(QDialog):
 
 
 class PestañaLoginsAdmin(QWidget):
-    """Cada vez que alguien entró a CYBERCONTROL con usuario y clave. Por
+    """Cada vez que alguien entró a Kiosko con usuario y clave. Por
     defecto solo los de rol ADMIN; el combo permite ver también a las
     empleadas (útil para ver quién estaba en el mostrador a cierta hora)."""
 

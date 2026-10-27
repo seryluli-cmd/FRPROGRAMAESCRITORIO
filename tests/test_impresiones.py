@@ -5,10 +5,10 @@ Pedido del dueño (2026-10-19):
 
 - En su base, IMPRESIONES es el artículo código 4 (hasta ese día el programa
   buscaba el 1, y las impresiones salían en $0 en todos los resúmenes).
-- Botón "Impresiones" en la barra de arriba, entre Vender y Trámites: cantidad,
+- Botón "Impresiones" en la barra de arriba, junto a Vender: cantidad,
   ventana de cobro de siempre, y se graba como una venta de kiosko común del
   artículo (repositories/impresiones_repo.py, ui/impresiones_window.py).
-- En Caja y Cierre de Turno, Kiosko, Impresiones y Trámites separados, cada uno
+- En Caja y Cierre de Turno, Kiosko e Impresiones separados, cada uno
   con su efectivo y digital, sin que cambie el efectivo del cajón
   (turnos_ventas_repo._aparte_por_metodo, turnos_repo._separar_de_kiosko).
 
@@ -31,7 +31,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QFrame, QPushButton  # noqa
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
 from repositories import (  # noqa: E402
-    articulos_repo, impresiones_repo, relevo_repo, reportes_repo, tramites_repo, turnos_repo, usuarios_repo,
+    articulos_repo, impresiones_repo, relevo_repo, reportes_repo, turnos_repo, usuarios_repo,
     ventas_repo,
 )
 from repositories.config_repo import obtener_fondo_cambio  # noqa: E402
@@ -149,13 +149,12 @@ class TestCobrarImpresiones(_ConArticulo):
 
 class TestKioskoSinImpresionesEnLaCaja(_ConArticulo):
     """Lo que muestran Caja y Cierre de Turno (eligió el dueño, 2026-10-19):
-    Kiosko, Impresiones y Trámites, cada uno con su ef. + dig., y los tres suman
+    Kiosko e Impresiones, cada uno con su ef. + dig., y ambos suman
     lo que se graba como Kiosko en el cierre."""
 
     def _suman_kiosko(self, resumen):
         for metodo in ("efectivo", "digital"):
-            partes = (resumen[f"kiosko_solo_{metodo}"] + resumen[f"impresiones_{metodo}"]
-                      + resumen[f"tramites_{metodo}"])
+            partes = resumen[f"kiosko_solo_{metodo}"] + resumen[f"impresiones_{metodo}"]
             self.assertAlmostEqual(partes, resumen[f"kiosko_{metodo}"], places=2, msg=metodo)
 
     def test_impresiones_cobradas_solas_quedan_con_su_medio_exacto(self):
@@ -191,18 +190,6 @@ class TestKioskoSinImpresionesEnLaCaja(_ConArticulo):
 
         self.assertEqual((resumen["impresiones_efectivo"], resumen["impresiones_digital"]), (33.33, 66.67))
         self.assertEqual((resumen["kiosko_solo_efectivo"], resumen["kiosko_solo_digital"]), (66.67, 133.33))
-        self._suman_kiosko(resumen)
-
-    def test_los_tramites_salen_de_kiosko_con_su_pago(self):
-        tramite_id = tramites_repo.crear_tramite("Boleta de luz")
-        tramites_repo.registrar_tramite(self.usuario_id, tramite_id, 2500.0, [_pago(EF, 1000.0), _pago(DIG, 1500.0)])
-        self._vender([self._linea("COD9", 1, 100.0)], [_pago(DIG, 100.0)])
-
-        resumen = turnos_repo.resumen_turno_actual()
-
-        self.assertEqual((resumen["tramites_efectivo"], resumen["tramites_digital"]), (1000.0, 1500.0))
-        self.assertEqual((resumen["kiosko_solo_efectivo"], resumen["kiosko_solo_digital"]), (0.0, 100.0))
-        self.assertEqual(resumen["tramites"], 2500.0)
         self._suman_kiosko(resumen)
 
     def test_el_efectivo_del_cajon_y_el_total_no_cambian(self):
@@ -296,10 +283,9 @@ class TestBotonEnLaBarra(_ConArticulo):
 
         ventana = MainWindow(usuario, lambda: None)
         self.addCleanup(ventana.deleteLater)
-        self.addCleanup(ventana.panel_pcs.detener_actualizacion)
         return ventana
 
-    def test_va_entre_vender_y_tramites_con_la_tecla_de_la_barra(self):
+    def test_va_despues_de_vender_con_la_tecla_de_la_barra(self):
         ventana = self._ventana(self.usuario)
         barra = ventana.findChild(QFrame, "encabezadoInicio")
         botones = [boton for boton in barra.findChildren(QPushButton)]
@@ -307,7 +293,6 @@ class TestBotonEnLaBarra(_ConArticulo):
 
         i = textos.index("🖨️  IMPRESIONES")
         self.assertEqual(textos[i - 1], "🛒  VENDER")
-        self.assertEqual(textos[i + 1], "📄  TRÁMITES")
         self.assertEqual(botones[i].property("clase"), "barra")
 
     def test_abre_la_ventana_con_el_articulo(self):
@@ -335,7 +320,7 @@ class TestBotonEnLaBarra(_ConArticulo):
 
 
 class TestCajaMuestraImpresionesAparte(_ConArticulo):
-    def test_caja_muestra_kiosko_impresiones_y_tramites_por_separado(self):
+    def test_caja_muestra_kiosko_e_impresiones_por_separado(self):
         from ui.caja_window import CajaWindow
 
         impresiones_repo.cobrar_impresiones(self.usuario_id, 2, 150.0, [_pago(DIG, 300.0)])
@@ -345,9 +330,8 @@ class TestCajaMuestraImpresionesAparte(_ConArticulo):
         self.addCleanup(ventana.deleteLater)
 
         montos = {clave: (ventana.renglon(clave).efectivo.text(), ventana.renglon(clave).digital.text())
-                  for clave in ("kiosko_solo", "impresiones", "tramites")}
-        self.assertEqual(montos, {"kiosko_solo": ("$ 100", "$ 0"), "impresiones": ("$ 0", "$ 300"),
-                                  "tramites": ("$ 0", "$ 0")})
+                  for clave in ("kiosko_solo", "impresiones")}
+        self.assertEqual(montos, {"kiosko_solo": ("$ 100", "$ 0"), "impresiones": ("$ 0", "$ 300")})
         # La Caja Actual son los $100 en efectivo (sin el cambio): separar no cambia nada.
         self.assertEqual(ventana.valor_actual.text(), "$ 100")
 

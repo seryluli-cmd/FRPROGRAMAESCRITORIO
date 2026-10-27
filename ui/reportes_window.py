@@ -5,23 +5,16 @@ Reportes, una pestaña por cada pregunta que se le hace a las ventas:
 
 - Resumen de Ventas: cuánta plata se trabajó en un rango de fechas.
 - Resumen del Día: un día abierto por turno, con quién cerró y si el sobre
-  cuadró; Kiosko, Impresiones, Trámites, Alquiler de PCs y PlayStation 5 van en
-  columnas aparte. Abajo, el detalle de todo lo vendido (venta por venta, por
+  cuadró; Kiosko e Impresiones van en columnas aparte. Abajo, el detalle de lo vendido (venta por venta, por
   producto y por operador) del día o del turno que se toque (en su propio
   archivo, ui/reportes_detalle_dia.py).
 - Por Turno: el total de un rango repartido entre Mañana/Tarde/Noche.
-- Totales: Kiosko / Impresiones / Trámites / Alquiler de PCs / PlayStation 5,
+- Totales: Kiosko / Impresiones,
   por turno, día, semana o rango.
-- Ranking de Ventas: qué se vendió más -- artículos de kiosko, bonos de PC,
-  bonos de socios, cargas de saldo por tarifa, trámites y bonos de la
-  PlayStation 5, todo junto, con una columna Categoría para distinguir de qué
-  rubro vino cada fila (ver reportes_repo.ranking_ventas).
+- Ranking de Ventas: qué artículos se vendieron más, con una columna Categoría
+  para distinguir las impresiones (ver reportes_repo.ranking_ventas).
 - Por Operador: quién vendió cuánto y, de cada uno, sus ventas con fecha y
   hora (en su propio archivo, ui/reportes_operador.py).
-- PCSTREAM: cuánto se usa la PC de streaming, en tiempo y en plata, día por día
-  (en su propio archivo, ui/reportes_pcstream.py).
-- PCs: Socios y Bonos: lo que dejaron las PCs, separado en cargas a socios y
-  bonos del mostrador, y comparado (ui/reportes_socios_bonos.py).
 
 Las usa el Admin o una Empleada con `permiso_reportes`.
 """
@@ -33,14 +26,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-import dominio
 from repositories import reportes_repo
 # Resumen del Día vive en su propio archivo; se importa también desde acá
 # (ui.reportes_window.PestañaResumenDelDia), como antes de partirlo.
 from ui.reportes_resumen_dia import PestañaResumenDelDia
 from ui.reportes_operador import PestañaPorOperador
-from ui.reportes_pcstream import PestañaPcstream
-from ui.reportes_socios_bonos import PestañaSociosYBonos
 from ui.utils import (
     armar_filtro_por_fechas, formato_pesos, manejar_errores, sin_boton_por_defecto,
     crear_tabla, rango_de_fechas, hoy_del_local,
@@ -55,11 +45,11 @@ class ReportesWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Reportes")
-        # El Resumen del Día tiene 13 columnas: con menos ancho la de "Cerró" (el
+        # El Resumen del Día tiene varias columnas: con menos ancho la de "Cerró" (el
         # nombre de quien cerró cada turno) queda tan angosta que corta el nombre.
         # No más ancho que la pantalla, para que la ventana no se salga de ella.
         # Alto: el Resumen del Día lleva abajo el detalle de las ventas.
-        ancho, alto = 1420, 820
+        ancho, alto = 1100, 820
         if self.screen() is not None:
             ancho = min(ancho, self.screen().availableGeometry().width() - 20)
             alto = min(alto, self.screen().availableGeometry().height() - 40)
@@ -69,11 +59,9 @@ class ReportesWindow(QDialog):
         pestañas.addTab(PestañaResumen(), "Resumen de Ventas")
         pestañas.addTab(PestañaResumenDelDia(), "Resumen del Día")
         pestañas.addTab(PestañaPorTurno(), "Por Turno")
-        pestañas.addTab(PestañaKioskoVsPCs(), "Totales")
+        pestañas.addTab(PestañaTotales(), "Totales")
         pestañas.addTab(PestañaRanking(), "Ranking de Ventas")
         pestañas.addTab(PestañaPorOperador(), "Por Operador")
-        pestañas.addTab(PestañaPcstream(), dominio.NOMBRE_PCSTREAM)
-        pestañas.addTab(PestañaSociosYBonos(), "PCs: Socios y Bonos")
 
         # Cómo se cuenta un día en TODAS las pestañas (pedido del dueño): sin
         # esto, ver la madrugada del 2 sumada en el día 1 parecería un error.
@@ -187,12 +175,11 @@ class PestañaPorTurno(QWidget):
 
 # Las columnas de plata de la pestaña "Totales", en el orden en que se ven: son
 # las claves de cada fila de reportes_repo.resumen_por_origen.
-_COLUMNAS_DE_TOTALES = ("kiosko", "impresiones", "tramites", "pcs", "playstation", "total")
+_COLUMNAS_DE_TOTALES = ("kiosko", "impresiones", "total")
 
 
-class PestañaKioskoVsPCs(QWidget):
-    """Desglosa lo facturado en Kiosko, Impresiones, Trámites, Alquiler de PCs y
-    PlayStation 5 (ver dominio.NOMBRE_ORIGEN_VENTA) en un rango de fechas,
+class PestañaTotales(QWidget):
+    """Desglosa lo facturado en Kiosko e Impresiones en un rango de fechas,
     agrupado a elección por turno, día, semana o el total del rango completo."""
 
     def __init__(self):
@@ -213,11 +200,11 @@ class PestañaKioskoVsPCs(QWidget):
         )
 
         self.tabla = crear_tabla(
-            ["Período", "Kiosko", "Impresiones", "Trámites", "Alquiler de PCs", "PlayStation 5", "Total"],
+            ["Período", "Kiosko", "Impresiones", "Total"],
             estirar=0,
         )
 
-        nota = QLabel("Impresiones y Trámites se muestran aparte: no están sumados en Kiosko.")
+        nota = QLabel("Impresiones se muestran aparte: no están sumadas en Kiosko.")
         nota.setStyleSheet("color: #7A869A;")
 
         layout = QVBoxLayout()
@@ -269,8 +256,7 @@ class PestañaKioskoVsPCs(QWidget):
 
 
 class PestañaRanking(QWidget):
-    """Ranking de TODO lo vendido (kiosko, bonos de PC, de socios y de la
-    PlayStation 5, cargas de saldo y trámites) en un rango de fechas, ordenable
+    """Ranking de artículos e impresiones vendidos en un rango de fechas, ordenable
     por cantidad o por monto."""
 
     def __init__(self):
@@ -293,9 +279,7 @@ class PestañaRanking(QWidget):
         self.etiqueta_titulo.setAlignment(Qt.AlignCenter)
 
         self.tabla = crear_tabla(["Cantidad", "Categoría", "Código", "Descripción", "Importe"], estirar=3)
-        # La categoría se muestra entera: con el ancho fijo de siempre, "Bono de
-        # PlayStation 5" y "Bono de Socio" se cortaban igual ("Bono de ...") y no
-        # se podían distinguir.
+        # La categoría se muestra entera en ventanas angostas.
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
 
         layout = QVBoxLayout()

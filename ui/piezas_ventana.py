@@ -2,9 +2,9 @@
 ui/piezas_ventana.py
 ====================
 Las piezas del diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26
-(maqueta A, en PROPUESTA_VENTANAS_ADMIN) para Configuración ADMIN, Gestionar
-Estaciones y Reservas, y después Administrar Kiosko, Caja y Cierre de Turno: la cabecera oscura como la barra de arriba del mostrador, con
-una estela celeste como la del cometa del mosaico y pastillas con números; paneles
+(maqueta A, en PROPUESTA_VENTANAS_ADMIN) para Configuración ADMIN, Administrar
+Kiosko, Caja y Cierre de Turno: la cabecera oscura como la barra de arriba del mostrador, con
+una estela celeste y pastillas con números; paneles
 blancos con títulos de sección; tarjetas de menú (un botón con dibujito, título y una
 línea de para qué es); cifras destacadas (un monto grande en un recuadro verde o azul) y
 teclas con relieve.
@@ -69,7 +69,7 @@ def cabecera_oscura(icono: str, titulo: str, detalle: str = "") -> QFrame:
 
 
 def agregar_pastilla(cabecera: QFrame, texto: str, tono: str) -> QLabel:
-    """Una pastilla con un número a la derecha de la cabecera ("31 ESTACIONES")."""
+    """Una pastilla con un número a la derecha de la cabecera ("12 ARTÍCULOS")."""
     pastilla = QLabel(texto)
     pastilla.setObjectName("pastillaCabecera")
     pastilla.setProperty("tono", tono)
@@ -111,7 +111,7 @@ def cifra_destacada(titulo: str, aclaracion: str, tono: str) -> QFrame:
 
 
 def titulo_de_seccion(texto: str) -> QLabel:
-    """El título chiquito, en mayúscula y gris, de un grupo ("BONOS")."""
+    """El título chiquito, en mayúscula y gris, de un grupo ("MERCADERÍA")."""
     etiqueta = QLabel(texto.upper())
     etiqueta.setObjectName("tituloDeSeccion")
     return etiqueta

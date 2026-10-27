@@ -4,13 +4,11 @@ tests/test_barra_para_todos.py
 La barra de arriba de la ventana principal muestra los mismos botones a todos
 (pedido del dueño, 2026-10-19: con solo los suyos, la barra de una empleada quedaba
 muy vacía). Los que no le tocan a alguien se ven igual que los demás pero no abren
-nada al apretarlos. Configuración ADMIN la abre cualquiera, pero un Operador solo
-puede usar Gestionar Estaciones: el resto se ve en gris, con candado (mismo día). Adentro,
-todo menos la contraseña de las PCs clientes y Actualizar el Cliente PC. Las tarjetas de
-esas dos ventanas (diseño del 2026-10-26) llevan el título en `accessibleName()`: su
-texto lo dibujan etiquetas de adentro (ver ui/piezas_ventana.tarjeta_de_menu). Miembros abre
-para cualquier operador logueado (pedido del dueño, 2026-10-19: antes pedía
-permiso_control_pcs o Admin). Se prueba sin abrir ninguna ventana (plataforma
+nada al apretarlos. Configuración ADMIN es solo del Administrador (acá adentro no
+quedó nada que use un Operador): una empleada ve el botón igual, pero no abre. Las
+tarjetas de Configuración ADMIN y Administrar Kiosko (diseño del 2026-10-26) llevan el
+título en `accessibleName()`: su texto lo dibujan etiquetas de adentro (ver
+ui/piezas_ventana.tarjeta_de_menu). Se prueba sin abrir ninguna ventana (plataforma
 "offscreen").
 
 Se ejecutan con:
@@ -26,12 +24,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QFrame, QPushButton  # noqa: E402
 
 import dominio  # noqa: E402
-from database import conexion_db  # noqa: E402
 from repositories import usuarios_repo  # noqa: E402
 from ui.administrar_kiosko_window import TEXTO_SIN_PERMISO, AdministrarKioskoWindow  # noqa: E402
 from ui.main_window import ConfiguracionAdminWindow, MainWindow  # noqa: E402
 from ui.piezas_ventana import TEXTO_SOLO_ADMIN  # noqa: E402
-from control_pcs.ui.pcs_gestion_dialogos import DialogoGestionEstaciones  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
@@ -42,10 +38,9 @@ def _nombre(boton):
     return boton.accessibleName() or boton.text()
 
 # Botón de la barra -> la ventana que abre (el nombre en ui.main_window).
-# Miembros no está acá: abre para cualquiera, como Vender (ver
-# test_miembros_abre_para_cualquier_empleada).
 _CON_PERMISO = {
     "🛠️  ADMIN KIOSKO": "AdministrarKioskoWindow",
+    "⚙️  CONFIG ADMIN": "ConfiguracionAdminWindow",
 }
 
 
@@ -58,7 +53,6 @@ class TestBarraParaTodos(_ConUsuarios):
     def _ventana(self, nombre, rol, permisos=None):
         ventana = MainWindow(self._usuario(nombre, rol, permisos), lambda: None)
         self.addCleanup(ventana.deleteLater)
-        self.addCleanup(ventana.panel_pcs.detener_actualizacion)
         return ventana
 
     def _botones(self, ventana):
@@ -102,39 +96,11 @@ class TestBarraParaTodos(_ConUsuarios):
 
         self.assertEqual(self._que_abre(encargada), {"🛠️  ADMIN KIOSKO"})
 
-    def test_la_casilla_vieja_de_pcs_ya_no_la_hace_encargada(self):
-        """Pedido del dueño, 2026-10-22: se sacó "Operar PCs y Miembros" de
-        Usuarios. Quien la tenía tildada (la columna sigue en la base, con su
-        valor) ya no abre Admin Kiosko, que se le abría vacío."""
-        usuario_id = usuarios_repo.crear_usuario("PCs", "1234", dominio.ROL_EMPLEADA)
-        with conexion_db() as conexion:
-            conexion.execute("UPDATE usuarios SET permiso_control_pcs = 1 WHERE id = ?", (usuario_id,))
-        ventana = MainWindow(usuarios_repo.obtener_usuario(usuario_id), lambda: None)
-        self.addCleanup(ventana.deleteLater)
-        self.addCleanup(ventana.panel_pcs.detener_actualizacion)
+    def test_config_admin_no_se_delega_con_ningun_permiso(self):
+        todos = {clave: True for clave, _ in usuarios_repo.PERMISOS_EMPLEADA}
+        encargada = self._ventana("Encargada", dominio.ROL_EMPLEADA, todos)
 
-        self.assertEqual(self._que_abre(ventana), set())
-        # Y modificarla en Usuarios no le pisa lo que tenía guardado.
-        usuarios_repo.modificar_usuario(usuario_id, "PCs", dominio.ROL_EMPLEADA, permisos={})
-        self.assertEqual(usuarios_repo.obtener_usuario(usuario_id)["permiso_control_pcs"], 1)
-
-    def test_miembros_abre_para_cualquier_empleada(self):
-        """Pedido del dueño, 2026-10-19: antes pedía permiso_control_pcs o Admin,
-        pero cargarle saldo a un socio es una venta más y cualquiera tiene que
-        poder hacerlo."""
-        empleada = self._ventana("TOBY", dominio.ROL_EMPLEADA)
-        botones = self._botones(empleada)
-
-        with mock.patch("ui.main_window.MiembrosWindow") as clase:
-            botones["🧑  MIEMBROS"].click()
-
-        clase.assert_called_once()
-
-    def test_config_admin_abre_para_todos(self):
-        for ventana in (self._ventana("Admin", dominio.ROL_ADMIN), self._ventana("TOBY", dominio.ROL_EMPLEADA)):
-            with mock.patch("ui.main_window.ConfiguracionAdminWindow") as clase:
-                self._botones(ventana)["⚙️  CONFIG ADMIN"].click()
-            clase.assert_called_once()
+        self.assertEqual(self._que_abre(encargada), {"🛠️  ADMIN KIOSKO"})
 
 
 class TestConfiguracionAdminParaUnOperador(_ConUsuarios):
@@ -144,11 +110,11 @@ class TestConfiguracionAdminParaUnOperador(_ConUsuarios):
         self.addCleanup(ventana.deleteLater)
         return {_nombre(b): b.isEnabled() for b in ventana.findChildren(QPushButton) if b.text() != "CERRAR"}
 
-    def test_un_operador_solo_puede_usar_gestionar_estaciones(self):
+    def test_un_operador_lo_ve_todo_en_gris(self):
         habilitados = self._habilitados(self._usuario("TOBY", dominio.ROL_EMPLEADA))
 
-        self.assertEqual([texto for texto, si in habilitados.items() if si], ["Gestionar Estaciones"])
-        self.assertGreater(len(habilitados), 1)  # el resto sigue a la vista, en gris
+        self.assertEqual([texto for texto, si in habilitados.items() if si], [])
+        self.assertGreater(len(habilitados), 1)  # sigue a la vista, en gris
 
     def test_lo_que_no_usa_el_operador_dice_que_es_del_admin(self):
         ventana = ConfiguracionAdminWindow(self._usuario("TOBY", dominio.ROL_EMPLEADA))
@@ -158,27 +124,16 @@ class TestConfiguracionAdminParaUnOperador(_ConUsuarios):
             if tarjeta.accessibleName() and not tarjeta.isEnabled():
                 self.assertEqual((tarjeta.icono.text(), tarjeta.detalle.text()), ("🔒", TEXTO_SOLO_ADMIN))
 
-    def test_ni_con_todos_los_permisos_usa_lo_demas(self):
-        # Los catálogos son de super admin: ningún permiso de empleada los habilita.
+    def test_ni_con_todos_los_permisos_usa_nada(self):
         todos = {clave: True for clave, _ in usuarios_repo.PERMISOS_EMPLEADA}
         habilitados = self._habilitados(self._usuario("TOBY", dominio.ROL_EMPLEADA, todos))
 
-        self.assertEqual([texto for texto, si in habilitados.items() if si], ["Gestionar Estaciones"])
+        self.assertEqual([texto for texto, si in habilitados.items() if si], [])
 
     def test_el_admin_usa_todo(self):
         habilitados = self._habilitados(self._usuario("Admin", dominio.ROL_ADMIN))
 
         self.assertTrue(all(habilitados.values()), habilitados)
-
-    def test_un_operador_abre_gestionar_estaciones(self):
-        ventana = ConfiguracionAdminWindow(self._usuario("TOBY", dominio.ROL_EMPLEADA))
-        self.addCleanup(ventana.deleteLater)
-        boton = next(b for b in ventana.findChildren(QPushButton) if _nombre(b) == "Gestionar Estaciones")
-
-        with mock.patch("ui.configuracion_admin_window.DialogoGestionEstaciones") as dialogo:
-            boton.click()
-
-        dialogo.assert_called_once()
 
 
 class TestAdministrarKiosko(_ConUsuarios):
@@ -198,7 +153,8 @@ class TestAdministrarKiosko(_ConUsuarios):
         tarjetas = self._tarjetas(self._ventana(self._usuario("Admin", dominio.ROL_ADMIN)))
 
         self.assertEqual(sorted(tarjetas), ["Artículos", "Compras", "Consulta de Ventas / Anular",
-                                            "Control de Cierres de Turno", "Reportes", "Usuarios"])
+                                            "Control de Cierres de Turno", "Control de Stock", "Reportes",
+                                            "Usuarios"])
         self.assertTrue(all(tarjeta.isEnabled() for tarjeta in tarjetas.values()))
 
     def test_una_encargada_usa_solo_lo_que_tiene_habilitado(self):
@@ -208,7 +164,9 @@ class TestAdministrarKiosko(_ConUsuarios):
 
         self.assertEqual([nombre for nombre, tarjeta in tarjetas.items() if tarjeta.isEnabled()], ["Reportes"])
         self.assertIn("Consulta de Ventas", tarjetas)  # sin "/ Anular": anular es del Admin
+        # Usuarios y Control de Stock son solo del Admin: ningún permiso los habilita.
         self.assertEqual(tarjetas["Usuarios"].detalle.text(), TEXTO_SOLO_ADMIN)
+        self.assertEqual(tarjetas["Control de Stock"].detalle.text(), TEXTO_SOLO_ADMIN)
         for nombre in ("Artículos", "Compras", "Consulta de Ventas", "Control de Cierres de Turno"):
             self.assertEqual((tarjetas[nombre].icono.text(), tarjetas[nombre].detalle.text()),
                              ("🔒", TEXTO_SIN_PERMISO), nombre)
@@ -217,6 +175,7 @@ class TestAdministrarKiosko(_ConUsuarios):
         tarjetas = self._tarjetas(self._ventana(self._usuario("Admin", dominio.ROL_ADMIN)))
 
         for nombre, pantalla in (("Artículos", "ArticulosWindow"), ("Compras", "ComprasWindow"),
+                                 ("Control de Stock", "VentanaControlStock"),
                                  ("Consulta de Ventas / Anular", "ConsultaVentasWindow"),
                                  ("Reportes", "ReportesWindow"),
                                  ("Control de Cierres de Turno", "ControlCierresWindow"),
@@ -224,28 +183,3 @@ class TestAdministrarKiosko(_ConUsuarios):
             with mock.patch(f"ui.administrar_kiosko_window.{pantalla}") as clase:
                 tarjetas[nombre].click()
             clase.assert_called_once()
-
-
-class TestGestionarEstacionesParaUnOperador(_ConUsuarios):
-    """Adentro de Gestionar Estaciones el Operador usa todo menos la contraseña de
-    las PCs clientes y Actualizar el Cliente PC, que ve en gris (pedido del dueño,
-    2026-10-19: el fondo y el filtro sí los puede usar)."""
-
-    def _habilitados(self, usuario):
-        ventana = DialogoGestionEstaciones(usuario)
-        self.addCleanup(ventana.deleteLater)
-        return {_nombre(b): b.isEnabled() for b in ventana.findChildren(QPushButton)}
-
-    def test_un_operador_ve_en_gris_la_contrasena_y_actualizar_el_cliente_pc(self):
-        habilitados = self._habilitados(self._usuario("TOBY", dominio.ROL_EMPLEADA))
-
-        self.assertEqual(sorted(texto for texto, si in habilitados.items() if not si),
-                         ["Actualizar el Cliente PC", "Contraseña de las PCs"])
-        for texto in ("＋  AGREGAR", "✏️  RENOMBRAR", "DESACTIVAR", "TRAER IP", "BORRAR IP", "Fondo de pantalla",
-                      "Filtro de palabras"):
-            self.assertTrue(habilitados[texto], texto)
-
-    def test_el_admin_usa_todo(self):
-        habilitados = self._habilitados(self._usuario("Admin", dominio.ROL_ADMIN))
-
-        self.assertTrue(all(habilitados.values()), habilitados)

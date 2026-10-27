@@ -16,7 +16,6 @@ from PySide6.QtCore import Qt
 
 import dominio
 from repositories import ventas_repo
-from control_pcs.repositories import miembros_repo
 from ui.detalle_venta import VentanaConDetalleDeVenta, crear_tabla_detalle_venta
 from ui.utils import (
     formato_pesos, formato_fecha_hora, mostrar_error, mostrar_info, confirmar, manejar_errores,
@@ -111,16 +110,6 @@ class ConsultaVentasWindow(VentanaConDetalleDeVenta):
             mostrar_error(self, "Falta el motivo", "Tenés que indicar un motivo para anular la venta.")
             return
 
-        # Una venta de "Alquiler de PCs" puede ser una carga de saldo de
-        # socio -- esa sí necesita revertir los minutos ya acreditados,
-        # no solo cambiar el estado de la venta (ver
-        # miembros_repo.anular_carga). Las de Kiosko y las de PlayStation 5
-        # nunca cargan saldo, así que siguen con el camino simple de siempre
-        # (anular la venta de la consola no corta su cuenta regresiva: se la
-        # libera aparte, desde Control de PCs, como con un bono de PC).
-        if venta["origen"] == dominio.ORIGEN_ALQUILER_PCS:
-            miembros_repo.anular_carga(venta["id"], self.usuario["id"], motivo.strip())
-        else:
-            ventas_repo.anular_venta(venta["id"], self.usuario["id"], motivo.strip())
+        ventas_repo.anular_venta(venta["id"], self.usuario["id"], motivo.strip())
         mostrar_info(self, "Venta anulada", f"Se anuló la venta Nº {venta['id']}.")
         self._cargar()

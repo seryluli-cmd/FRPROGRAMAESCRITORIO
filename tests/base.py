@@ -1,7 +1,7 @@
 """
 tests/base.py
 ===============
-Fixture compartida entre tests/test_kiosko.py y tests/test_control_pcs.py.
+Fixture compartida por todas las pruebas que usan una base temporal.
 A propósito NO se llama "test_algo.py": ese nombre coincide con el patrón
 que usa "python -m unittest discover tests" para buscar módulos de test,
 y este archivo no tiene ningún test adentro, solo la base que los otros

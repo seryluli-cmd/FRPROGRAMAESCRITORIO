@@ -5,9 +5,9 @@ Punto de entrada de SQLite para el resto del sistema:
 - Dónde se guarda el archivo de la base de datos.
 - Cómo se conecta el resto del programa a ella.
 - El esquema completo vive en database_esquema.py.
-- Las migraciones (`_migrar_*`) viven en database_migraciones.py.
+- Las versiones del esquema viven en database_migraciones.py.
 - Los datos mínimos de la primera vez: un Administrador, el fondo de
-  cambio, la tarifa de socios y los rubros de fábrica.
+  cambio y los rubros de fábrica.
 
 Usamos SQLite porque es un archivo único en el disco (no hace falta instalar
 ningún "servidor" de base de datos aparte), y funciona perfecto sin
@@ -28,7 +28,7 @@ from datetime import datetime
 import dominio
 
 # Carpeta donde vive el archivo de la base de datos. Se guarda al lado del
-# programa, dentro de una carpeta "data" para no mezclar el archivo .db
+# programa, dentro de una carpeta propia "data_fr" para no mezclar el archivo .db
 # con el código fuente. Cuando el programa corre como .exe empaquetado
 # (PyInstaller), __file__ apunta a una carpeta temporal que se borra en
 # cada arranque — si se usara esa carpeta para guardar la base de datos,
@@ -36,7 +36,7 @@ import dominio
 # empaquetado, se usa la carpeta donde vive el .exe real en su lugar.
 BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) \
     else os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = os.path.join(BASE_DIR, "data_fr")
 DB_PATH = os.path.join(DATA_DIR, "kiosko.db")
 
 
@@ -120,8 +120,8 @@ def _backup_consistente(destino: str):
     Copia la base de datos a `destino` usando la Online Backup API de
     SQLite (`sqlite3.Connection.backup`), no una copia de archivo cruda
     (`shutil.copy`). El programa sigue corriendo mientras se hace un
-    backup -- el servidor de red (servidor_red.py) sigue atendiendo
-    pedidos de las PCs cliente en su propio hilo, y cualquier pantalla
+    backup -- el servidor de administración remota puede seguir atendiendo
+    pedidos en su propio hilo, y cualquier pantalla
     puede estar a mitad de una operación de varias tablas (ver
     ventas_repo.confirmar_venta: cabecera, detalle, pagos y stock se
     graban juntos, todo o nada). Copiar el archivo .db a mano justo en
@@ -160,13 +160,6 @@ def copiar_backup_a(carpeta_destino: str) -> str:
     return destino
 
 
-# Columnas de "ventas", para copiarlas al reconstruir la tabla.
-_COLUMNAS_VENTAS = (
-    "id", "fecha", "usuario_id", "turno", "total", "estado", "anulada_por",
-    "anulada_fecha", "anulada_motivo", "origen",
-)
-
-
 def _valores_sql(valores) -> str:
     """Una lista de dominio.py (ROLES, ESTADOS_VENTA, TURNOS...) como va dentro
     de un CHECK (columna IN (...)): "'ADMIN', 'EMPLEADA'". Así los valores
@@ -175,88 +168,10 @@ def _valores_sql(valores) -> str:
     comillas adentro)."""
     return ", ".join(f"'{valor}'" for valor in valores)
 
-
-def _origenes_venta_sql() -> str:
-    """Los orígenes de venta (dominio.ORIGENES_VENTA) como van dentro de un
-    CHECK (origen IN (...))."""
-    return _valores_sql(dominio.ORIGENES_VENTA)
-
-
-def _sql_tabla_ventas(nombre: str = "ventas", si_no_existe: bool = False) -> str:
-    """
-    El CREATE TABLE de "ventas", escrito una sola vez. Lo usa
-    inicializar_base_de_datos() para una base nueva y
-    _migrar_check_origen_en_ventas() para reconstruir la tabla de una base
-    vieja (SQLite no deja cambiar un CHECK ya grabado). `nombre` es el de la
-    tabla a crear: la migración arma "ventas_nueva" aparte y recién al final
-    la renombra, porque otras cinco tablas apuntan a "ventas".
-    """
-    existe = "IF NOT EXISTS " if si_no_existe else ""
-    return f"""
-        CREATE TABLE {existe}{nombre} (
-            id                INTEGER PRIMARY KEY AUTOINCREMENT,
-            fecha             TEXT NOT NULL,
-            usuario_id        INTEGER NOT NULL REFERENCES usuarios(id),
-            turno             TEXT NOT NULL CHECK (turno IN ({_valores_sql(dominio.TURNOS)})),
-            total              REAL NOT NULL,
-            estado            TEXT NOT NULL DEFAULT '{dominio.VENTA_CONFIRMADA}' CHECK (estado IN ({_valores_sql(dominio.ESTADOS_VENTA)})),
-            anulada_por        INTEGER REFERENCES usuarios(id),
-            anulada_fecha      TEXT,
-            anulada_motivo     TEXT,
-            origen             TEXT NOT NULL DEFAULT '{dominio.ORIGEN_KIOSKO}' CHECK (origen IN ({_origenes_venta_sql()}))
-        )
-    """
-
-
-def _sql_tabla_de_bonos(tabla: str) -> str:
-    """
-    El CREATE TABLE de un catálogo de bonos de tiempo. Hay cuatro con el mismo
-    esquema -- "bonos_tiempo" (walk-ins), "bonos_miembro" (exclusivo de
-    socios), "bonos_playstation" (exclusivo de la consola) y "bonos_pcstream"
-    (exclusivo de la PC de streaming) -- a propósito en tablas separadas: ver
-    CLAUDE.md, "Hay CUATRO catálogos de bonos".
-    """
-    return f"""
-        CREATE TABLE IF NOT EXISTS {tabla} (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre  TEXT NOT NULL,
-            minutos INTEGER NOT NULL,
-            precio  REAL NOT NULL,
-            activo  INTEGER NOT NULL DEFAULT 1
-        )
-    """
-
-
 def inicializar_base_de_datos():
-    """Crea el esquema y actualiza bases anteriores sin reemplazar sus datos."""
+    """Crea el esquema de Kiosko y registra su versión."""
     from database_esquema import inicializar_base_de_datos as crear_esquema
     return crear_esquema()
-
-
-def _respaldar_antes_de_migrar(motivo: str):
-    """
-    Copia de seguridad de la base ANTES de una migración que reconstruye una
-    tabla con plata adentro (ver _migrar_check_origen_en_ventas). La carpeta
-    sale de DATA_DIR al momento de llamar (no al importar el módulo), así los
-    tests, que apuntan DATA_DIR a una carpeta temporal, nunca escriben en los
-    backups reales.
-
-    Es un extra, no un requisito: la migración es una sola transacción y se
-    deshace sola si falla, así que si no se puede escribir la copia (disco
-    lleno, sin permisos) se sigue igual en vez de dejar el programa sin arrancar.
-    """
-    destino = os.path.join(
-        DATA_DIR, "backups", f"antes_de_{motivo}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-    )
-    try:
-        _backup_consistente(destino)
-    except (OSError, sqlite3.Error):
-        pass
-
-
-# --------------------------------------------------------------------
-# Datos de la primera vez
-# --------------------------------------------------------------------
 
 def _insertar_configuracion_si_falta(cursor: sqlite3.Cursor, clave: str, valor: str) -> bool:
     """
@@ -274,7 +189,7 @@ def _insertar_configuracion_si_falta(cursor: sqlite3.Cursor, clave: str, valor: 
 def _cargar_datos_iniciales(conexion: sqlite3.Connection):
     """
     Carga un usuario Administrador y los valores por defecto del fondo de
-    cambio, la tarifa de socios y los rubros de fábrica la primera vez que
+    cambio y los rubros de fábrica la primera vez que
     se usa el sistema (lo que ya esté cargado no se toca, para no pisar
     datos reales).
     """
@@ -292,9 +207,8 @@ def _cargar_datos_iniciales(conexion: sqlite3.Connection):
         )
         conexion.commit()
 
-    for clave, valor in (("fondo_cambio", "50000"), ("tarifa_hora_miembro", "1000")):
-        _insertar_configuracion_si_falta(cursor, clave, valor)
-        conexion.commit()
+    _insertar_configuracion_si_falta(cursor, "fondo_cambio", "50000")
+    conexion.commit()
 
     # Rubros de fábrica: se cargan UNA sola vez (se deja constancia en
     # "configuracion" de que ya se hizo). Si se gatillara en cada
@@ -304,51 +218,3 @@ def _cargar_datos_iniciales(conexion: sqlite3.Connection):
         for nombre in ("BEBIDAS", "KIOSKO", "ARTÍCULOS DE LIMPIEZA", "INSUMOS DE PAPELERÍA"):
             cursor.execute("INSERT OR IGNORE INTO rubros (nombre) VALUES (?)", (nombre,))
         conexion.commit()
-
-
-# API histórica: los tests y los docs nombran estas funciones como database.X, y
-# database_esquema las toma de acá.
-#
-# ESTE BLOQUE TIENE QUE QUEDAR AL FINAL DEL ARCHIVO. database_migraciones hace
-# `from database import _sql_tabla_ventas, ...` al cargarse: si este import
-# subiera al principio (como se ordenan normalmente), database_migraciones se
-# cargaría antes de que existan esas funciones y el programa no arrancaría
-# (ImportError; se comprobó en la revisión del 2026-10-17). Tampoco se puede
-# sacar: _migrar_check_tipo_en_movimientos_saldo_miembro lee
-# `database._TIPOS_MOVIMIENTO_SALDO` a propósito, para que las pruebas puedan
-# reemplazarlo acá.
-from database_migraciones import (
-    _agregar_columna_si_falta,
-    _migrar_columnas_permisos,
-    _migrar_columna_ultima_conexion_estaciones,
-    _migrar_columna_ultima_ip_estaciones,
-    _migrar_columna_ip_asentada_estaciones,
-    _migrar_columna_cliente_cerrado_desde_estaciones,
-    _migrar_columnas_actualizacion_estaciones,
-    _migrar_columna_cliente_arranque_estaciones,
-    _migrar_columnas_temperatura_estaciones,
-    _migrar_columna_mantenimiento_estaciones,
-    _migrar_columna_miembro_en_sesiones,
-    _migrar_columnas_aviso_fin_en_sesiones,
-    _migrar_columna_whatsapp_en_miembros,
-    _migrar_columna_desde_ip_en_sesiones,
-    _migrar_columna_miembro_en_reservas,
-    _sql_tabla_movimientos_saldo_miembro,
-    _reconstruir_tabla,
-    _admite_todos_los_tipos,
-    _migrar_referencia_bono_en_movimientos_saldo_miembro,
-    _migrar_check_tipo_en_movimientos_saldo_miembro,
-    _sql_tabla_comandos_pc,
-    _migrar_check_tipo_en_comandos_pc,
-    _sql_tabla_eventos_admin_pc,
-    _migrar_check_tipo_en_eventos_admin_pc,
-    _migrar_borrar_clave_vieja_de_clientes_pc,
-    _migrar_columna_origen_en_ventas,
-    _migrar_columnas_origen_en_cierres,
-    _migrar_check_origen_en_ventas,
-    _COLUMNAS_MOVIMIENTOS_SALDO,
-    _TIPOS_MOVIMIENTO_SALDO_ORIGINALES,
-    _TIPOS_MOVIMIENTO_SALDO,
-    _TIPOS_COMANDO_PC_ORIGINALES,
-    _TIPOS_EVENTO_ADMIN_PC_ORIGINALES,
-)

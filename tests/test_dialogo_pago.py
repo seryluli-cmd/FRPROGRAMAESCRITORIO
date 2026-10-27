@@ -1,9 +1,8 @@
 """
 tests/test_dialogo_pago.py
 ============================
-El cuadro de cobro (ui/dialogo_pago.DialogoPago), que usan las ventas de kiosko,
-los bonos de Control de PCs (PC, PCSTREAM, PlayStation 5) y el Mixto de la carga de
-saldo y los trámites, y su cuenta (dominio.cuenta_del_cobro).
+El cuadro de cobro (ui/dialogo_pago.DialogoPago), que usan las ventas de kiosko
+e Impresiones, y su cuenta (dominio.cuenta_del_cobro).
 
 Pedidos del dueño (2026-10-18): arranca con el total escrito en Efectivo, porque casi
 siempre pagan justo, y si pagan justo un Enter cobra; si pagan con otro billete, lo
@@ -133,7 +132,7 @@ class TestDialogoPago(unittest.TestCase):
         self.assertEqual(dialogo.pagos, [{"metodo": _DIGITAL, "monto": 2100.0}])
 
     def test_una_parte_en_efectivo_completa_sola_la_digital_y_enter_cobra(self):
-        # Así arranca también el cobro Mixto de PCs, PlayStation 5, socios y trámites.
+        # Así arranca también el cobro de Impresiones.
         dialogo = self._abrir(1500.0)
 
         self._escribir(dialogo.campo_efectivo, "1000")

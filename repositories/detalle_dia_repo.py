@@ -1,25 +1,16 @@
 """
 detalle_dia_repo.py
 ====================
-El detalle de TODO lo que se vendió en un día del local, venta por venta, para
-Reportes > Resumen del Día (pedido del dueño, 2026-10-18: "que me aparezcan
-todos los turnos, y operadores, y el detalle de todo lo que se vendió:
-cantidades, hora, turno, operador... de kiosko y de bonos de PC, PlayStation y
-PCSTREAM, absolutamente todo").
+El detalle de lo vendido en un día del local, venta por venta, para
+Reportes > Resumen del Día: cantidades, hora, turno y operador.
 
 Qué venta es de qué turno lo decide `turnos_repo._ventanas_del_dia`, la misma
 función que arma las filas de cada turno del Resumen del Día: así la suma del
 detalle de un turno da lo mismo que su fila (salvo una venta anulada DESPUÉS de
 cerrar: el cierre guardó una foto con ella adentro; acá se la marca).
 
-Qué se vendió en cada venta sale de la tabla que corresponde a cada cosa (como
-en reportes_repo.ranking_ventas, con sus mismas categorías): venta_detalle
-(artículos de kiosko), tramites_venta, sesion_bonos (bono de PC, con la PC
-donde estaba la sesión AL VENDERLO aunque después se haya cambiado de máquina),
-sesion_pcstream_bonos, sesion_playstation_bonos y movimientos_saldo_miembro
-(bono o carga de saldo de un socio). Las ventas de una reserva (seña, pago
-total, resto, devolución; ver control_pcs/repositories/reservas_repo.py) salen de
-reservas_pagos y se nombran como lo que fueron.
+Qué se vendió en cada venta sale de venta_detalle. Impresiones conserva el
+detalle de cada renglón tal como se cobró.
 
 Cada venta trae además sus `lineas`, renglón por renglón tal cual se cobró (con el
 código del artículo), para el listado "Renglón por renglón" que se imprime (pedido
@@ -36,53 +27,15 @@ from repositories import reportes_repo, turnos_repo
 from turnos import etiqueta_turno
 
 
-def _texto_minutos(minutos: int) -> str:
-    """180 -> "3 h", 90 -> "1 h 30 min", 45 -> "45 min"."""
-    horas, resto = divmod(int(minutos), 60)
-    if horas and resto:
-        return f"{horas} h {resto} min"
-    return f"{horas} h" if horas else f"{resto} min"
-
-
 def _texto_cantidad(cantidad) -> str:
     return str(int(cantidad)) if float(cantidad).is_integer() else str(cantidad)
 
 
 def _sin_articulo(rubro: str, detalle: str, producto: str, importe: float) -> tuple:
-    """Lo vendido en una venta sin artículo de kiosko (trámite, bono, carga de
-    saldo): un solo renglón, sin código."""
+    """Descripción de respaldo para una venta que no tiene renglones."""
     return (
         rubro, detalle, [(rubro, producto, 1, importe)],
         [{"codigo": "", "descripcion": detalle, "cantidad": 1, "importe": round(importe, 2)}],
-    )
-
-
-def _de_una_reserva(fila) -> tuple:
-    """
-    Lo vendido en una venta de una reserva, como _sin_articulo pero diciendo qué
-    fue: "Seña reserva Nº 12 · Juan · Promo 10 hs · PC7 21/10 10:00", "Resto
-    reserva Nº 12 · ... · habilitada en PC7" o "Devolución reserva Nº 12 · ...".
-    El bono cuenta UNA vez en "Lo vendido": en lo que se pagó al reservar; el
-    resto no suma unidades y la devolución la resta.
-    """
-    equipo = dominio.nombre_equipo_reservado(fila["equipo"], fila["pc"])
-    if fila["tipo"] == dominio.PAGO_RESERVA_ANTICIPO:
-        que = "Seña" if fila["total"] < fila["precio"] - 0.005 else "Pago total"
-        cuando = datetime.fromisoformat(fila["fecha_reserva"]).strftime("%d/%m %H:%M")
-        detalle = f"{que} reserva Nº {fila['numero']} · {fila['cliente']} · {fila['bono_nombre']} · {equipo} {cuando}"
-        cantidad = 1
-    elif fila["tipo"] == dominio.PAGO_RESERVA_RESTO:
-        lugar = dominio.NOMBRE_PLAYSTATION if fila["sesion_playstation_id"] is not None else fila["habilitada_en"]
-        detalle = (f"Resto reserva Nº {fila['numero']} · {fila['cliente']} · {fila['bono_nombre']}"
-                   f" · habilitada en {lugar or equipo}")
-        cantidad = 0
-    else:
-        detalle = f"Devolución reserva Nº {fila['numero']} · {fila['cliente']} · {fila['bono_nombre']}"
-        cantidad = -1
-    rubro = reportes_repo.CATEGORIA_RESERVA
-    return (
-        rubro, detalle, [(rubro, fila["bono_nombre"], cantidad, fila["total"])],
-        [{"codigo": "", "descripcion": detalle, "cantidad": cantidad, "importe": round(fila["total"], 2)}],
     )
 
 
@@ -136,119 +89,6 @@ def _que_se_vendio_entre(conexion, desde: str, hasta: str) -> dict:
               "importe": round(f["subtotal"], 2)} for f in filas],
         )
 
-    for fila in conexion.execute(
-        """
-        SELECT tramites_venta.venta_id, tramites_venta.descripcion, ventas.total
-        FROM tramites_venta JOIN ventas ON ventas.id = tramites_venta.venta_id
-        WHERE ventas.fecha > ? AND ventas.fecha <= ?
-        """, rango,
-    ):
-        resultado[fila["venta_id"]] = _sin_articulo(
-            reportes_repo.CATEGORIA_TRAMITE, f"Trámite: {fila['descripcion']}", fila["descripcion"], fila["total"],
-        )
-
-    # La PC donde estaba la sesión al vender el bono: si después la cambiaron de
-    # máquina (traslados_sesion), la del primer traslado posterior a la venta;
-    # si no, la de la sesión.
-    for fila in conexion.execute(
-        """
-        SELECT sesion_bonos.venta_id, sesion_bonos.minutos, bonos_tiempo.nombre AS bono, ventas.total,
-               COALESCE(
-                   (SELECT origen.nombre FROM traslados_sesion
-                    JOIN estaciones AS origen ON origen.id = traslados_sesion.estacion_origen_id
-                    WHERE traslados_sesion.sesion_id = sesion_bonos.sesion_id
-                      AND traslados_sesion.fecha > ventas.fecha
-                    ORDER BY traslados_sesion.fecha, traslados_sesion.id LIMIT 1),
-                   estaciones.nombre
-               ) AS pc
-        FROM sesion_bonos
-        JOIN ventas ON ventas.id = sesion_bonos.venta_id
-        JOIN bonos_tiempo ON bonos_tiempo.id = sesion_bonos.bono_id
-        JOIN sesiones_pc ON sesiones_pc.id = sesion_bonos.sesion_id
-        JOIN estaciones ON estaciones.id = sesiones_pc.estacion_id
-        WHERE ventas.fecha > ? AND ventas.fecha <= ?
-        """, rango,
-    ):
-        resultado[fila["venta_id"]] = _sin_articulo(
-            reportes_repo.CATEGORIA_BONO_PC, f"{fila['pc']} · {fila['bono']} ({_texto_minutos(fila['minutos'])})",
-            fila["bono"], fila["total"],
-        )
-
-    for fila in conexion.execute(
-        """
-        SELECT sesion_pcstream_bonos.venta_id, sesion_pcstream_bonos.minutos, bonos_pcstream.nombre AS bono,
-               ventas.total, estaciones.nombre AS pc
-        FROM sesion_pcstream_bonos
-        JOIN ventas ON ventas.id = sesion_pcstream_bonos.venta_id
-        JOIN bonos_pcstream ON bonos_pcstream.id = sesion_pcstream_bonos.bono_id
-        JOIN sesiones_pc ON sesiones_pc.id = sesion_pcstream_bonos.sesion_id
-        JOIN estaciones ON estaciones.id = sesiones_pc.estacion_id
-        WHERE ventas.fecha > ? AND ventas.fecha <= ?
-        """, rango,
-    ):
-        resultado[fila["venta_id"]] = _sin_articulo(
-            reportes_repo.CATEGORIA_BONO_PCSTREAM,
-            f"{fila['pc']} · {fila['bono']} ({_texto_minutos(fila['minutos'])})",
-            fila["bono"], fila["total"],
-        )
-
-    for fila in conexion.execute(
-        """
-        SELECT sesion_playstation_bonos.venta_id, sesion_playstation_bonos.minutos,
-               bonos_playstation.nombre AS bono, ventas.total
-        FROM sesion_playstation_bonos
-        JOIN ventas ON ventas.id = sesion_playstation_bonos.venta_id
-        JOIN bonos_playstation ON bonos_playstation.id = sesion_playstation_bonos.bono_id
-        WHERE ventas.fecha > ? AND ventas.fecha <= ?
-        """, rango,
-    ):
-        resultado[fila["venta_id"]] = _sin_articulo(
-            reportes_repo.CATEGORIA_BONO_PLAYSTATION,
-            f"{dominio.NOMBRE_PLAYSTATION} · {fila['bono']} ({_texto_minutos(fila['minutos'])})",
-            fila["bono"], fila["total"],
-        )
-
-    for fila in conexion.execute(
-        """
-        SELECT movimientos_saldo_miembro.venta_id, movimientos_saldo_miembro.minutos,
-               bonos_miembro.nombre AS bono, miembros.nombre AS socio, ventas.total
-        FROM movimientos_saldo_miembro
-        JOIN ventas ON ventas.id = movimientos_saldo_miembro.venta_id
-        JOIN miembros ON miembros.id = movimientos_saldo_miembro.miembro_id
-        LEFT JOIN bonos_miembro ON bonos_miembro.id = movimientos_saldo_miembro.bono_id
-        WHERE movimientos_saldo_miembro.tipo = ? AND ventas.fecha > ? AND ventas.fecha <= ?
-        """, (dominio.MOVIMIENTO_CARGA, *rango),
-    ):
-        minutos = _texto_minutos(fila["minutos"])
-        if fila["bono"] is not None:
-            resultado[fila["venta_id"]] = _sin_articulo(
-                reportes_repo.CATEGORIA_BONO_SOCIO, f"Socio {fila['socio']} · {fila['bono']} ({minutos})",
-                fila["bono"], fila["total"],
-            )
-        else:
-            resultado[fila["venta_id"]] = _sin_articulo(
-                reportes_repo.CATEGORIA_CARGA_TARIFA_SOCIO, f"Socio {fila['socio']} · carga de saldo ({minutos})",
-                "Carga por monto", fila["total"],
-            )
-
-    # Al final a propósito: una vez habilitada, la venta con que se pagó la
-    # reserva también tiene su bono en sesion_bonos (reservas_habilitar_repo.habilitar),
-    # y acá se la nombra como lo que fue.
-    for fila in conexion.execute(
-        """
-        SELECT reservas_pagos.venta_id, reservas_pagos.tipo, reservas.id AS numero, reservas.cliente,
-               reservas.bono_nombre, reservas.equipo, reservas.precio, reservas.fecha_reserva,
-               reservas.sesion_playstation_id, estaciones.nombre AS pc, habilitada.nombre AS habilitada_en,
-               ventas.total
-        FROM reservas_pagos
-        JOIN ventas ON ventas.id = reservas_pagos.venta_id
-        JOIN reservas ON reservas.id = reservas_pagos.reserva_id
-        LEFT JOIN estaciones ON estaciones.id = reservas.estacion_id
-        LEFT JOIN estaciones AS habilitada ON habilitada.id = reservas.estacion_habilitada_id
-        WHERE ventas.fecha > ? AND ventas.fecha <= ?
-        """, rango,
-    ):
-        resultado[fila["venta_id"]] = _de_una_reserva(fila)
     return resultado
 
 
@@ -374,3 +214,4 @@ def detalle_del_dia(dia) -> dict:
         "por_operador": _por_operador(todas),
         "totales": _totales(todas),
     }
+

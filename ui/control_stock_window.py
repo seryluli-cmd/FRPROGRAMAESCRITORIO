@@ -6,11 +6,8 @@ tienen stock, en orden alfabético y con cuántas unidades hay de cada uno, para
 imprimirla y que la supervisora, con la lista en la mano, cuente si el estante
 coincide. Los que están en 0 o en negativo no salen.
 
-El botón va debajo del mosaico de Control de PCs, a la derecha de APAGAR (ahí
-lo pidió el dueño, aunque el stock es del kiosko). Lo ven todos, pero solo el
-Admin lo abre: con otro operador se ve igual y no hace nada al apretarlo, como
-Admin Kiosko en la barra de arriba (en gris se vería distinto del resto). El
-repo vuelve a exigir Admin (articulos_repo.listar_para_control_de_stock).
+Se abre desde Administrar Kiosko. Solo el Admin puede usarlo; el repositorio
+vuelve a exigir ese permiso (articulos_repo.listar_para_control_de_stock).
 
 Solo muestra: para corregir un stock mal contado está ORDENAR Stock, en
 Artículos. La hoja impresa trae además una columna "Contado" vacía, para
@@ -20,10 +17,9 @@ anotar a mano lo que hay en el estante.
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QTableWidgetItem, QVBoxLayout
 
-import dominio
 from repositories import articulos_repo
 from ui import imprimir
-from ui.utils import aplicar_clase, crear_tabla, manejar_errores, sin_boton_por_defecto
+from ui.utils import aplicar_clase, crear_tabla, sin_boton_por_defecto
 
 TITULO = "Control de Stock"
 COLUMNAS = ["Artículo", "Unidades"]
@@ -31,22 +27,6 @@ COLUMNA_UNIDADES = 1
 # La hoja impresa suma "Contado": una raya en cada renglón para escribir encima.
 COLUMNAS_IMPRESAS = COLUMNAS + ["Contado"]
 _PARA_ANOTAR = "_" * 14
-
-
-class BotonControlStock(QPushButton):
-    """La tecla "📦 CONTROL DE STOCK" de debajo del mosaico, con el mismo relieve
-    que las de al lado."""
-
-    def __init__(self, usuario, parent=None):
-        super().__init__("📦  CONTROL DE STOCK", parent)
-        self.usuario = usuario
-        aplicar_clase(self, "barra")
-        if dominio.es_admin(usuario):
-            self.clicked.connect(self._abrir)
-
-    @manejar_errores
-    def _abrir(self):
-        VentanaControlStock(self.usuario["id"], self.window()).exec()
 
 
 def _subtitulo(cantidad: int) -> str:

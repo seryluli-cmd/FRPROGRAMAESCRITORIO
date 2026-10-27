@@ -22,9 +22,8 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    # Con el nombre con que lo usa el dueño (antes salía Kiosko.exe y había que
-    # renombrarlo a mano en cada armado; revisión del 2026-10-17).
-    name='CyberBios',
+    # Nombre propio para que el ejecutable del Kiosko independiente no pise CyberBios.exe.
+    name='FRKiosko',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -39,3 +38,4 @@ exe = EXE(
     entitlements_file=None,
     icon=['assets/icono.ico'],
 )
+

@@ -16,22 +16,14 @@ from database import conexion_db, hash_clave, verificar_clave
 # Permisos que un Admin puede sumarle a una empleada: (columna en
 # `usuarios`, etiqueta para mostrar en la UI).
 #
-# - Sin ningún permiso, una empleada ya puede: Ventas, operar la grilla de
-#   PCs (asignarle un bono a una PC es una venta más, no un privilegio),
-#   Miembros, la PlayStation 5, Caja, Cierre de Turno y Cambiar mi Clave.
+# - Sin ningún permiso, una empleada ya puede: Ventas, Caja, Cierre de
+#   Turno y Cambiar mi Clave.
 # - Un ADMIN los tiene todos siempre (ver tiene_permiso) y no se le pueden
 #   sacar desde acá.
 # - "Usuarios" (crear/borrar gente, resetear claves) y "Anular Venta" son
 #   exclusivos de ADMIN a propósito: no están en esta lista.
 # - Tener al menos uno de estos permisos es lo que separa a un "encargado"
 #   de una empleada común en ui/main_window.py: ve "Administrar Kiosko".
-# - "Operar PCs y Miembros" (`permiso_control_pcs`) se sacó de esta lista el
-#   2026-10-22 (pedido del dueño: "así no está por estar"): desde el 19/10
-#   PCs, Miembros y la PlayStation 5 los opera cualquiera y la casilla no daba
-#   nada. La columna sigue en la tabla con lo que tenía cada usuario (las
-#   columnas no se borran, regla 6), pero ya no se lee ni se escribe. Si el
-#   dueño quiere volver a repartir quién opera qué, se suma de nuevo acá y se
-#   engancha en playstation_repo.puede_operar o en Miembros.
 PERMISOS_EMPLEADA = [
     ("permiso_articulos", "Artículos (crear/editar productos y precios)"),
     ("permiso_compras", "Compras (cargar mercadería / stock)"),
@@ -217,7 +209,7 @@ def usuario_habilitado(usuario_id: int):
     si ya no existe o fue desactivado: quien quedó con una sesión abierta no
     puede seguir operando. Es para las operaciones que se controlan en el repo
     y no solo escondiendo el botón, así un permiso quitado o un usuario dado de
-    baja corta el acceso en el acto (PlayStation 5, ORDENAR Stock).
+    baja corta el acceso en el acto (por ejemplo, ORDENAR Stock).
     """
     usuario = obtener_usuario(usuario_id)
     if usuario is None or not usuario["activo"]:

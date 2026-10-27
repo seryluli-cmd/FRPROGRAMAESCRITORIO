@@ -26,10 +26,8 @@ los mismos datos que antes y los botones hacen lo mismo.
 
 from datetime import datetime
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout
 
-from control_pcs.repositories import cuentas_pc_repo
-from control_pcs.ui.cuenta_pc_dialogos import DialogoCobrarAntesDelCierre
 from repositories import turnos_repo
 from ui.control_cierres_window import ControlCierresWindow, DialogoDetalleCierre  # noqa: F401 (API de main_window y las pruebas)
 from ui.envio_pwa_progreso import DialogoEnviandoCierre
@@ -81,7 +79,6 @@ class CajaWindow(QDialog):
         self.valor_fondo = self.tabla.valor_cambio
         self.valor_ventas = self.tabla.valor_efectivo
         self.valor_digital = self.tabla.valor_digital
-        self.detalle_reservas = self.tabla.detalle_reservas
 
         botones = QHBoxLayout()
         botones.addWidget(tecla("🔄  ACTUALIZAR", self._refrescar))
@@ -132,16 +129,6 @@ class CierreTurnoWindow(QDialog):
 
     def _armar_interfaz(self):
         self.tarjeta = TarjetaCierreDeTurno()
-        # Lo que quedó sin cobrar en las Cuentas de las PCs (pedido del dueño,
-        # 2026-10-25): no entra en este cierre (nunca se cobró) y no lo frena, pero
-        # quien cierra y quien entra tienen que saberlo.
-        self.aviso_cuentas = QLabel("")
-        self.aviso_cuentas.setWordWrap(True)
-        self.aviso_cuentas.setStyleSheet(
-            "background: #FFF0FA; border: 2px solid #FF3EC8; border-radius: 10px; padding: 8px 10px; color: #1E2330;"
-        )
-        self.aviso_cuentas.setVisible(False)
-
         botones = QHBoxLayout()
         botones.addWidget(tecla("CANCELAR", self.close))
         botones.addStretch()
@@ -151,7 +138,6 @@ class CierreTurnoWindow(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
         layout.addWidget(self.tarjeta)
-        layout.addWidget(self.aviso_cuentas)
         layout.addStretch()
         layout.addLayout(botones)
         self.setLayout(layout)
@@ -160,35 +146,9 @@ class CierreTurnoWindow(QDialog):
     @manejar_errores
     def _refrescar_vista_previa(self):
         self.tarjeta.mostrar(turnos_repo.resumen_turno_actual())
-        cuentas = cuentas_pc_repo.cuentas_abiertas()
-        self.aviso_cuentas.setVisible(bool(cuentas))
-        if cuentas:
-            renglones = [
-                f"{cuenta['estacion']}: {formato_pesos(cuenta['total'])}"
-                + (f" ({cuenta['nombre']})" if cuenta["nombre"] else "") + f", anotó {cuenta['abrio']}"
-                for cuenta in cuentas
-            ]
-            self.aviso_cuentas.setText(
-                "💳 Quedan cuentas de PCs sin cobrar (no entran en este cierre):\n" + "\n".join(renglones)
-            )
-            # Con el aviso, la ventana crece lo que haga falta: si no, aprieta la tarjeta y
-            # los importes de abajo se cortan.
-            self.resize(self.width(), max(self.height(), self.sizeHint().height()))
 
     @manejar_errores
     def _cerrar_turno(self):
-        # Lo fiado en este turno se cobra en este turno (pedido del dueño, 2026-10-25):
-        # si queda algo, se ofrece cobrarlo; si se cierra igual, queda en el cierre.
-        if cuentas_pc_repo.fiado_del_turno_en_curso():
-            pregunta = DialogoCobrarAntesDelCierre(self.usuario, DialogoCobrarAntesDelCierre.CIERRE, self)
-            cerrar = pregunta.exec()
-            self._refrescar_vista_previa()  # lo que se cobró recién ya suma en la tarjeta
-            if not cerrar:
-                return
-            if pregunta.cerrar_igual:
-                resultado = turnos_repo.cerrar_turno(self.usuario["id"])
-                self._turno_cerrado(resultado)
-                return
         if not confirmar(self, "Confirmar cierre",
                           "¿Confirmás el cierre de este turno? No se puede deshacer."):
             return
@@ -210,8 +170,6 @@ class CierreTurnoWindow(QDialog):
             f"{ausencia}"
             f"Retirá: {formato_pesos(resultado['monto_a_retirar'])} para el sobre y guardalo en la caja fuerte.\n"
             f"(dejando {formato_pesos(resultado['cambio_que_queda'])} de cambio fijo para el próximo turno)\n\n"
-            + (f"Quedó en tu cierre {formato_pesos(resultado['fiado_sin_cobrar'])} fiado sin cobrar "
-               "(Cuenta de la PC).\n\n" if resultado["fiado_sin_cobrar"] else "") +
             "Ahora volvés a la pantalla de ingreso: quien te releve tiene que entrar con su propio "
             "usuario. Si tu reemplazo no llegó, volvé a entrar con el tuyo y seguí vendiendo."
         )

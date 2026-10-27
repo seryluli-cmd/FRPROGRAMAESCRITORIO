@@ -3,7 +3,7 @@ tests/test_cajas.py
 ====================
 Las cajas con número (pedido del dueño, 2026-10-18; reglas en
 repositories/relevo_repo.py): abrir contando el Cambio Fijo, recibir la caja de
-quien cubrió el turno, cerrar la de quien se fue, el cierre forzoso a los 15
+quien cubrió el turno, cerrar la de quien se fue, el cierre forzoso a los 30
 minutos, las ventas del Admin a nombre de la responsable y el sobre que carga
 solo el Admin.
 
@@ -19,7 +19,7 @@ from unittest import mock
 import dominio
 from database import conexion_db
 from repositories import (
-    articulos_repo, compras_repo, relevo_repo, tramites_repo, turnos_repo, usuarios_repo,
+    articulos_repo, compras_repo, relevo_repo, turnos_repo, usuarios_repo,
     ventas_repo,
 )
 from base import BaseConBaseTemporal
@@ -370,8 +370,6 @@ _LO_QUE_SE_VE_AL_CERRAR = (
     "turno_actual_label", "caja_numero", "responsable", "cambio_inicial",
     "ventas_efectivo", "ventas_digital", "ventas_total",
     "kiosko_solo_efectivo", "kiosko_solo_digital", "impresiones_efectivo", "impresiones_digital",
-    "tramites_efectivo", "tramites_digital", "pcs_efectivo", "pcs_digital",
-    "playstation_efectivo", "playstation_digital",
 )
 
 
@@ -386,7 +384,6 @@ class TestUnCierreHechoSeVeComoAlCerrarlo(_BaseDeCajas):
     def setUp(self):
         super().setUp()
         articulos_repo.crear_articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", None, None, 150.0, 0.0, 0)
-        self.tramite_id = tramites_repo.crear_tramite("Boleta de luz")
 
     def _vender_impresiones(self, momento, cantidad=3):
         with mock.patch("repositories.ventas_repo.datetime") as datetime_mock:
@@ -399,22 +396,11 @@ class TestUnCierreHechoSeVeComoAlCerrarlo(_BaseDeCajas):
             )
 
     def _turno_de_lucia(self):
-        """Caja de Lucía (contó $500 de menos) con un poco de todo: kiosko en
-        efectivo y digital, impresiones, un trámite y un bono de PC."""
+        """Caja de Lucía (contó $500 de menos) con kiosko e impresiones."""
         relevo_repo.abrir_caja(self.lucia_id, 49500.0, _a_las(5, 55))
         self._vender(self.lucia_id, _a_las(8), 1000.0)
         self._vender(self.lucia_id, _a_las(9), 600.0, dominio.PAGO_DIGITAL)
         self.venta_impresiones = self._vender_impresiones(_a_las(10))          # $450 en efectivo
-        with mock.patch("repositories.tramites_repo.datetime") as datetime_mock:
-            datetime_mock.now.return_value = _a_las(11)
-            tramites_repo.registrar_tramite(
-                self.lucia_id, self.tramite_id, 2500.0, [{"metodo": dominio.PAGO_DIGITAL, "monto": 2500.0}]
-            )
-        with conexion_db() as conexion:
-            ventas_repo.registrar_venta_sin_detalle(
-                conexion, self.lucia_id, 3000.0, [{"metodo": dominio.PAGO_EFECTIVO, "monto": 3000.0}],
-                dominio.ORIGEN_ALQUILER_PCS, _a_las(12),
-            )
 
     def _en_pantalla_al_cerrar(self, momento):
         """Lo que mostraba la pantalla Cierre de Turno a esa hora."""
@@ -434,9 +420,8 @@ class TestUnCierreHechoSeVeComoAlCerrarlo(_BaseDeCajas):
         self.assertEqual(self._se_ve(resumen), self._se_ve(al_cerrar))
         self.assertEqual(
             (resumen["cambio_inicial"], resumen["kiosko_solo_efectivo"], resumen["kiosko_solo_digital"],
-             resumen["impresiones_efectivo"], resumen["tramites_digital"], resumen["pcs_efectivo"],
-             resumen["ventas_total"]),
-            (49500.0, 1000.0, 600.0, 450.0, 2500.0, 3000.0, 7550.0),
+             resumen["impresiones_efectivo"], resumen["ventas_total"]),
+            (49500.0, 1000.0, 600.0, 450.0, 2050.0),
         )
 
     def test_un_cierre_forzoso_se_ve_igual_que_si_lo_hubiera_cerrado_ella(self):

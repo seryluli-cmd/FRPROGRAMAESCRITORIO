@@ -3,7 +3,7 @@ tests/test_cierre_turno_ui.py
 ===============================
 La pantalla de Cierre de Turno es el resumen que las empleadas le mandan al dueño
 (se prueba sin abrir ninguna ventana, plataforma "offscreen" de Qt): que muestre
-Kiosko, Impresiones y Trámites separados (pedido del dueño, 2026-10-19), que el cambio fijo se llame "Cambio Fijo" (nunca "fondo") y
+Kiosko e Impresiones separados (pedido del dueño, 2026-10-19), que el cambio fijo se llame "Cambio Fijo" (nunca "fondo") y
 que el aviso al cerrar también lo diga así. La cuenta de fondo está en
 tests/test_kiosko.py (TestResumenDelDia).
 
@@ -80,21 +80,6 @@ class TestCierreDeTurnoEnPantalla(BaseConBaseTemporal):
         self.assertEqual(ventana.tarjeta.valor_total.text(), "$ 460")
         self.assertTrue({"Efectivo", "Digital", "TOTAL (EFECTIVO + DIGITAL)"} <= set(textos), textos)
 
-    def test_muestra_los_tramites_sin_duplicarlos_en_el_total(self):
-        from repositories import tramites_repo
-
-        tramite_id = tramites_repo.crear_tramite("Sacar boleta de luz")
-        tramites_repo.registrar_tramite(
-            self.usuario_id, tramite_id, 2500.0, [{"metodo": dominio.PAGO_EFECTIVO, "monto": 2500.0}]
-        )
-        self._vender("COD9", "Producto", 1, 10.0)
-
-        ventana = self._abrir()
-
-        self.assertEqual(_montos(ventana.tarjeta.renglon("tramites")), ("$ 2.500", "$ 0"))
-        self.assertEqual(_montos(ventana.tarjeta.renglon("kiosko_solo")), ("$ 10", "$ 0"))
-        self.assertEqual(ventana.tarjeta.valor_total.text(), "$ 2.510")      # cuenta una sola vez
-
     def test_sin_impresiones_muestra_cero(self):
         self._vender("COD9", "Producto", 1, 10.0)
 
@@ -162,8 +147,8 @@ class TestCierreDeTurnoEnPantalla(BaseConBaseTemporal):
         tarjeta = self._abrir().tarjeta
 
         self.assertFalse(tarjeta.renglon("kiosko_solo").efectivo.property("vacio"))
-        self.assertTrue(tarjeta.renglon("tramites").efectivo.property("vacio"))
-        self.assertTrue(tarjeta.renglon("tramites").nombre.property("vacio"))
+        self.assertTrue(tarjeta.renglon("impresiones").efectivo.property("vacio"))
+        self.assertTrue(tarjeta.renglon("impresiones").nombre.property("vacio"))
 
     def test_la_pantalla_caja_se_parece_al_cierre_y_la_caja_actual_no_suma_el_cambio(self):
         """Pedido del dueño (2026-10-20): Caja con los mismos renglones que el Cierre de Turno,

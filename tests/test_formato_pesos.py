@@ -94,7 +94,7 @@ class TestUnSoloLugar(unittest.TestCase):
 
     def test_ninguna_pantalla_arma_un_campo_de_plata_suelto(self):
         sueltos = []
-        for carpeta in ("ui", "control_pcs/ui"):
+        for carpeta in ("ui",):
             for archivo in (RAIZ / carpeta).glob("*.py"):
                 texto = archivo.read_text(encoding="utf-8")
                 for patron in (r"QDoubleSpinBox\(\)", r"getDouble\("):

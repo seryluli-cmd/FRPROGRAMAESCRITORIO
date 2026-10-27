@@ -35,7 +35,6 @@ from turnos import (
 )
 from repositories.config_repo import obtener_fondo_cambio
 from repositories import cajas_repo, envio_pwa_repo
-from control_pcs.repositories import deudas_pc_repo
 from repositories import turnos_faltantes_repo as _faltantes_repo
 from repositories.control_cierres_repo import (  # noqa: F401 (API de las pantallas y las pruebas)
     _PRINCIPIO_DE_LOS_TIEMPOS, _cierre_o_error, _desde_del_cierre, detalle_cierre, listar_cierres,
@@ -43,11 +42,9 @@ from repositories.control_cierres_repo import (  # noqa: F401 (API de las pantal
 )
 # _PREFIJO_COLUMNAS_POR_ORIGEN: con qué prefijo se llaman, en el desglose de un
 # turno y en las columnas de "cierres_turno", los importes de cada origen de
-# venta (kiosko_efectivo, pcs_digital, ...). Tiene que tener TODOS los
-# dominio.ORIGENES_VENTA (ver _desglose_de_totales y TestCadaOrigenSumaEnLaCaja);
-# vive en turnos_ventas_repo desde el 2026-10-20 (lo usan también las reservas).
+# venta. Tiene que tener TODOS los dominio.ORIGENES_VENTA.
 from repositories.turnos_ventas_repo import (
-    _LINEAS_APARTE, _PREFIJO_COLUMNAS_POR_ORIGEN, _aparte_por_metodo, _contar_ventas_entre, _resumen_de_reservas,
+    _LINEAS_APARTE, _PREFIJO_COLUMNAS_POR_ORIGEN, _aparte_por_metodo, _contar_ventas_entre,
     _separar_de_kiosko, _sumar_ventas_por_origen_y_metodo, _vendido_aparte_entre,
 )
 
@@ -146,8 +143,7 @@ def _ventana_en_curso(conexion, ahora_dt=None) -> dict:
 
 def ventana_del_turno_en_curso() -> dict:
     """La ventana del turno abierto (ver _ventana_en_curso) con "fin": la hora en
-    que termina ese turno (turnos.fin_del_turno). La usa la Cuenta de la PC para
-    el aviso de los 15 minutos (cuentas_pc_repo.aviso_antes_del_cierre)."""
+    que termina ese turno (turnos.fin_del_turno)."""
     with conexion_db() as conexion:
         ventana = _ventana_en_curso(conexion)
     return {**ventana, "fin": fin_del_turno(ventana["dia"], ventana["turno"]),
@@ -181,23 +177,14 @@ def resumen_turno_actual():
     fondo de cambio, ventas en efectivo y digital acumuladas desde el último
     cierre, y cuánto debería haber ahora mismo en el cajón.
 
-    "impresiones" (lo vendido del artículo IMPRESIONES) y "tramites" (lo cobrado
-    por trámites) en esta ventana YA están sumados dentro de
-    kiosko_efectivo/kiosko_digital: esos dos son los que se graban en el cierre
+    "impresiones" (lo vendido del artículo IMPRESIONES) en esta ventana ya
+    está sumado dentro de kiosko_efectivo/kiosko_digital: esos dos son los que se graban en el cierre
     y con los que cierra el cajón, y no cambian. Para mostrar Kiosko por
     separado (pedido del dueño, 2026-10-19) vienen además
-    "impresiones_efectivo"/"impresiones_digital", "tramites_efectivo"/
-    "tramites_digital" (repartidos con los pagos de cada venta, ver
+    "impresiones_efectivo"/"impresiones_digital" (repartidos con los pagos de cada venta, ver
     turnos_ventas_repo._aparte_por_metodo) y "kiosko_solo_efectivo"/
-    "kiosko_solo_digital": Kiosko sin impresiones ni trámites. Los tres suman
+    "kiosko_solo_digital": Kiosko sin impresiones. Los dos suman
     justo kiosko_efectivo/kiosko_digital.
-
-    Con las reservas pasa lo mismo (pedido del dueño, 2026-10-20: renglón propio
-    "Reservas"): lo cobrado por reservas ya está en pcs_*/playstation_*, y vienen
-    además "pcs_solo_*"/"playstation_solo_*" (sin las reservas),
-    "reservas_efectivo"/"reservas_digital"/"reservas", "reservas_por_tipo" (cuántas
-    señas, pagos totales, restos y devoluciones) y "reservas_sin_cobro" (las que se
-    habilitaron ya pagadas de otro turno). Ver turnos_ventas_repo._resumen_de_reservas.
 
     Con una caja abierta trae también "caja_numero" y "responsable" (si no,
     None), y "cambio_inicial" es el cambio con que arrancó esa caja (lo que se
@@ -218,7 +205,6 @@ def _resumen_en_curso(conexion, ahora_dt=None) -> dict:
         _sumar_ventas_por_origen_y_metodo(conexion, ventana["desde"], ventana["hasta"])
     )
     aparte = _separar_de_kiosko(desglose, _aparte_por_metodo(conexion, ventana["desde"], ventana["hasta"]))
-    reservas = _resumen_de_reservas(conexion, desglose, ventana["desde"], ventana["hasta"])
 
     fondo_cambio = obtener_fondo_cambio()
     caja = ventana["caja"]
@@ -230,9 +216,8 @@ def _resumen_en_curso(conexion, ahora_dt=None) -> dict:
         "fondo_cambio": fondo_cambio,
         **desglose,
         **aparte,
-        **reservas,
         # Todo lo cobrado en el turno (efectivo + digital de todos los negocios).
-        # Las impresiones y los trámites no se suman: ya están dentro de Kiosko.
+        # Las impresiones no se suman: ya están dentro de Kiosko.
         "ventas_total": round(desglose["ventas_efectivo"] + desglose["ventas_digital"], 2),
         "cambio_inicial": cambio_inicial,
         "caja_actual": round(cambio_inicial + desglose["ventas_efectivo"], 2),
@@ -261,10 +246,6 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
     la caja: lo que contó quien la abrió. Así un faltante del cambio se ve una
     sola vez, en la caja donde apareció, y no en todas las que siguen.
 
-    Lo que se anotó en la Cuenta de la PC en este turno y no se cobró queda en el
-    cierre como "fiado sin cobrar" ("fiado_sin_cobrar", deudas_pc_repo): lo dio
-    quien tenía el turno y se ve en Control de Cierres (pedido del dueño,
-    2026-10-25). No cambia lo que hay que retirar: esa plata nunca entró.
     """
     fondo_cambio = obtener_fondo_cambio()
 
@@ -311,9 +292,6 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
         cierre_id = cursor.lastrowid
         if caja is not None:
             cajas_repo._marcar_cerrada(conexion, caja["id"], cierre_id, forzoso)
-        fiado_sin_cobrar = deudas_pc_repo.anotar_fiado_en_el_cierre(
-            conexion, cierre_id, ventana["desde"], ventana["hasta"]
-        )
         # Si está prendido el envío a la app de gastos del dueño, el cierre queda en
         # la cola en ESTA transacción: hay fila si y solo si quedó el cierre. Lo
         # manda un hilo propio; el cierre nunca espera a internet.
@@ -333,7 +311,6 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
         "responsable": caja["responsable"] if caja is not None else None,
         "cambio_que_queda": cajas_repo.cambio_inicial(caja) if caja is not None else fondo_cambio,
         "forzoso": forzoso,
-        "fiado_sin_cobrar": fiado_sin_cobrar,
         # True = quedó en la cola para la app de gastos (la pantalla muestra la barra).
         "envio_a_la_app": se_manda,
     }
@@ -472,12 +449,9 @@ def resumen_del_dia(dia):
     está en las filas de ESE día, no en las de este.
 
     "impresiones" (lo vendido del artículo IMPRESIONES, ver
-    dominio.CODIGO_ARTICULO_IMPRESIONES) y "tramites" (lo cobrado por
-    trámites, ver tramites_repo) salen aparte de "kiosko": el cierre guarda
-    un solo importe de Kiosko, así que acá se les resta, y kiosko +
-    impresiones + tramites + pcs + playstation sigue dando "total" ("playstation"
-    es lo cobrado por los bonos de la consola, origen aparte, así que no se resta
-    de nada). Efectivo/Digital no cambian (se cobraron igual, por esos medios).
+    dominio.CODIGO_ARTICULO_IMPRESIONES) sale aparte de "kiosko": el cierre guarda
+    un solo importe de Kiosko, así que acá se lo resta. Kiosko + impresiones
+    da el total. Efectivo/Digital no cambian.
     """
     dia = date.fromisoformat((dia if isinstance(dia, str) else dia.isoformat())[:10])
     ahora_dt = datetime.now()
@@ -566,8 +540,6 @@ def resumen_del_dia(dia):
             **plata,
             "kiosko": round(plata["kiosko_efectivo"] + plata["kiosko_digital"] - sum(aparte.values()), 2),
             **{linea: round(monto, 2) for linea, monto in aparte.items()},
-            "pcs": plata["pcs_efectivo"] + plata["pcs_digital"],
-            "playstation": plata["playstation_efectivo"] + plata["playstation_digital"],
             "efectivo": sum(plata[campo] for campo in _CAMPOS_PLATA if campo.endswith("_efectivo")),
             "digital": sum(plata[campo] for campo in _CAMPOS_PLATA if campo.endswith("_digital")),
             "total": sum(plata.values()),
@@ -577,7 +549,7 @@ def resumen_del_dia(dia):
 
     total = {
         clave: sum(fila[clave] for fila in resultado)
-        for clave in ("kiosko", *_LINEAS_APARTE, "pcs", "playstation", "efectivo", "digital", "total",
+        for clave in ("kiosko", *_LINEAS_APARTE, "efectivo", "digital", "total",
                       "cantidad_ventas", "cantidad_anuladas")
     }
     return {"fecha": dia, "turnos": resultado, "total": total, "cierres_de_otro_dia": cierres_de_otro_dia}

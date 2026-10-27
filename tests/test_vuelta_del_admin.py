@@ -183,7 +183,6 @@ class TestLaVentanaPrincipal(_ConEmpleadas):
         ventana = MainWindow(usuarios_repo.obtener_usuario(usuario_id), kwargs.pop("al_cerrar_sesion", lambda: None),
                              **kwargs)
         self.addCleanup(ventana.deleteLater)
-        self.addCleanup(ventana.panel_pcs.detener_actualizacion)
         return ventana
 
     def test_solo_el_administrador_tiene_reloj(self):
@@ -240,7 +239,6 @@ class TestDeTobyAlAdministradorYDeVuelta(_ConEmpleadas):
             aplicacion._al_loguearse(usuarios_repo.obtener_usuario(self.admin_id))
             admin = aplicacion.ventana_principal
             self.addCleanup(admin.deleteLater)
-            self.addCleanup(admin.panel_pcs.detener_actualizacion)
             self.assertEqual(admin._vuelta._volver_a_id, self.toby_id)
 
             admin._vuelta._vence = 0   # pasaron los 10 minutos
@@ -248,7 +246,6 @@ class TestDeTobyAlAdministradorYDeVuelta(_ConEmpleadas):
 
             de_vuelta = aplicacion.ventana_principal
             self.addCleanup(de_vuelta.deleteLater)
-            self.addCleanup(de_vuelta.panel_pcs.detener_actualizacion)
         self.assertEqual(de_vuelta.usuario["nombre"], "TOBY")
         self.assertIsNone(de_vuelta._vuelta)
         self.assertEqual(len(self._ingresos(self.toby_id)), 1)

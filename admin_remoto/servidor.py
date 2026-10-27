@@ -1,10 +1,9 @@
 """
 servidor.py
 ============
-Lo que atiende el CyberBIOS del MOSTRADOR cuando el Administrador trabaja
-desde otra PC del local. Lo llama servidor_red.py (el mismo servidor y el
-mismo puerto que usan las PCs del cyber) para todo pedido que empiece con
-PREFIJO; las PCs del cyber no pasan por acá.
+Lo que atiende el kiosko del MOSTRADOR cuando el Administrador trabaja
+desde otra PC del local. Lo llama servidor_red.py para todo pedido que
+empiece con PREFIJO.
 
 Rutas (todas POST, JSON):
 
@@ -33,8 +32,8 @@ Seguridad, dicho sin exagerar (ver también admin_remoto_repo):
   se pierde al cerrarlo, vence tras SESION_VENCE_MINUTOS sin uso y solo vale
   desde la PC que entró (misma IP). En cada pedido se vuelve a mirar que la
   entrada siga prendida y que el usuario siga siendo un Admin activo.
-- La clave viaja sin cifrar dentro de la red del local, igual que todo lo que
-  hablan las PCs con el mostrador. Nada de esto queda abierto a internet.
+- La clave viaja sin cifrar dentro de la red del local. El servidor se usa
+  solamente en la red del local, sin exponerlo a internet.
 
 No toca Qt (corre en los hilos del servidor de red) y nunca anota claves ni el
 cuerpo de un pedido en el log de errores.
@@ -62,12 +61,12 @@ BLOQUEO_MINUTOS = 5
 MAX_FALLIDOS_EN_TOTAL = 20
 VENTANA_TOTAL_MINUTOS = 15
 SESION_VENCE_MINUTOS = 180
-# Un fondo de pantalla de las PCs (el pedido más grande) pesa a lo sumo ~1,5 MB.
+# Límite para evitar pedidos de tamaño desmedido, incluso en la red del local.
 TAMANO_MAXIMO_PEDIDO = 16 * 1024 * 1024
 
-_MENSAJE_INTERNO = "Algo falló en el mostrador y quedó anotado en su data/errores.log."
+_MENSAJE_INTERNO = "Algo falló en el mostrador y quedó anotado en su data_fr/errores.log."
 _MENSAJE_OTRA_VERSION = (
-    "El CyberBios.exe de esta PC no es el mismo que el del mostrador. Abrí el programa "
+    "El FRKiosko.exe de esta PC no es el mismo que el del mostrador. Abrí el programa "
     "desde la carpeta compartida del mostrador (o copiá el mismo .exe en las dos)."
 )
 _MENSAJE_SESION_VENCIDA = "La sesión desde esta PC se cerró (o venció). Cerrá sesión y volvé a entrar."

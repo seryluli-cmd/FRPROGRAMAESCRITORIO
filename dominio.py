@@ -1,335 +1,70 @@
-"""
-dominio.py
-===========
-Los valores fijos del negocio, escritos UNA sola vez.
+"""Valores y cuentas compartidos por el kiosko, sin dependencias de interfaz ni base."""
 
-Roles, estados de una venta, métodos de pago y turnos son textos que
-viajan por todo el programa y se guardan tal cual en la base de datos.
-Escritos a mano en cada pantalla, un error de tipeo no se nota: la
-consulta no falla, simplemente devuelve cero filas — y alguien se entera
-recién cuando falta plata en un cierre. Nombrándolos acá, un typo es un
-error de Python que salta al instante.
-
-Este módulo NO importa nada del programa a propósito: lo pueden usar
-tanto `ui/` como `repositories/` como `database.py` sin romper la
-dirección de las capas (ver CLAUDE.md, regla 1).
-
-IMPORTANTE: los CHECK del esquema (`CHECK (rol IN (...))`, etc.) se arman
-con las listas de acá (`ROLES`, `ESTADOS_VENTA`, `TURNOS`, `ORIGENES_VENTA`...,
-ver `database._valores_sql`), así una base NUEVA nunca queda desfasada. Pero
-SQLite no deja cambiar un CHECK ya grabado: si se agrega un valor, una base
-que ya existe necesita además una migración que reconstruya esa tabla (como
-`_migrar_check_tipo_en_comandos_pc`, que lo hace sola para los comandos).
-"""
-
-import re
 import unicodedata
-from datetime import datetime, timedelta
 
 
-# --------------------------------------------------------------------
-# Roles de usuario
-# --------------------------------------------------------------------
-# ADMIN ve todo el sistema. EMPLEADA ve Ventas y Caja siempre, y el resto
-# solo si el Admin le dio el permiso puntual (ver usuarios_repo.tiene_permiso).
 ROL_ADMIN = "ADMIN"
 ROL_EMPLEADA = "EMPLEADA"
-
 ROLES = (ROL_ADMIN, ROL_EMPLEADA)
 
 
 def es_admin(usuario) -> bool:
-    """
-    Único lugar donde se pregunta si un usuario es Administrador. Acepta
-    la fila de la base (sqlite3.Row o dict). Usar esto en vez de comparar
-    `usuario["rol"] == "ADMIN"` a mano en cada pantalla.
-    """
     return usuario is not None and usuario["rol"] == ROL_ADMIN
 
 
-# --------------------------------------------------------------------
-# Estados de una venta
-# --------------------------------------------------------------------
-# Una venta nunca se borra: si hay que darla de baja, pasa a ANULADA y
-# queda el rastro de quién, cuándo y por qué (ver CLAUDE.md, regla 7).
 VENTA_CONFIRMADA = "CONFIRMADA"
 VENTA_ANULADA = "ANULADA"
-
 ESTADOS_VENTA = (VENTA_CONFIRMADA, VENTA_ANULADA)
 
-
-# --------------------------------------------------------------------
-# Métodos de pago
-# --------------------------------------------------------------------
-# DIGITAL agrupa Mercado Pago y transferencias: para el cierre de caja
-# son lo mismo (plata que no está en el cajón), y separarlos obligaría a
-# la empleada a elegir entre dos botones casi idénticos con la cola
-# esperando.
 PAGO_EFECTIVO = "EFECTIVO"
 PAGO_DIGITAL = "DIGITAL"
-
 METODOS_PAGO = (PAGO_EFECTIVO, PAGO_DIGITAL)
-
-# Cómo se le muestra cada método a la usuaria.
 NOMBRE_METODO_PAGO = {
     PAGO_EFECTIVO: "Efectivo",
     PAGO_DIGITAL: "Digital (Mercado Pago / Transferencia)",
 }
 
-
-# --------------------------------------------------------------------
-# Origen de una venta (Kiosko, Alquiler de PCs, PlayStation 5)
-# --------------------------------------------------------------------
-# Vender productos de kiosko, alquilar PCs (bonos + saldo de Miembros) y
-# alquilar la PlayStation 5 son negocios distintos para el dueño, aunque
-# comparten la misma caja: "ventas" y "cierres_turno" necesitan saber de
-# cuál vino cada peso para que el cierre de turno pueda mostrar el desglose
-# exacto (ver ventas_repo.registrar_venta_sin_detalle y
-# turnos_ventas_repo._sumar_ventas_por_origen_y_metodo).
-# ORIGEN_ALQUILER_PCS describe una categoría de reporte ("Kiosko vs.
-# Alquiler de PCs", con las palabras del dueño) y a propósito no
-# coincide con el nombre del módulo de código (control_pcs).
-#
-# Sumar un origen nuevo NO es solo agregarlo acá: también va en el CHECK de
-# "ventas.origen" (database._migrar_check_origen_en_ventas lo reconstruye solo
-# a partir de esta lista), en el desglose de Caja/Cierre de Turno
-# (turnos_repo._PREFIJO_COLUMNAS_POR_ORIGEN y las columnas de "cierres_turno") y
-# en los reportes. Un origen que quede afuera de eso hace desaparecer su plata
-# de la caja sin avisar: hay un test que lo atrapa (TestCadaOrigenSumaEnLaCaja).
+# La venta sigue llevando origen para que el dato guardado sea explícito.
 ORIGEN_KIOSKO = "KIOSKO"
-ORIGEN_ALQUILER_PCS = "ALQUILER_PCS"
-ORIGEN_PLAYSTATION = "PLAYSTATION"
+ORIGENES_VENTA = (ORIGEN_KIOSKO,)
+NOMBRE_ORIGEN_VENTA = {ORIGEN_KIOSKO: "Kiosko"}
 
-ORIGENES_VENTA = (ORIGEN_KIOSKO, ORIGEN_ALQUILER_PCS, ORIGEN_PLAYSTATION)
-
-NOMBRE_ORIGEN_VENTA = {
-    ORIGEN_KIOSKO: "Kiosko",
-    ORIGEN_ALQUILER_PCS: "Alquiler de PCs",
-    ORIGEN_PLAYSTATION: "PlayStation 5",
-}
-
-# IMPRESIONES es un artículo más del kiosko (se vende por el mismo
-# mostrador, con `origen` KIOSKO), pero es el producto que más se vende y el
-# dueño lo quiere ver como renglón propio en Reportes (Totales y Resumen del
-# Día), en Caja y en Cierre de Turno, separado del resto de lo que se vende en
-# Kiosko; también tiene su propio botón en la barra de arriba
-# (ui/impresiones_window.py). Se lo reconoce por el código del artículo, que es
-# la clave primaria y no se puede cambiar una vez creado. Si este artículo no
-# existe (o se creó con otro código), esas columnas simplemente muestran $0.
-# Es el 4 desde la base nueva de octubre de 2026 (dato del dueño, 2026-10-19);
-# en la base anterior era el 1, y hasta ese día el programa seguía buscando el 1.
+# Impresiones es un artículo de mercadería, pero se muestra aparte en Caja.
 CODIGO_ARTICULO_IMPRESIONES = "4"
 
+TURNO_MANANA = "MAÑANA"
+TURNO_TARDE = "TARDE"
+TURNO_NOCHE = "NOCHE"
+TURNOS = (TURNO_MANANA, TURNO_TARDE, TURNO_NOCHE)
+TURNOS_DOMINGO = (TURNO_MANANA, TURNO_NOCHE)
 
-# --------------------------------------------------------------------
-# Comandos remotos a una PC cliente
-# --------------------------------------------------------------------
-# Lo que el mostrador le puede pedir a una estación desde el menú contextual
-# de Control de PCs. El CHECK de `comandos_pc.tipo` sale de TIPOS_COMANDO_PC y
-# una base vieja se reconstruye sola al arrancar
-# (database_migraciones._migrar_check_tipo_en_comandos_pc): alcanza con sumar
-# el comando a la lista.
-COMANDO_REINICIAR = "REINICIAR"
-COMANDO_APAGAR = "APAGAR"
-COMANDO_MENSAJE = "MENSAJE"
-COMANDO_SCREENSHOT = "SCREENSHOT"
-COMANDO_CAMBIAR_RED = "CAMBIAR_RED"
-COMANDO_VOLUMEN = "VOLUMEN"
-# Shadow Defender (pedido del dueño, 2026-10-18; ver congelado_repo): llevan
-# la clave de Shadow Defender en el payload. Tienen que coincidir con los de
-# CLIENTE PC/shadow_defender.py.
-COMANDO_DESCONGELAR = "DESCONGELAR"
-COMANDO_CONGELAR = "CONGELAR"
-COMANDO_ESTADO_CONGELADO = "ESTADO_CONGELADO"
-COMANDOS_CON_CLAVE = (COMANDO_DESCONGELAR, COMANDO_CONGELAR, COMANDO_ESTADO_CONGELADO)
-# "Programas y estado" y el mantenimiento a distancia (pedido del dueño, 2026-10-22; ver
-# programas_pc_repo y mantenimiento_pc_repo). Los contesta un Cliente PC desde la
-# VERSION_CLIENTE_PROGRAMAS: uno más viejo no los conoce y no contesta nada. Tienen que
-# coincidir con los de CLIENTE PC/cliente_pc.py, igual que el payload de MANTENIMIENTO.
-COMANDO_INFO_PC = "INFO_PC"
-COMANDO_CERRAR_PROGRAMA = "CERRAR_PROGRAMA"
-COMANDO_ABRIR_PROGRAMA = "ABRIR_PROGRAMA"
-COMANDO_MANTENIMIENTO = "MANTENIMIENTO"
-MANTENIMIENTO_INICIAR = "INICIAR"
-MANTENIMIENTO_TERMINAR = "TERMINAR"
-ORDENES_MANTENIMIENTO = (MANTENIMIENTO_INICIAR, MANTENIMIENTO_TERMINAR)
-VERSION_CLIENTE_PROGRAMAS = "1.6"
-TIPOS_COMANDO_PC = (
-    COMANDO_REINICIAR, COMANDO_APAGAR, COMANDO_MENSAJE,
-    COMANDO_SCREENSHOT, COMANDO_CAMBIAR_RED, COMANDO_VOLUMEN,
-) + COMANDOS_CON_CLAVE + (COMANDO_INFO_PC, COMANDO_CERRAR_PROGRAMA, COMANDO_ABRIR_PROGRAMA, COMANDO_MANTENIMIENTO)
+MINUTOS_ADMIN_VUELVE_SOLO = 10
 
-# En qué está cada comando de la cola (`comandos_pc.estado`): PENDIENTE hasta
-# que viaja en la respuesta de `GET /estado` de su PC, ENTREGADO después (ver
-# comandos_pc_repo). Un typo acá dejaría a los comandos sin llegar nunca.
-ESTADO_COMANDO_PENDIENTE = "PENDIENTE"
-ESTADO_COMANDO_ENTREGADO = "ENTREGADO"
-ESTADOS_COMANDO_PC = (ESTADO_COMANDO_PENDIENTE, ESTADO_COMANDO_ENTREGADO)
+ENVIO_PENDIENTE = "PENDIENTE"
+ENVIO_ENVIADO = "ENVIADO"
+ENVIO_ERROR = "ERROR"
+ESTADOS_ENVIO_PWA = (ENVIO_PENDIENTE, ENVIO_ENVIADO, ENVIO_ERROR)
 
-
-# --------------------------------------------------------------------
-# Actualización del Cliente PC desde el Servidor
-# --------------------------------------------------------------------
-# Cómo va la actualización en cada PC, tal como la cuenta su Cliente PC en cada
-# GET /estado (parámetro `act`, ver actualizacion_cliente_repo). Tienen que
-# coincidir con las de CLIENTE PC/actualizador.py; cualquier otro valor se guarda
-# como "nada pendiente". Vacío también es "nada pendiente".
-ACTUALIZACION_BAJANDO = "bajando"
-ACTUALIZACION_DESCARGADA = "descargada"
-ACTUALIZACION_ERROR = "error"
-ACTUALIZACION_FALLO = "fallo"
-ESTADOS_ACTUALIZACION_CLIENTE = (
-    ACTUALIZACION_BAJANDO, ACTUALIZACION_DESCARGADA, ACTUALIZACION_ERROR, ACTUALIZACION_FALLO,
-)
-# Por qué una versión que la PC ya había copiado sigue sin ponerse después de reiniciarla
-# (pedido del dueño, 2026-10-22; ver actualizacion_cliente_repo.seguir_la_copia).
-NO_SE_PUSO_SE_BORRO = "se_borro"            # la copia desapareció con el reinicio (Shadow Defender)
-NO_SE_PUSO_SIN_LANZADOR = "sin_lanzador"    # la copia siguió ahí: la PC no arrancó con Lanzador.exe
-
-
-# --------------------------------------------------------------------
-# Accesos de admin en las PCs cliente
-# --------------------------------------------------------------------
-# Lo que el Cliente PC le avisa al servidor cuando alguien entra a su panel
-# admin (la "A" chica de la pantalla de bloqueo) -- ver
-# control_pcs/repositories/accesos_admin_pc_repo.py. Los de
-# EVENTOS_ADMIN_REPORTADOS_POR_CLIENTE los manda el Cliente PC (son el
-# "protocolo" de POST /evento_admin, tienen que coincidir con CLIENTE
-# PC/red_kiosko.py); CLIENTE_REANUDADO no viaja por la red: lo anota el
-# servidor solo, cuando una PC que había quedado sin Cliente PC vuelve a
-# preguntar su estado. Sumar uno cambia el CHECK de eventos_admin_pc: la
-# migración (database_migraciones._migrar_check_tipo_en_eventos_admin_pc) lo
-# agrega sola a las bases que ya existen.
-EVENTO_ADMIN_ACCESO = "ACCESO"
-# Desde el 2026-10-19 el Cliente PC nuevo ya no lo manda ("Cerrar software
-# cliente" lo reemplazó "Hacer mantenimiento"), pero una PC sin actualizar sí,
-# y está en la historia de la base.
-EVENTO_ADMIN_CIERRE_CLIENTE = "CIERRE_CLIENTE"
-EVENTO_ADMIN_RECONFIGURAR = "RECONFIGURAR"
-# "Hacer mantenimiento (15 min)" del panel admin (pedido del dueño,
-# 2026-10-19): la PC queda libre ese rato con el Cliente PC ABIERTO, contando,
-# y se vuelve a bloquear sola. Por eso no está en
-# EVENTOS_ADMIN_QUE_DEJAN_PC_SIN_CLIENTE: la PC sigue preguntando su estado.
-EVENTO_ADMIN_MANTENIMIENTO = "MANTENIMIENTO"
-EVENTO_ADMIN_CLIENTE_REANUDADO = "CLIENTE_REANUDADO"
-# Cuánto dura el mantenimiento lo decide el Cliente PC (CLIENTE PC/mantenimiento.py);
-# acá es solo para el texto.
-MINUTOS_MANTENIMIENTO_PC = 15
-
-EVENTOS_ADMIN_REPORTADOS_POR_CLIENTE = (
-    EVENTO_ADMIN_ACCESO, EVENTO_ADMIN_CIERRE_CLIENTE, EVENTO_ADMIN_RECONFIGURAR, EVENTO_ADMIN_MANTENIMIENTO,
-)
-EVENTOS_ADMIN_PC = EVENTOS_ADMIN_REPORTADOS_POR_CLIENTE + (EVENTO_ADMIN_CLIENTE_REANUDADO,)
-# Los que dejan a la PC SIN Cliente PC corriendo, o sea sin bloqueo: la PC
-# queda usable por cualquiera hasta que el Cliente PC vuelve a arrancar.
-EVENTOS_ADMIN_QUE_DEJAN_PC_SIN_CLIENTE = (EVENTO_ADMIN_CIERRE_CLIENTE, EVENTO_ADMIN_RECONFIGURAR)
-
-NOMBRE_EVENTO_ADMIN_PC = {
-    EVENTO_ADMIN_ACCESO: "Entró al panel admin",
-    EVENTO_ADMIN_CIERRE_CLIENTE: "Cerró el Cliente PC (la PC quedó SIN bloqueo)",
-    EVENTO_ADMIN_RECONFIGURAR: "Abrió la reconfiguración (el Cliente PC se cerró)",
-    EVENTO_ADMIN_MANTENIMIENTO: f"Mantenimiento: {MINUTOS_MANTENIMIENTO_PC} min sin bloqueo (después se bloquea sola)",
-    EVENTO_ADMIN_CLIENTE_REANUDADO: "El Cliente PC volvió a arrancar",
-}
-
-
-# --------------------------------------------------------------------
-# Cortes de las PCs (alerta "SIN CLIENTE" que se apagó sola)
-# --------------------------------------------------------------------
-# Por qué una PC con sesión dejó de dar noticias un rato y volvió sola (pedido
-# del dueño, 2026-10-19). Lo decide el servidor cuando la PC vuelve, con lo que
-# cuenta su Cliente PC: ver control_pcs/repositories/cortes_pc_repo.py. No viaja
-# por la red: el Cliente PC manda datos, no la causa.
-CORTE_RED = "RED"
-CORTE_CLIENTE_REABIERTO = "CLIENTE_REABIERTO"
-CORTE_PC_REINICIADA = "PC_REINICIADA"
-CORTE_CLIENTE_TRABADO = "CLIENTE_TRABADO"
-CORTE_MOSTRADOR = "MOSTRADOR"
-CORTE_SIN_DATOS = "SIN_DATOS"
-
-CAUSAS_CORTE_PC = (
-    CORTE_RED, CORTE_CLIENTE_REABIERTO, CORTE_PC_REINICIADA, CORTE_CLIENTE_TRABADO, CORTE_MOSTRADOR,
-    CORTE_SIN_DATOS,
-)
-
-NOMBRE_CAUSA_CORTE_PC = {
-    CORTE_RED: "se cortó la comunicación con el mostrador (red)",
-    CORTE_CLIENTE_REABIERTO: "el Cliente PC se cerró y se volvió a abrir",
-    CORTE_PC_REINICIADA: "la PC se reinició",
-    CORTE_CLIENTE_TRABADO: "el Cliente PC se trabó o la PC se suspendió",
-    CORTE_MOSTRADOR: "la PC tuvo respuesta pero el mostrador no la anotó",
-    CORTE_SIN_DATOS: "no se sabe (el Cliente PC de esa PC es una versión vieja)",
-}
-# Para la cuenta de cortes de una sesión ("red ×2, PC reiniciada"), donde no entra la frase.
-NOMBRE_CORTO_CAUSA_CORTE_PC = {
-    CORTE_RED: "red",
-    CORTE_CLIENTE_REABIERTO: "Cliente PC reabierto",
-    CORTE_PC_REINICIADA: "PC reiniciada",
-    CORTE_CLIENTE_TRABADO: "Cliente PC trabado",
-    CORTE_MOSTRADOR: "mostrador",
-    CORTE_SIN_DATOS: "sin datos",
-}
-
-
-# --------------------------------------------------------------------
-# Reinicios que pidió el Cliente PC
-# --------------------------------------------------------------------
-# Por qué el Cliente PC de una PC la reinició o la apagó (revisión del
-# 2026-10-21: a un chico se le reinició la PC jugando y no se sabía si había
-# sido el programa). Viajan tal cual desde la PC (CLIENTE PC/motivo_reinicio.py):
-# ver control_pcs/repositories/reinicios_pc_repo.py.
-REINICIO_SESION_TERMINADA = "SESION_TERMINADA"
-REINICIO_TIEMPO_SIN_CONEXION = "TIEMPO_SIN_CONEXION"
-REINICIO_ORDEN_REINICIAR = "ORDEN_REINICIAR"
-REINICIO_ORDEN_APAGAR = "ORDEN_APAGAR"
-REINICIO_DESCONGELAR = "DESCONGELAR"
-# La reinició el seguro de fin de sesión: una tarea de Windows que el Cliente PC
-# deja programada a la hora de fin (más un margen) y que corre aunque el programa
-# esté cerrado o colgado (CLIENTE PC/seguro_fin.py, pedido del dueño 2026-10-21).
-# La cuenta la PC al volver: si la reinició el seguro, a esa hora no estaba andando.
-REINICIO_SEGURO_FIN = "SEGURO_FIN"
-
-# Sale del CHECK de reinicios_pc.motivo. SEGURO_FIN se sumó el mismo día en que
-# nació la tabla, antes de armar ningún exe con ella: ninguna base la tiene sin él.
-# Un motivo que se sume después necesita una migración que reconstruya la tabla.
-MOTIVOS_REINICIO_PC = (
-    REINICIO_SESION_TERMINADA, REINICIO_TIEMPO_SIN_CONEXION, REINICIO_ORDEN_REINICIAR,
-    REINICIO_ORDEN_APAGAR, REINICIO_DESCONGELAR, REINICIO_SEGURO_FIN,
+# Orden y nombres compartidos por el cierre en pantalla y la PWA.
+NEGOCIOS_DEL_CIERRE = (
+    ("kiosko_solo", "Kiosko"),
+    ("impresiones", "Impresiones"),
 )
 
 
 def lo_que_falta_para(total: float, monto: float) -> float:
-    """En el cobro, lo que va en el OTRO medio cuando se escribe `monto` en uno
-    (Efectivo <-> Digital): lo que falta para el total, nunca negativo."""
+    """Monto que completa un cobro entre efectivo y digital."""
     return round(max(0.0, total - monto), 2)
 
 
 def cuenta_del_cobro(total: float, efectivo: float, digital: float, paga_con: float = 0.0) -> dict:
-    """
-    La cuenta del cuadro de cobro (ui/dialogo_pago.py; pedido del dueño,
-    2026-10-18: Efectivo y Digital siempre a la vista, el reparto se completa
-    solo y el vuelto va aparte).
-
-    - `digital`: lo que se cobra por medio digital (de 0 al total).
-    - `efectivo`: lo escrito en Efectivo. Lo que no se cobra en digital es la
-      parte en efectivo; si se escribió MÁS, es el billete con que pagan (como
-      se hacía siempre: "escribí con cuánto pagan").
-    - `paga_con`: el billete que da el cliente, escrito aparte (0 = no se
-      escribió). Sirve para dar vuelto sin tocar lo digital: $1.500 = $1.000
-      efectivo + $500 digital, y paga los $1.000 con uno de $2.000.
-
-    Devuelve {"parte_efectivo", "digital", "entrega" (el efectivo que da el
-    cliente), "vuelto", "falta" (efectivo que todavía no entregó; con algo
-    acá no se puede cobrar) y "pagos"}. "pagos" ya es lo que queda en la caja
-    (neto de vuelto): una o dos filas de
-    PAGO_EFECTIVO/PAGO_DIGITAL, listas para grabar.
-    """
+    """Separa un cobro entre métodos y calcula el vuelto sin guardarlo como ingreso."""
     total = round(total, 2)
     digital = round(min(max(digital, 0.0), total), 2)
     parte_efectivo = round(total - digital, 2)
     entrega = round(paga_con if paga_con > 0 else max(efectivo, 0.0), 2)
     if parte_efectivo <= 0:
-        entrega = 0.0  # todo digital: no entrega billetes, así que no hay vuelto
+        entrega = 0.0
     falta = round(max(0.0, parte_efectivo - entrega), 2)
     vuelto = round(entrega - parte_efectivo, 2) if not falta else 0.0
     pagos = []
@@ -343,44 +78,16 @@ def cuenta_del_cobro(total: float, efectivo: float, digital: float, paga_con: fl
     }
 
 
-# --------------------------------------------------------------------
-# Dispositivos que se alquilan por tiempo (PCs y PlayStation 5)
-# --------------------------------------------------------------------
-# El local alquila tiempo de dos tipos de equipo: las PCs (muchas, cada una
-# una fila de "estaciones") y UNA PlayStation 5. Cada una tiene su catálogo
-# de bonos y sus sesiones, y nunca se mezclan: un bono de PC no se le puede
-# vender a la consola ni al revés. En la grilla de Control de PCs, cada fila
-# trae su tipo en `item["dispositivo"]`.
-DISPOSITIVO_PC = "PC"
-DISPOSITIVO_PLAYSTATION = "PLAYSTATION"
-
-# La consola es una sola y su nombre no se edita (a diferencia de una PC, que
-# es una fila de "estaciones" que el Admin renombra o da de baja).
-NOMBRE_PLAYSTATION = "PLAYSTATION 5"
-
-# La PC de streaming SÍ es una PC (una fila de "estaciones", con su Cliente PC y
-# su bloqueo), pero se cobra con su propio catálogo de bonos (ver
-# pcstream_repo), no la pueden abrir los socios y no entra en "Intercambiar de
-# máquina". Se la reconoce solo por el nombre (pedido del dueño, 2026-10-17):
-# si el Admin la renombra a otra cosa, vuelve a ser una PC común.
-NOMBRE_PCSTREAM = "PCSTREAM"
-
-
 def sin_acentos(texto) -> str:
-    """El texto en minúscula y sin acentos: para buscar ("perez" encuentra
-    "Pérez") y para ordenar como lo haría una persona (en el orden de la
-    computadora las mayúsculas van antes que las minúsculas y "Álamo" queda
-    después de la "z")."""
+    """Texto en minúsculas y sin acentos para búsquedas y orden natural."""
     return "".join(
-        letra for letra in unicodedata.normalize("NFD", (texto or "").lower()) if not unicodedata.combining(letra)
+        letra for letra in unicodedata.normalize("NFD", (texto or "").lower())
+        if not unicodedata.combining(letra)
     )
 
 
 def orden_de_codigo(codigo) -> tuple:
-    """Para ordenar códigos de artículo de menor a mayor como números (pedido del
-    dueño, 2026-10-25: F5 lista 1, 2, 3, 4... y no 1, 10, 100, 2, que es el orden
-    de un texto). Primero los que son solo números, por su valor; después los que
-    tienen letras, alfabéticamente. "007" y "7" valen lo mismo: el texto desempata."""
+    """Ordena códigos numéricos por valor y luego códigos con letras."""
     texto = (codigo or "").strip()
     if texto.isascii() and texto.isdigit():
         return (0, int(texto), texto)
@@ -388,15 +95,7 @@ def orden_de_codigo(codigo) -> tuple:
 
 
 def texto_pesos(monto) -> str:
-    """Un monto como se lee en el local: "$ 1.500", "$ 30.000" (punto para los
-    miles, sin centavos: pedido del dueño 2026-10-26, todos los precios son en
-    miles y "$ 1.500,00" o "1500,00" se leían mal). Si el monto tiene centavos de
-    verdad (un reparto en proporción entre efectivo y digital) se muestran,
-    "$ 1.234,50": escondidos, una suma de la caja podría no cerrar por $ 1.
-
-    Es el único lugar donde se escribe un monto: la pantalla lo usa con
-    `ui.utils.formato_pesos` y los campos con `ui.utils.CampoPesos`; los repos, en
-    sus mensajes."""
+    """Presenta pesos con miles y centavos solo cuando existen."""
     try:
         monto = round(float(monto), 2)
     except (TypeError, ValueError):
@@ -405,364 +104,4 @@ def texto_pesos(monto) -> str:
         texto = f"{round(monto):,}"
     else:
         texto = f"{monto:,.2f}"
-    # Python escribe "en inglés" (1,234.50): se dan vuelta la coma y el punto.
     return "$ " + texto.replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
-
-
-def es_pcstream(nombre_estacion: str) -> bool:
-    """
-    Único lugar donde se decide si una estación es la PC de streaming. Compara
-    sin espacios, guiones ni mayúsculas: "PCSTREAM", "PC STREAM" y "Pc-Stream"
-    son la misma PC (escrita a mano en "Gestionar Estaciones", un espacio de más
-    no puede cambiarle los precios).
-    """
-    return re.sub(r"[\s_-]", "", nombre_estacion or "").upper() == NOMBRE_PCSTREAM
-
-
-# La temperatura del procesador de una PC (pedido del dueño, 2026-10-22; la manda cada Cliente PC,
-# ver temperatura_pc_repo). Desde TIBIA el termómetro del mosaico se pone ámbar; desde CALIENTE,
-# rojo, y el monitor dice "CALIENTE" titilando. Un procesador de escritorio jugando anda por los
-# 60-80°; pasados los 85° de forma sostenida conviene mirar los ventiladores y el polvo.
-TEMPERATURA_TIBIA = 75
-TEMPERATURA_CALIENTE = 85
-TEMPERATURA_NORMAL_NIVEL = "normal"
-TEMPERATURA_TIBIA_NIVEL = "tibia"
-TEMPERATURA_CALIENTE_NIVEL = "caliente"
-
-
-def nivel_de_temperatura(grados):
-    """Único lugar donde se decide si un procesador está normal, tibio o caliente (None si no
-    hay dato)."""
-    if grados is None:
-        return None
-    if grados >= TEMPERATURA_CALIENTE:
-        return TEMPERATURA_CALIENTE_NIVEL
-    if grados >= TEMPERATURA_TIBIA:
-        return TEMPERATURA_TIBIA_NIVEL
-    return TEMPERATURA_NORMAL_NIVEL
-
-# Estado de una sesión de tiempo. Tienen que coincidir con el CHECK de
-# "sesiones_playstation.estado" en database.py (las sesiones de PC todavía los
-# escriben a mano, ver CLAUDE.md "Estado").
-SESION_ACTIVA = "ACTIVA"
-SESION_FINALIZADA = "FINALIZADA"
-
-# ¿La PC se enteró de que se terminó su sesión? (sesiones_pc.aviso_fin, ver
-# control_pcs/repositories/avisos_fin_pc_repo.py; pedido del dueño 2026-10-21).
-# NULL en las sesiones cerradas antes de que existiera.
-AVISO_FIN_PENDIENTE = "PENDIENTE"   # cerrada; la PC todavía no volvió a preguntar
-AVISO_FIN_ENTERADA = "ENTERADA"     # la PC preguntó después del fin: ya se bloqueó
-AVISO_FIN_REVISADO = "REVISADO"     # no se enteró y el operador apretó "Ya revisé la PC"
-
-# Tipos del historial de saldo de socios. Los usa también el CHECK del esquema.
-MOVIMIENTO_CARGA = "CARGA"
-MOVIMIENTO_CONSUMO = "CONSUMO"
-MOVIMIENTO_REINTEGRO = "REINTEGRO"
-MOVIMIENTO_ANULACION = "ANULACION"
-# El tiempo que cada socio traía del programa de cyber anterior, sin venta
-# (esa plata se cobró allá). Lo grabó una importación desde Excel que se usó
-# una sola vez en la base del local (2026-10-19) y después se sacó del programa
-# a pedido del dueño. No lo saques de la lista: esas filas siguen en la base, y
-# una migración que reconstruya la tabla sin este tipo en el CHECK las perdería
-# sin aviso (INSERT OR IGNORE también saltea las que no pasan el CHECK).
-MOVIMIENTO_IMPORTACION = "IMPORTACION"
-TIPOS_MOVIMIENTO_SALDO = (
-    MOVIMIENTO_CARGA, MOVIMIENTO_CONSUMO, MOVIMIENTO_REINTEGRO, MOVIMIENTO_ANULACION,
-    MOVIMIENTO_IMPORTACION,
-)
-
-# La "Cuenta de la PC" (pedido del dueño, 2026-10-25): lo que un cliente que está
-# jugando pide sin pagar en el momento (un pancho, más tiempo) se anota en la
-# cuenta de su sesión y se cobra después, todo junto. Ver cuentas_pc_repo.
-CUENTA_ABIERTA = "ABIERTA"    # debe: su PC titila en fucsia
-CUENTA_COBRADA = "COBRADA"
-CUENTA_PERDIDA = "PERDIDA"    # se fue sin pagar: la dio por perdida un Admin, con el motivo
-ESTADOS_CUENTA_PC = (CUENTA_ABIERTA, CUENTA_COBRADA, CUENTA_PERDIDA)
-# Qué es cada renglón de la cuenta: un artículo del kiosko o un bono de tiempo.
-ITEM_CUENTA_ARTICULO = "ARTICULO"
-ITEM_CUENTA_BONO = "BONO"
-# Tiempo de socio (pedido del dueño, el mismo día): un bono de socio o un monto con
-# la tarifa de socios, como en Cargar Saldo, pero sin cobrar.
-ITEM_CUENTA_TIEMPO_SOCIO = "TIEMPO_SOCIO"
-TIPOS_ITEM_CUENTA_PC = (ITEM_CUENTA_ARTICULO, ITEM_CUENTA_BONO, ITEM_CUENTA_TIEMPO_SOCIO)
-# Los que suman tiempo a la sesión (para los reintegros y quitar un renglón).
-TIPOS_ITEM_CUENTA_CON_TIEMPO = (ITEM_CUENTA_BONO, ITEM_CUENTA_TIEMPO_SOCIO)
-# Qué pasa si con lo que se anota la PC debería más que el tope (lo elige el
-# Admin en Configuración ADMIN > Reglas de Cuenta de PC): no se deja, o se deja
-# con la clave de un Admin.
-TOPE_CUENTA_NO_DEJA = "NO_DEJA"
-TOPE_CUENTA_CON_CLAVE_ADMIN = "CLAVE_ADMIN"
-ACCIONES_TOPE_CUENTA_PC = (TOPE_CUENTA_NO_DEJA, TOPE_CUENTA_CON_CLAVE_ADMIN)
-# Con lo que arranca (decisión del dueño: "para empezar un tope de 10.000").
-TOPE_CUENTA_PC_INICIAL = 10000.0
-# Lo fiado en un turno se cobra en ese turno (pedido del dueño, 2026-10-25: "que lo
-# que dio el operador de X turno quede en su turno"): desde estos minutos antes del
-# fin del turno las PCs que deben lo de ese turno titilan más rápido y sale el
-# cartel "Cobrá antes de cerrar el turno", que se puede posponer estos minutos.
-MINUTOS_AVISO_CUENTAS_ANTES_DEL_FIN = 15
-MINUTOS_POSPONER_AVISO_CUENTAS = 5
-
-# El Administrador en el mostrador (pedido del dueño, 2026-10-26: entra para algo
-# rápido y se olvida de volver a cambiar de usuario): a estos minutos de entrar, la
-# sesión vuelve sola y en silencio a la empleada que estaba antes, o a la pantalla
-# de ingreso (ver ui/vuelta_del_admin.py).
-MINUTOS_ADMIN_VUELVE_SOLO = 10
-
-
-def repartir_pagos(pagos: list, montos: list) -> list:
-    """
-    Reparte un cobro entre varias ventas: `pagos` es lo que devolvió la ventana
-    de cobro (netos de vuelto, ver cuenta_del_cobro: suman justo el total) y
-    `montos`, lo que vale cada venta. Devuelve, para cada monto, sus filas de
-    pago. Se va llenando cada venta en orden con el efectivo primero y después
-    lo digital, así cada medio suma en la caja exactamente lo que se cobró en
-    él. Lo usa el cobro de la Cuenta de la PC, que graba el kiosko y cada bono
-    como ventas separadas (cada una con su origen).
-    """
-    total = round(sum(montos), 2)
-    if abs(round(sum(pago["monto"] for pago in pagos), 2) - total) > 0.009:
-        raise ValueError("Lo cobrado no coincide con lo que se debe.")
-    quedan = [{"metodo": pago["metodo"], "monto": round(pago["monto"], 2)}
-              for pago in sorted(pagos, key=lambda pago: pago["metodo"] != PAGO_EFECTIVO)]
-    repartidos = []
-    for monto in montos:
-        falta = round(monto, 2)
-        filas = []
-        for pago in quedan:
-            toma = round(min(pago["monto"], falta), 2)
-            if toma <= 0:
-                continue
-            filas.append({"metodo": pago["metodo"], "monto": toma})
-            pago["monto"] = round(pago["monto"] - toma, 2)
-            falta = round(falta - toma, 2)
-        repartidos.append(filas)
-    return repartidos
-
-
-# Desde cuántos días sin venir un socio se marca en naranja en Miembros (columna
-# "No viene hace", pedido del dueño 2026-10-24), y con cuántos arranca el filtro
-# "No vienen hace más de N días" (ver ultima_visita_repo).
-DIAS_SIN_VENIR_AVISO = 15
-
-
-def segundos_restantes(fin_previsto: datetime, ahora: datetime) -> int:
-    """
-    Único lugar donde se calcula cuánto le queda a una sesión de tiempo (PC
-    o PlayStation 5): los segundos que faltan hasta `fin_previsto`, nunca
-    negativos (0 = el tiempo se acabó). Es una cuenta contra el reloj de AHORA,
-    no un contador guardado: por eso sigue siendo correcta aunque el programa
-    se cierre y se vuelva a abrir.
-    """
-    return max(0, int((fin_previsto - ahora).total_seconds()))
-
-
-def fin_al_sumar_minutos(fin_actual, minutos: int, ahora: datetime) -> datetime:
-    """
-    Único lugar donde se decide cuándo vence una sesión de tiempo al venderle
-    `minutos` más (PC o PlayStation 5). `fin_actual` es el vencimiento que ya
-    tenía, o None si todavía no hay sesión.
-
-    Si la sesión sigue en curso, los minutos se suman a SU vencimiento (el
-    cliente sigue jugando). Si no hay sesión, o ya venció y nadie la dio de
-    baja todavía, se cuentan desde ahora: si no, se perderían los minutos
-    entre que se agotó el tiempo anterior y que se vendió el siguiente.
-    """
-    base = ahora if fin_actual is None else max(fin_actual, ahora)
-    return base + timedelta(minutes=minutos)
-
-
-# --------------------------------------------------------------------
-# Reservas (pedido del dueño, 2026-10-20; ver control_pcs/repositories/reservas_repo.py)
-# --------------------------------------------------------------------
-# Un cliente reserva un equipo para más tarde y paga una seña o todo en el
-# momento. Qué equipo: una PC común (una puntual, o "cualquiera disponible"),
-# PCSTREAM o la PlayStation 5. Cada uno se cobra con SU catálogo de bonos.
-EQUIPO_RESERVA_PC = "PC"
-EQUIPO_RESERVA_PCSTREAM = "PCSTREAM"
-EQUIPO_RESERVA_PLAYSTATION = "PLAYSTATION"
-EQUIPOS_RESERVA = (EQUIPO_RESERVA_PC, EQUIPO_RESERVA_PCSTREAM, EQUIPO_RESERVA_PLAYSTATION)
-# Cómo se ve una reserva de PC sin PC fija (no aparta ninguna: decisión del dueño).
-NOMBRE_RESERVA_CUALQUIER_PC = "Cualquier PC disponible"
-
-
-def nombre_equipo_reservado(equipo: str, nombre_pc=None) -> str:
-    """Cómo se nombra el equipo de una reserva: la PC pedida (`nombre_pc`),
-    "Cualquier PC disponible", PCSTREAM o la PlayStation 5."""
-    if equipo == EQUIPO_RESERVA_PLAYSTATION:
-        return NOMBRE_PLAYSTATION
-    if equipo == EQUIPO_RESERVA_PCSTREAM:
-        return NOMBRE_PCSTREAM
-    return nombre_pc or NOMBRE_RESERVA_CUALQUIER_PC
-
-# Cómo está una reserva. "Pendiente" sirve con seña o ya pagada: lo que falta
-# cobrar se calcula con sus pagos, no es otro estado.
-RESERVA_PENDIENTE = "PENDIENTE"
-RESERVA_HABILITADA = "HABILITADA"
-# Dejó seña y no vino: la pierde (decisión del dueño).
-RESERVA_NO_VINO = "NO_VINO"
-# Pagó todo y no vino: se le da otro día, con cualquier PC disponible.
-RESERVA_A_REPROGRAMAR = "A_REPROGRAMAR"
-# Quedó "A reprogramar" y nadie le dio otro día a tiempo: la plata queda donde entró.
-RESERVA_VENCIDA = "VENCIDA"
-# El Admin le devolvió la plata (corte de luz, PC rota, el local canceló).
-RESERVA_DEVUELTA = "DEVUELTA"
-ESTADOS_RESERVA = (
-    RESERVA_PENDIENTE, RESERVA_HABILITADA, RESERVA_NO_VINO, RESERVA_A_REPROGRAMAR,
-    RESERVA_VENCIDA, RESERVA_DEVUELTA,
-)
-# Las que todavía esperan al cliente: se pueden habilitar, reprogramar o dar por no venidas.
-ESTADOS_RESERVA_ABIERTA = (RESERVA_PENDIENTE, RESERVA_A_REPROGRAMAR)
-
-# Qué fue cada venta de una reserva: lo que se pagó al reservar (una seña o
-# todo), lo que se cobró al habilitarla y la devolución (una venta en negativo:
-# sale de la caja de quien entrega la plata).
-PAGO_RESERVA_ANTICIPO = "ANTICIPO"
-PAGO_RESERVA_RESTO = "RESTO"
-PAGO_RESERVA_DEVOLUCION = "DEVOLUCION"
-TIPOS_PAGO_RESERVA = (PAGO_RESERVA_ANTICIPO, PAGO_RESERVA_RESTO, PAGO_RESERVA_DEVOLUCION)
-# Cómo se cuentan esos pagos debajo del renglón "Reservas" de Caja y Cierre de
-# Turno ("1 seña · 1 resto"), en este orden: lo pagado al reservar es una seña si
-# no cubría el precio, o un pago total si sí (no se guarda: se mira al contar).
-CLASE_PAGO_RESERVA_SENA = "SENA"
-CLASE_PAGO_RESERVA_TOTAL = "TOTAL"
-CLASES_PAGO_RESERVA = (
-    CLASE_PAGO_RESERVA_SENA, CLASE_PAGO_RESERVA_TOTAL, PAGO_RESERVA_RESTO, PAGO_RESERVA_DEVOLUCION,
-)
-
-# Pasada la hora de la reserva más esto sin que el cliente llegue, la reserva
-# pasa sola a "No vino" o a "A reprogramar" (decisión del dueño).
-MINUTOS_TOLERANCIA_RESERVA = 20
-# Una reserva "A reprogramar" vence a los cinco días (decisión del dueño).
-DIAS_PARA_REPROGRAMAR_RESERVA = 5
-# Desde cuánto antes de la hora una PC puntual, PCSTREAM o la consola se ve
-# RESERVADA en el mosaico y en la pantalla de bloqueo (decisión del dueño: 2 h).
-MINUTOS_EQUIPO_RESERVADO_ANTES = 120
-# Un socio entra a una PC reservada solo hasta la hora de la reserva (decisión del
-# dueño); si le quedaría menos que esto, no entra y se le pide que use otra PC.
-MINUTOS_MINIMOS_SOCIO_ANTES_DE_RESERVA = 15
-# Reservas de socios (pedido del dueño, 2026-10-26; ver
-# control_pcs/repositories/reservas_socios_repo.py): reserva sin seña solo un socio
-# con por lo menos estas horas de saldo. Es el valor de arranque: el Admin lo cambia
-# en Miembros > "$ Para Reserva", entre 1 y HORAS_MAXIMAS_SALDO_PARA_RESERVAR.
-HORAS_SALDO_PARA_RESERVAR = 5
-HORAS_MAXIMAS_SALDO_PARA_RESERVAR = 99
-# Lo más largo que reserva un socio (además, nunca más que su saldo).
-HORAS_MAXIMAS_RESERVA_SOCIO = 12
-
-
-# --------------------------------------------------------------------
-# Bonos de tiempo (reglas compartidas por los cuatro catálogos)
-# --------------------------------------------------------------------
-# Hay cuatro catálogos de bonos -- pcs_repo.bonos_tiempo (walk-ins),
-# bonos_miembro_repo (exclusivo de socios), playstation_repo.bonos_playstation
-# (exclusivo de la consola) y pcstream_repo.bonos_pcstream (exclusivo de la PC
-# de streaming) -- deliberadamente separados (distinta tabla, distinto permiso
-# para administrarlos), pero un bono es un bono: mismas tres reglas en los
-# cuatro. Vive acá para no repetirla en cada repo (ver CLAUDE.md, regla 2).
-def validar_datos_bono(nombre: str, minutos: int, precio: float):
-    """Levanta ValueError (mensaje listo para mostrar) si el bono no es válido."""
-    if not nombre.strip():
-        raise ValueError("El nombre del bono no puede quedar vacío.")
-    if minutos <= 0:
-        raise ValueError("Los minutos del bono tienen que ser mayores a 0.")
-    if precio <= 0:
-        raise ValueError("El precio del bono tiene que ser mayor a 0.")
-
-
-# --------------------------------------------------------------------
-# Tarifa por hora de Socios (tramos por monto cargado)
-# --------------------------------------------------------------------
-# Hasta 2026-09-30 había una sola tarifa $/hora para convertir un monto
-# libre en minutos (config_repo.obtener_tarifa_hora_miembro). El dueño
-# pidió poder ofrecer tarifas distintas según cuánta plata carga el
-# socio de una vez -- sin asumir que cargar más siempre sale más barato:
-# cada tramo (a partir de qué monto mínimo rige, y a qué $/hora) lo
-# define el dueño a mano, en cualquier orden de precios.
-def validar_tramos_tarifa_hora_miembro(tramos: list):
-    """Levanta ValueError (mensaje listo para mostrar) si la tabla de
-    tramos está vacía o tiene un monto/tarifa inválido o un monto mínimo
-    repetido."""
-    if not tramos:
-        raise ValueError("Tiene que haber al menos un tramo de tarifa.")
-    montos_vistos = set()
-    for tramo in tramos:
-        if tramo["monto_minimo"] < 0:
-            raise ValueError("El monto mínimo de un tramo no puede ser negativo.")
-        if tramo["tarifa_hora"] <= 0:
-            raise ValueError("La tarifa por hora de un tramo tiene que ser mayor a 0.")
-        if tramo["monto_minimo"] in montos_vistos:
-            raise ValueError("No puede haber dos tramos con el mismo monto mínimo.")
-        montos_vistos.add(tramo["monto_minimo"])
-
-
-def carga_minima_de_saldo(tramos: list) -> float:
-    """
-    Único lugar donde se decide cuánto es lo mínimo que puede cargar un
-    socio con un monto libre: el monto_minimo del tramo más bajo (pedido del
-    dueño, 2026-10-17: con un único tramo "desde $13.000 a $1.000/h" no se
-    tiene que poder cargar $2.000). Un tramo "desde $0" deja cargar cualquier
-    monto. Hasta ese día un monto menor se aceptaba igual con la tarifa del
-    tramo más bajo. Lo hace cumplir miembros_repo.cargar_saldo_por_monto.
-    """
-    return min(tramo["monto_minimo"] for tramo in tramos)
-
-
-def tarifa_hora_para_monto(tramos: list, monto: float) -> float:
-    """
-    Único lugar donde se decide qué tarifa $/hora le corresponde a un
-    monto cargado, según la tabla de tramos (no hace falta que venga
-    ordenada). Se usa el tramo con el monto_minimo más alto que no
-    supere `monto`. Un monto menor que el tramo más bajo devuelve la
-    tarifa de ese tramo (para la vista previa mientras se tipea), pero
-    esa carga no se acepta: ver carga_minima_de_saldo.
-    """
-    tramos_ordenados = sorted(tramos, key=lambda tramo: tramo["monto_minimo"])
-    tarifa = tramos_ordenados[0]["tarifa_hora"]
-    for tramo in tramos_ordenados:
-        if tramo["monto_minimo"] > monto:
-            break
-        tarifa = tramo["tarifa_hora"]
-    return tarifa
-
-
-# --------------------------------------------------------------------
-# Turnos
-# --------------------------------------------------------------------
-# El local abre las 24 hs. De lunes a sábado son 3 turnos de 8 hs; los
-# domingos son 2 de 12 hs y NO existe el turno TARDE (ver
-# turnos.calcular_turno, que es donde se decide a qué turno pertenece
-# una hora concreta, y turnos.turnos_del_dia para saber qué turnos
-# existen en un día dado).
-TURNO_MANANA = "MAÑANA"
-TURNO_TARDE = "TARDE"
-TURNO_NOCHE = "NOCHE"
-
-TURNOS = (TURNO_MANANA, TURNO_TARDE, TURNO_NOCHE)
-TURNOS_DOMINGO = (TURNO_MANANA, TURNO_NOCHE)
-
-# --------------------------------------------------------------------
-# Envío de cada Cierre de Turno a la app de gastos del dueño (la PWA
-# "Gastos — CyberBIOS"; pedido del dueño 2026-10-26, ver
-# repositories/envio_pwa_repo.py). Cómo va cada cierre en la cola
-# `envios_pwa`.
-# --------------------------------------------------------------------
-ENVIO_PENDIENTE = "PENDIENTE"   # recién cerrado, todavía no se mandó
-ENVIO_ENVIADO = "ENVIADO"       # la app de gastos lo aceptó: no se vuelve a mandar
-ENVIO_ERROR = "ERROR"           # falló; se vuelve a probar solo
-ESTADOS_ENVIO_PWA = (ENVIO_PENDIENTE, ENVIO_ENVIADO, ENVIO_ERROR)
-
-# Los renglones de "de dónde vino la plata" de un Cierre de Turno, en orden:
-# (clave, nombre). La clave con "_efectivo" o "_digital" detrás es lo que trae
-# turnos_repo.resumen_turno_actual (Kiosko sin impresiones ni trámites, pedido
-# del dueño 2026-10-19; Alquiler de PCs y PlayStation 5 sin sus reservas,
-# 2026-10-20). Los usan la tarjeta del cierre (ui/tarjeta_cierre.py, con su
-# dibujito) y lo que viaja a la app de gastos (envio_pwa_repo): un solo lugar
-# para que las dos muestren lo mismo.
-NEGOCIOS_DEL_CIERRE = (
-    ("kiosko_solo", NOMBRE_ORIGEN_VENTA[ORIGEN_KIOSKO]),
-    ("impresiones", "Impresiones"),
-    ("tramites", "Trámites"),
-    ("pcs_solo", NOMBRE_ORIGEN_VENTA[ORIGEN_ALQUILER_PCS]),
-    ("playstation_solo", NOMBRE_ORIGEN_VENTA[ORIGEN_PLAYSTATION]),
-    ("reservas", "Reservas"),
-)

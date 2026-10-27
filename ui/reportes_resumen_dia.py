@@ -45,8 +45,8 @@ class PestañaResumenDelDia(QWidget):
         turnos_repo.ESTADO_SIN_CERRAR: "#C62828",
         turnos_repo.ESTADO_PENDIENTE: "#7A869A",
     }
-    _COLUMNAS = ["Turno", "Estado", "Cerró", "Ventas", "Kiosko", "Impresiones", "Trámites",
-                 "Alquiler de PCs", "PlayStation 5", "Efectivo", "Digital", "Total",
+    _COLUMNAS = ["Turno", "Estado", "Cerró", "Ventas", "Kiosko", "Impresiones",
+                 "Efectivo", "Digital", "Total",
                  "Sobre (contado - esperado)"]
 
     def __init__(self):
@@ -93,7 +93,7 @@ class PestañaResumenDelDia(QWidget):
         nota = QLabel(
             "Cada turno cuenta lo que se vendió hasta que se lo cerró (la Noche incluye hasta las 06:00 "
             "del día siguiente). \"Sin contar\": el Admin todavía no cargó cuánto contó del sobre. "
-            "Impresiones y Trámites se muestran aparte: no están sumados en Kiosko."
+            "Impresiones se muestran aparte: no están sumadas en Kiosko."
         )
         nota.setWordWrap(True)
         nota.setStyleSheet("color: #7A869A;")
@@ -268,9 +268,6 @@ class PestañaResumenDelDia(QWidget):
                     self._texto_ventas(turno["cantidad_ventas"], turno["cantidad_anuladas"]) if tiene_plata else "—",
                     formato_pesos(turno["kiosko"]) if tiene_plata else "—",
                     formato_pesos(turno["impresiones"]) if tiene_plata else "—",
-                    formato_pesos(turno["tramites"]) if tiene_plata else "—",
-                    formato_pesos(turno["pcs"]) if tiene_plata else "—",
-                    formato_pesos(turno["playstation"]) if tiene_plata else "—",
                     formato_pesos(turno["efectivo"]) if tiene_plata else "—",
                     formato_pesos(turno["digital"]) if tiene_plata else "—",
                     formato_pesos(turno["total"]) if tiene_plata else "—",
@@ -286,8 +283,6 @@ class PestañaResumenDelDia(QWidget):
                 "TOTAL DEL DÍA", "", "",
                 self._texto_ventas(total["cantidad_ventas"], total["cantidad_anuladas"]),
                 formato_pesos(total["kiosko"]), formato_pesos(total["impresiones"]),
-                formato_pesos(total["tramites"]), formato_pesos(total["pcs"]),
-                formato_pesos(total["playstation"]),
                 formato_pesos(total["efectivo"]), formato_pesos(total["digital"]),
                 formato_pesos(total["total"]), "",
             ],

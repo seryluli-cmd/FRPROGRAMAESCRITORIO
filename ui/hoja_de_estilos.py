@@ -72,9 +72,8 @@ HOJA_DE_ESTILOS = """
         background-color: #255BC7;
         border-color: #255BC7;
     }
-    /* Un bono tildado dentro de una lista deshabilitada (la de PC cuando está
-       elegida la PlayStation, y al revés) no tiene que verse tan fuerte como
-       uno activo: es lo que deja claro cuál de las dos listas se puede usar. */
+    /* Un botón tildado dentro de un grupo deshabilitado no tiene que verse tan
+       fuerte como uno activo. */
     QPushButton:checked:disabled {
         background-color: #AEC3F2;
         border: 1px solid #AEC3F2;
@@ -271,147 +270,6 @@ HOJA_DE_ESTILOS = """
         color: #9AA4B5;
     }
 
-    /* Mosaico de PCs (control_pcs/ui/pcs_mosaico.py): fondo oscuro para que
-       resalten los colores de las pantallas, como en los programas de cyber. */
-    QFrame#marcoMosaico {
-        background-color: #181B21;
-        border: 1px solid #0C0E12;
-        border-radius: 12px;
-    }
-    QListWidget#mosaicoPcs {
-        background-color: transparent;
-        border: none;
-        outline: none;
-    }
-    QLabel#textoLeyendaMosaico {
-        color: #C9CED8;
-        font-size: 12px;
-    }
-    /* Las reservas de "Cualquier PC disponible", arriba del mosaico (maqueta 7 de
-       PROPUESTA_RESERVAS: recuadro claro con letra azul). */
-    QLabel#avisoReservasMosaico {
-        background-color: #EAF1FE;
-        color: #1D4FB8;
-        border-radius: 6px;
-        padding: 5px 12px;
-        font-size: 12px;
-    }
-    /* Desde otra PC, con el mostrador sin contestar (ver PanelControlPcs._refrescar_desde_otra_pc). */
-    QLabel#avisoSinConexionMosaico {
-        background-color: #FDECEC;
-        color: #B42318;
-        border-radius: 6px;
-        padding: 5px 12px;
-        font-size: 13px;
-        font-weight: 700;
-    }
-    QListWidget#mosaicoPcs QScrollBar:vertical {
-        background: #181B21;
-    }
-    QListWidget#mosaicoPcs QScrollBar::handle:vertical {
-        background: #3A404C;
-    }
-    QListWidget#mosaicoPcs QScrollBar::handle:vertical:hover {
-        background: #4A5160;
-    }
-
-    /* Panel del costado de Control de PCs (control_pcs/ui/pcs_detalle.py) en gris
-       medio: lo eligió el dueño entre 5 maquetas (2026-10-19). Todo va con ">"
-       (solo los hijos directos del panel y de su lista de bonos) a propósito: las
-       ventanas que abre el panel (el cobro, el login del socio, los avisos) son
-       hijas suyas, y con un selector común heredarían las letras claras sobre su
-       fondo claro. */
-    QFrame#panelDetalle {
-        background-color: #5E636B;
-        border: 1px solid #4A4E55;
-        border-radius: 12px;
-    }
-    QFrame#panelDetalle > QLabel, QWidget#contenedorBonos > QLabel {
-        color: #F3F4F6;
-        background: transparent;
-    }
-    /* La lista de bonos que no corresponde al equipo elegido, con su título apagado. */
-    QFrame#panelDetalle > QLabel:disabled, QWidget#contenedorBonos > QLabel:disabled {
-        color: #A3A8B0;
-    }
-    QWidget#contenedorBonos > QLabel#avisoSinBonos {
-        color: #D5D8DD;
-    }
-    QFrame#panelDetalle > QPushButton, QWidget#contenedorBonos > QPushButton {
-        background-color: #F2F3F5;
-        border: 1px solid #C3C7CD;
-        color: #1E2229;
-    }
-    QFrame#panelDetalle > QPushButton:hover, QWidget#contenedorBonos > QPushButton:hover {
-        background-color: #FFFFFF;
-        border-color: #E1E4E8;
-    }
-    QFrame#panelDetalle > QPushButton:pressed, QWidget#contenedorBonos > QPushButton:pressed {
-        background-color: #DADDE2;
-    }
-    QWidget#contenedorBonos > QPushButton:checked,
-    QFrame#panelDetalle > QPushButton[clase="primario"] {
-        background-color: #2F6FED;
-        border-color: #2F6FED;
-        color: #FFFFFF;
-    }
-    QWidget#contenedorBonos > QPushButton:checked:hover,
-    QFrame#panelDetalle > QPushButton[clase="primario"]:hover {
-        background-color: #255BC7;
-        border-color: #255BC7;
-    }
-    QFrame#panelDetalle > QPushButton[clase="primario"]:pressed {
-        background-color: #1D48A0;
-        border-color: #1D48A0;
-    }
-    QFrame#panelDetalle > QPushButton[clase="peligro"] {
-        border-color: #D9838A;
-        color: #A6323C;
-    }
-    QFrame#panelDetalle > QPushButton[clase="peligro"]:hover {
-        background-color: #FBEAEA;
-        border-color: #C96870;
-    }
-    QFrame#panelDetalle > QPushButton[clase="peligro"]:pressed {
-        background-color: #F3D3D3;
-    }
-    /* La Cuenta de la PC (2026-10-25): fucsia, el color que eligió el dueño para la
-       PC que debe (el mismo del borde que titila en el mosaico). */
-    QPushButton[clase="cuenta"], QFrame#panelDetalle > QPushButton[clase="cuenta"] {
-        background-color: #FF3EC8;
-        border: 1px solid #E52DB2;
-        color: #3A0030;
-        font-weight: 600;
-    }
-    QPushButton[clase="cuenta"]:hover, QFrame#panelDetalle > QPushButton[clase="cuenta"]:hover {
-        background-color: #FF66D4;
-    }
-    QPushButton[clase="cuenta"]:pressed, QFrame#panelDetalle > QPushButton[clase="cuenta"]:pressed {
-        background-color: #E52DB2;
-    }
-    QFrame#panelDetalle > QLabel#cuentaPendiente {
-        background-color: #FFFFFF;
-        border: 2px solid #FF3EC8;
-        border-radius: 8px;
-        color: #1E2330;
-        padding: 6px 8px;
-    }
-    QFrame#panelDetalle > QPushButton:disabled, QWidget#contenedorBonos > QPushButton:disabled,
-    QFrame#panelDetalle > QPushButton[clase="peligro"]:disabled {
-        background-color: #6B7078;
-        border-color: #767B83;
-        color: #A9AEB6;
-    }
-    QWidget#contenedorBonos > QPushButton:checked:disabled,
-    QFrame#panelDetalle > QPushButton[clase="primario"]:disabled {
-        background-color: #5B72A3;
-        border-color: #5B72A3;
-        color: #C9D3EA;
-    }
-    QScrollArea#areaBonos QScrollBar:vertical {
-        background: #5E636B;
-    }
-
     /* --- Pulido visual (2026-10-10) --- */
 
     /* Botones de la barra oscura de arriba (2026-10-19): cada uno es una tecla con
@@ -548,12 +406,12 @@ HOJA_DE_ESTILOS = """
     QTableWidget::item:selected {
         border: none;
     }
-    /* El campo que se abre al escribir en una celda (el stock de ORDENAR Stock, los
-       módems): con el relleno de 7 px de los demás campos, en un renglón de tabla le
+    /* El campo que se abre al escribir en una celda (el stock de ORDENAR
+       Stock): con el relleno de 7 px de los demás campos, en un renglón de tabla le
        quedaba ~1 px a la letra y el número se veía como una rayita (reportado por el
        dueño, 2026-10-20). Va con ">" (campo hijo del área de la tabla) para no tocar el
-       campo de adentro de un QSpinBox puesto en una celda, como los montos de la Tarifa
-       por Hora para Socios: ese cuelga del QSpinBox, no de la tabla. */
+       campo de adentro de un QSpinBox puesto en una celda: ese cuelga del QSpinBox, no
+       de la tabla. */
     QAbstractItemView > QWidget > QLineEdit {
         padding: 0 4px;
         border-radius: 3px;
@@ -717,16 +575,7 @@ HOJA_DE_ESTILOS = """
         border-bottom-width: 1px;
         margin-top: 2px;
     }
-    QPushButton#botonACuentaVenta {
-        border-bottom: 3px solid #B0238C;
-        padding: 10px;
-    }
-    QPushButton#botonACuentaVenta:pressed {
-        border-bottom-width: 1px;
-        margin-top: 2px;
-    }
-
-    /* Configuración ADMIN, Gestionar Estaciones y Reservas con el diseño que eligió el
+    /* Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno con el diseño que eligió el
        dueño el 2026-10-26 (maqueta "A", clara con cabecera cyber; las piezas están en
        ui/piezas_ventana.py). Todo va por objectName o "clase", nunca por tipo de widget:
        los avisos y las ventanas que se abren desde estas son hijas suyas y no tienen
@@ -908,62 +757,6 @@ HOJA_DE_ESTILOS = """
         border-bottom-color: #E1E4E9;
         color: #A7ADB8;
     }
-    /* "Todas / Las que esperan" de Reservas: dos botones en una pista gris; el elegido,
-       oscuro como la barra. */
-    QFrame#pistaSegmentos {
-        background-color: #E3E7EE;
-        border-radius: 9px;
-    }
-    QPushButton[clase="segmento"] {
-        background: transparent;
-        border: none;
-        border-radius: 7px;
-        padding: 6px 14px;
-        color: #3C4350;
-        font-weight: 700;
-    }
-    QPushButton[clase="segmento"]:hover {
-        background-color: #D5DBE5;
-    }
-    QPushButton[clase="segmento"]:checked {
-        background-color: #1E2330;
-        border: none;
-        color: #FFFFFF;
-    }
-    QTableWidget#tablaEstaciones, QTableWidget#tablaReservas {
-        border-radius: 10px;
-    }
-    QLabel#nombreEstacion {
-        font-size: 22px;
-        font-weight: 700;
-        color: #1B2233;
-    }
-    QLineEdit#campoIpAsentada {
-        font-family: Consolas;
-        font-size: 15px;
-        font-weight: 700;
-        color: #1D48A0;
-        background-color: #F3F6FB;
-        border: 1px dashed #B9C4D8;
-    }
-    QLabel#avisoIp {
-        background-color: #FFF4E5;
-        border: 1px solid #F5C98B;
-        border-radius: 8px;
-        color: #8A4B08;
-        padding: 7px 10px;
-    }
-    QFrame#pieAyuda {
-        background-color: #F6F8FB;
-        border: 1px solid #E1E5EC;
-        border-radius: 10px;
-    }
-    QFrame#pieAyuda > QLabel {
-        background: transparent;
-        color: #5B6472;
-        font-size: 12px;
-    }
-
     /* Caja y Cierre de Turno (y el detalle de un cierre en Control de Cierres) con el
        mismo diseño, 2026-10-26 (ui/tarjeta_cierre.py). Las cifras grandes: la verde es
        el efectivo del cajón o del sobre, la azul el TOTAL (los colores que eligió el
@@ -1076,10 +869,6 @@ HOJA_DE_ESTILOS = """
         font-size: 11px;
         padding: 0 0 2px 0;
     }
-    QLabel#notaReservas {
-        color: #5B6472;
-        font-size: 11px;
-    }
     QLabel#notaCierre {
         background-color: #F6F8FB;
         border: 1px solid #E1E5EC;
@@ -1095,20 +884,4 @@ HOJA_DE_ESTILOS = """
         font-weight: 600;
     }
 
-    /* Reserva de socio: la lista de socios (control_pcs/ui/reservas_socio_dialogo.py). */
-    QListWidget#listaSociosReserva::item {
-        padding: 5px 8px;
-    }
-    QListWidget#listaSociosReserva::item:selected {
-        background-color: #DCE8FF;
-        color: #1E2330;
-    }
-    QLabel#avisoCargaSocio {
-        color: #1F8A43;
-        font-size: 12px;
-    }
-    QLabel#avisoCargaSocio[alerta="true"] {
-        color: #C2620A;
-        font-weight: 600;
-    }
 """.replace("__RUTA_FLECHA_ABAJO__", RUTA_FLECHA_ABAJO)

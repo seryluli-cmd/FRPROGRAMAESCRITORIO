@@ -64,7 +64,7 @@ class DialogoEnviandoCierre(QDialog):
         self.barra.setValue(0)
         self.barra.setTextVisible(False)
         self.barra.setFixedHeight(22)
-        self.detalle = QLabel("A la app de gastos (Gastos — CyberBIOS)…")
+        self.detalle = QLabel("A la app de gastos (Gestión Central)…")
         self.detalle.setObjectName("detalleEnvio")
         self.detalle.setAlignment(Qt.AlignCenter)
         self.detalle.setWordWrap(True)
