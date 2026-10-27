@@ -517,7 +517,7 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   respuestas al usuario. El usuario no es programador: explicá los
   cambios en términos del kiosko, no de la implementación.
 - **Stack:** Python 3.10+, PySide6, SQLite. Sin ORM, sin frameworks.
-- **Git:** rama por cambio, después mergear a `master`. El repo es público:
+- **Git:** rama por cambio, después mergear a `main` (la rama principal de este repo). El repo es público:
   nunca una clave real en el código, en un test ni en un doc.
 - **Empaquetado:** `python -m PyInstaller Kiosko.spec --clean --noconfirm`
   genera `dist/FRKiosko.exe`. Ojo: `dist/data_fr/` sería la base *real* de la
