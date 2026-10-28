@@ -2,12 +2,11 @@
 ui/piezas_ventana.py
 ====================
 Las piezas del diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26
-(maqueta A, en PROPUESTA_VENTANAS_ADMIN) para Configuración ADMIN, Administrar
-Kiosko, Caja y Cierre de Turno: la cabecera oscura como la barra de arriba del mostrador, con
-una estela celeste y pastillas con números; paneles
-blancos con títulos de sección; tarjetas de menú (un botón con dibujito, título y una
-línea de para qué es); cifras destacadas (un monto grande en un recuadro verde o azul) y
-teclas con relieve.
+(maqueta A) para Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno:
+la cabecera oscura como la barra de arriba del mostrador, con una estela celeste y
+pastillas con números; paneles blancos con títulos de sección; tarjetas de menú (un
+botón con dibujito, título y una línea de para qué es); cifras destacadas (un monto
+grande en un recuadro verde o azul) y teclas con relieve.
 
 Solo arman widgets con su objectName o su "clase": los colores están en
 ui/hoja_de_estilos.py. Ninguna regla de esas va por tipo de widget, así que las
@@ -57,7 +56,8 @@ def cabecera_oscura(icono: str, titulo: str, detalle: str = "") -> QFrame:
     cabecera.fila.addStretch()
     capa.addLayout(cabecera.fila)
 
-    # La estela: una línea que se aclara hacia la derecha, como la cola del cometa.
+    # La estela: una línea celeste que se aclara hacia la derecha (los colores, en
+    # #estelaCabecera de ui/hoja_de_estilos.py).
     estela = QFrame()
     estela.setObjectName("estelaCabecera")
     estela.setFixedHeight(2)

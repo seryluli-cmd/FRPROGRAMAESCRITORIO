@@ -450,5 +450,79 @@ class TestPantallaDeCopias(_ConCopias):
         self.assertEqual(dialogo.tabla.rowCount(), 1)
 
 
+class TestCopiaEnOtraCarpeta(BaseConBaseTemporal):
+    """database.copiar_backup_a, la copia que se guarda a mano en un pendrive (la
+    usa copias_repo.guardar_copia_en): tiene que ser una base sana, que se abre,
+    con los mismos datos que la del programa en ese momento."""
+
+    def setUp(self):
+        super().setUp()
+        self._pendrive = tempfile.TemporaryDirectory()
+        self.empleada_id = usuarios_repo.crear_usuario("Empleada", "1234", dominio.ROL_EMPLEADA)
+        turnos_repo.cerrar_turno(self.empleada_id)
+
+    def tearDown(self):
+        self._pendrive.cleanup()
+        super().tearDown()
+
+    @staticmethod
+    def _contenido_de_la_base(ruta):
+        """Cada tabla de la base de `ruta` con todas sus filas, y su versión."""
+        conexion = sqlite3.connect(ruta)
+        try:
+            tablas = [fila[0] for fila in conexion.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+            )]
+            contenido = {tabla: conexion.execute(f'SELECT * FROM "{tabla}" ORDER BY rowid').fetchall()
+                         for tabla in tablas}
+            contenido["user_version"] = conexion.execute("PRAGMA user_version").fetchone()[0]
+            return contenido
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def _nombres_de_usuarios(ruta):
+        conexion = sqlite3.connect(ruta)
+        try:
+            return [fila[0] for fila in conexion.execute("SELECT nombre FROM usuarios")]
+        finally:
+            conexion.close()
+
+    def test_la_copia_se_abre_sana_y_tiene_los_mismos_datos(self):
+        ruta = database.copiar_backup_a(self._pendrive.name)
+
+        self.assertEqual(os.path.dirname(ruta), self._pendrive.name)
+        self.assertRegex(os.path.basename(ruta), r"^frkiosko_backup_\d{8}_\d{6}\.db$")
+        conexion = sqlite3.connect(ruta)
+        try:
+            self.assertEqual(conexion.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        finally:
+            conexion.close()
+        copia = self._contenido_de_la_base(ruta)
+        self.assertEqual(copia, self._contenido_de_la_base(database.DB_PATH))
+        self.assertEqual(len(copia["cierres_turno"]), 1)
+        self.assertIn("Empleada", self._nombres_de_usuarios(ruta))
+
+    def test_lo_que_esta_a_medio_grabar_no_entra_en_la_copia(self):
+        # Otra conexión empezó a grabar y todavía no terminó (como una venta a
+        # mitad de camino): la copia es la foto de lo ya grabado, sin eso.
+        escritora = sqlite3.connect(database.DB_PATH, isolation_level=None)
+        try:
+            escritora.execute("BEGIN IMMEDIATE")
+            escritora.execute(
+                "INSERT INTO usuarios (nombre, clave_hash, rol, activo, fecha_creacion) VALUES (?, ?, ?, 1, ?)",
+                ("A medio grabar", "x", dominio.ROL_EMPLEADA, "2026-10-28T12:00:00"),
+            )
+            ruta = database.copiar_backup_a(self._pendrive.name)
+            escritora.execute("ROLLBACK")
+        finally:
+            escritora.close()
+
+        nombres = self._nombres_de_usuarios(ruta)
+        self.assertIn("Empleada", nombres)
+        self.assertNotIn("A medio grabar", nombres)
+        self.assertNotIn("A medio grabar", self._nombres_de_usuarios(database.DB_PATH))
+
+
 if __name__ == "__main__":
     unittest.main()

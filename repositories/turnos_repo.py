@@ -37,7 +37,7 @@ from repositories.config_repo import obtener_fondo_cambio
 from repositories import cajas_repo, envio_pwa_repo
 from repositories import turnos_faltantes_repo as _faltantes_repo
 from repositories.control_cierres_repo import (  # noqa: F401 (API de las pantallas y las pruebas)
-    _PRINCIPIO_DE_LOS_TIEMPOS, _cierre_o_error, _desde_del_cierre, detalle_cierre, listar_cierres,
+    _PRINCIPIO_DE_LOS_TIEMPOS, _desde_del_cierre, detalle_cierre, listar_cierres,
     verificar_cierre,
 )
 # _PREFIJO_COLUMNAS_POR_ORIGEN: con qué prefijo se llaman, en el desglose de un
@@ -551,10 +551,6 @@ def resumen_del_dia(dia):
                       "cantidad_ventas", "cantidad_anuladas")
     }
     return {"fecha": dia, "turnos": resultado, "total": total, "cierres_de_otro_dia": cierres_de_otro_dia}
-
-
-def turnos_del_mes_actual():
-    return _faltantes_repo.turnos_del_mes_actual(datetime.now().date())
 
 
 def turnos_faltantes():

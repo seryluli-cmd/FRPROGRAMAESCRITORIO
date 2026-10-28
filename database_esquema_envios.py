@@ -4,9 +4,9 @@ database_esquema_envios.py
 La cola de los Cierres de Turno que se mandan a la app de gastos "Gestión
 Central" (reglas en repositories/envio_pwa_repo.py). En archivo aparte, como las
 cajas (ver database_esquema_cajas.py). La crea
-database_esquema.inicializar_base_de_datos con CREATE TABLE IF NOT EXISTS: al
-agregarla a una base existente, empieza vacía y ningún cierre anterior se manda
-solo (el Admin puede mandar uno con el botón de Control de Cierres).
+database_esquema.inicializar_base_de_datos con CREATE TABLE IF NOT EXISTS. Solo
+se encola con el envío prendido: un cierre de antes de prenderlo no se manda solo
+(el Admin puede mandarlo con el botón de Control de Cierres).
 """
 
 import dominio

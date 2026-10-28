@@ -67,7 +67,7 @@ def main():
     from http.server import ThreadingHTTPServer
     import servidor_red
 
-    servidor = ThreadingHTTPServer(("127.0.0.1", 0), servidor_red._ManejadorEstado)
+    servidor = ThreadingHTTPServer(("127.0.0.1", 0), servidor_red._ManejadorAdminRemoto)
     threading.Thread(target=_cerrar_cuando_se_cierre_la_entrada, daemon=True).start()
     print(servidor.server_address[1], flush=True)
     servidor.serve_forever()

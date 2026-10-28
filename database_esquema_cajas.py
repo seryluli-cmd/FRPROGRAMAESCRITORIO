@@ -7,9 +7,8 @@ CLAUDE.md); las crea database_esquema.inicializar_base_de_datos.
 
 Una caja es lo que tiene a cargo UNA persona por vez: se abre contando el cambio
 del cajón, puede pasar de mano en un relevo (quien llega cuenta todo el cajón) y
-se cierra con el Cierre de Turno de siempre (cierres_turno). Todo se agrega con
-CREATE TABLE IF NOT EXISTS: al agregarlas a una base existente, sus ventas y
-cierres anteriores quedan tal cual, sin caja (ver relevo_repo).
+se cierra con el Cierre de Turno de siempre (cierres_turno). Se crean con
+CREATE TABLE IF NOT EXISTS, como el resto del esquema, que corre en cada arranque.
 
 Lo que se vende NO se le suma a la caja por estas tablas: la plata de un cierre
 sigue saliendo de la ventana entre cierres (turnos_repo). `ventas_caja` es el

@@ -23,6 +23,7 @@ Se ejecutan con:
 """
 
 import ast
+import importlib
 import json
 import os
 import socket
@@ -463,7 +464,7 @@ class TestPorLaRed(_ConServidor):
 
     def setUp(self):
         super().setUp()
-        self.servidor_http = ThreadingHTTPServer(("127.0.0.1", 0), servidor_red._ManejadorEstado)
+        self.servidor_http = ThreadingHTTPServer(("127.0.0.1", 0), servidor_red._ManejadorAdminRemoto)
         threading.Thread(target=self.servidor_http.serve_forever, daemon=True).start()
         self.addCleanup(self.servidor_http.server_close)
         self.addCleanup(self.servidor_http.shutdown)
@@ -729,7 +730,7 @@ class TestLasPantallasSoloPidenLoQueEstaEnLaLista(unittest.TestCase):
                         continue
                     repo, nombre = uso.value.id, uso.attr
                     if not repo.endswith("_repo") or nombre.isupper():
-                        continue  # no es un repo, o es una constante (TIPO_REINICIAR...)
+                        continue  # no es un repo, o es una constante (PERMISOS_EMPLEADA...)
                     if lista_blanca.permitida(repo, nombre) or (repo, nombre) in _NO_VAN_A_LA_BASE:
                         continue
                     faltan.append(f"{archivo}: {funcion.name} usa {repo}.{nombre}")
@@ -777,10 +778,16 @@ class TestLasPantallasSoloPidenLoQueEstaEnLaLista(unittest.TestCase):
 
     def test_vender_cobrar_y_cerrar_no_estan_en_la_lista(self):
         for repo, nombre in [
-            ("ventas_repo", "confirmar_venta"), ("ventas_repo", "registrar_venta_sin_detalle"),
+            ("ventas_repo", "confirmar_venta"), ("impresiones_repo", "cobrar_impresiones"),
             ("turnos_repo", "cerrar_turno"),
             ("relevo_repo", "cierre_forzoso_si_corresponde"), ("relevo_repo", "abrir_caja"),
+            ("relevo_repo", "recibir_caja"), ("relevo_repo", "cerrar_para_entrar"),
         ]:
+            # Primero que exista: permitida() da False para un nombre que ya no está,
+            # así que un renglón viejo pasaba siempre sin vigilar nada.
+            modulo = importlib.import_module(f"repositories.{repo}")
+            self.assertTrue(callable(getattr(modulo, nombre, None)),
+                            f"{repo}.{nombre} ya no existe: poné el nombre nuevo o sacalo de esta lista")
             self.assertFalse(lista_blanca.permitida(repo, nombre), (repo, nombre))
 
     def test_no_quedan_modulos_de_control_de_pcs_en_la_lista(self):

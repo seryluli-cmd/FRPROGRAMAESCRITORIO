@@ -443,7 +443,7 @@ def cambiar_codigo(usuario_id: int, codigo_actual: str, codigo_nuevo, clave: str
 
 
 # ---------------------------------------------------------------------
-# CONTROL DE STOCK (botón de debajo del mosaico; pedido del dueño, 2026-10-24)
+# CONTROL DE STOCK (tarjeta de Administrar Kiosko, solo el Admin; pedido del dueño, 2026-10-24)
 # ---------------------------------------------------------------------
 
 def listar_para_control_de_stock(usuario_id: int):
