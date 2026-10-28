@@ -1,11 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+import ssl
+
+
+datos = [('assets', 'assets')]
+# El intérprete auxiliar puede necesitar este PEM al crear conexiones HTTPS.
+certificado_ssl = Path(ssl.__file__).with_name('codex-rejected-cas.pem')
+if certificado_ssl.is_file():
+    datos.append((str(certificado_ssl), '.'))
+
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets')],
+    datas=datos,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

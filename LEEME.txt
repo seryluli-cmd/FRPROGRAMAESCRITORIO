@@ -26,6 +26,14 @@ la carpeta compartida de otra PC, con su usuario y clave: se los pasa a
 Windows, no quedan en el programa), hace una copia en el momento o guarda
 una suelta en un pendrive.
 
+RECUPERAR UNA COPIA
+-------------------
+Si hay que volver a una copia, cerrá FRKiosko en el mostrador y en las otras
+PCs. Guardá aparte una copia completa de la carpeta data_fr actual. Después
+copiá el archivo elegido de data_fr\backups a la carpeta data_fr que está junto
+al FRKiosko.exe instalado y llamalo kiosko.db, reemplazando el archivo actual.
+Abrí el programa y comprobá los datos antes de volver a atender.
+
 LA CAJA (cada persona con su caja)
 ----------------------------------
 - Al entrar, si no hay ninguna caja abierta, el programa pide contar el
