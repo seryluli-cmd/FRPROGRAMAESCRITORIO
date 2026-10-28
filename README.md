@@ -56,7 +56,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 | [tests/](tests/) | Tests de repositorios, servidor y UI sobre bases SQLite temporales (no tocan `data_fr/kiosko.db`). |
 | [armar_base_de_prueba.py](armar_base_de_prueba.py) | Arma la base de prueba en `data_prueba/` (un año inventado); se abre con `python main.py --base data_prueba`. Ver "Cómo probarlo en local". |
 | [Kiosko.spec](Kiosko.spec) | Config de PyInstaller para generar `dist/FRKiosko.exe`. |
-| [assets/](assets/) | Ícono de la app (`icono.ico`/`.png`). |
+| [assets/](assets/) | Ícono de la app: el carrito (elegido por el dueño el 2026-10-28). Se dibuja en `icono.svg`; `icono.ico` y `icono.png` salen de ahí con `python assets/armar_icono.py`. |
 | `data_fr/backups/` | Copias automáticas de la base (después de cada Cierre de Turno y cada 8 horas; todas las de 3 días y una por día hasta 30). |
 
 ## Modelo de datos (SQLite, `database_esquema.py`)

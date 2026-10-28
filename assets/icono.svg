@@ -1,16 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <defs>
-    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#262D3F"/>
-      <stop offset="1" stop-color="#11141C"/>
-    </linearGradient>
-    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#22D3EE"/>
-      <stop offset="0.55" stop-color="#4C8DFF"/>
-      <stop offset="1" stop-color="#A855F7"/>
-    </linearGradient>
-  </defs>
-  <rect x="12" y="12" width="232" height="232" rx="50" fill="url(#fondo)"/>
-  <rect x="13.5" y="13.5" width="229" height="229" rx="48.5" fill="none"
-        stroke="#3A4358" stroke-width="3"/>
-<path d="M 82 92 L 174 92 Q 196 92 204 114 L 224 172 Q 232 198 212 204 Q 196 208 184 192 L 166 168 L 90 168 L 72 192 Q 60 208 44 204 Q 24 198 32 172 L 52 114 Q 60 92 82 92 Z" fill="#0A0D14" stroke-linejoin="round" stroke="url(#neon)" stroke-width="32" opacity="0.1"/><path d="M 82 92 L 174 92 Q 196 92 204 114 L 224 172 Q 232 198 212 204 Q 196 208 184 192 L 166 168 L 90 168 L 72 192 Q 60 208 44 204 Q 24 198 32 172 L 52 114 Q 60 92 82 92 Z" fill="#0A0D14" stroke-linejoin="round" stroke="url(#neon)" stroke-width="22" opacity="0.18"/><path d="M 82 92 L 174 92 Q 196 92 204 114 L 224 172 Q 232 198 212 204 Q 196 208 184 192 L 166 168 L 90 168 L 72 192 Q 60 208 44 204 Q 24 198 32 172 L 52 114 Q 60 92 82 92 Z" fill="#0A0D14" stroke-linejoin="round" stroke="url(#neon)" stroke-width="15" opacity="0.3"/><path d="M 82 92 L 174 92 Q 196 92 204 114 L 224 172 Q 232 198 212 204 Q 196 208 184 192 L 166 168 L 90 168 L 72 192 Q 60 208 44 204 Q 24 198 32 172 L 52 114 Q 60 92 82 92 Z" fill="#0A0D14" stroke-linejoin="round" stroke="url(#neon)" stroke-width="10"/><g fill="#22D3EE"><rect x="68" y="120" width="40" height="13" rx="4"/><rect x="81.5" y="106" width="13" height="41" rx="4"/></g><circle cx="174" cy="112" r="8" fill="#A855F7"/><circle cx="174" cy="142" r="8" fill="#A855F7"/><circle cx="159" cy="127" r="8" fill="#4C8DFF"/><circle cx="189" cy="127" r="8" fill="#4C8DFF"/></svg>
+  <!-- Ícono de FRKiosko: el carrito (maqueta C, elegida por el dueño el 2026-10-28).
+       icono.png e icono.ico salen de este archivo con assets/armar_icono.py. -->
+  <rect x="12" y="12" width="232" height="232" rx="50" fill="#2F6FED"/>
+  <!-- Los dos productos adentro del carrito. -->
+  <rect x="104" y="78" width="34" height="40" rx="5" fill="#FBBF24"/>
+  <rect x="144" y="64" width="30" height="54" rx="5" fill="#5DCAA5"/>
+  <!-- La manija y el canasto, de un solo trazo. -->
+  <path d="M44 66 H74 L98 162 H186 L204 104 H86" fill="none" stroke="#FFFFFF"
+        stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Las ruedas. -->
+  <circle cx="110" cy="196" r="16" fill="#FFFFFF"/>
+  <circle cx="176" cy="196" r="16" fill="#FFFFFF"/>
+</svg>
