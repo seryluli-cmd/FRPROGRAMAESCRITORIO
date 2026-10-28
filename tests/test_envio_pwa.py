@@ -45,6 +45,7 @@ from ui.envio_pwa_progreso import (  # noqa: E402
 )
 from ui.utils import formato_pesos  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
+from test_en_segundo_plano import esperar_la_respuesta  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
@@ -659,6 +660,7 @@ class TestPantalla(_BaseDeEnvios):
         with mock.patch.object(envio_pwa_repo, "_transporte_http", self.app), \
                 mock.patch("ui.envio_pwa_dialogo.mostrar_info") as aviso:
             self._tecla(ventana, "PROBAR LA CONEXIÓN").click()
+            esperar_la_respuesta(ventana)  # el pedido va en un hilo aparte
 
         titulo, mensaje = aviso.call_args[0][1], aviso.call_args[0][2]
         self.assertEqual(titulo, "Conexión OK, pero faltan nombres")
@@ -677,6 +679,7 @@ class TestPantalla(_BaseDeEnvios):
         with mock.patch.object(envio_pwa_repo, "_transporte_http", self.app), \
                 mock.patch("ui.envio_pwa_dialogo.mostrar_info") as aviso:
             self._tecla(ventana, "REINTENTAR AHORA").click()
+            esperar_la_respuesta(ventana)
 
         self.assertEqual(self._fila(cierre["id"])["estado"], dominio.ENVIO_ENVIADO)
         self.assertEqual(ventana.tabla.item(0, 3).text(), "Enviado")

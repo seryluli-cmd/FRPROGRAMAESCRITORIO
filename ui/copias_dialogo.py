@@ -6,17 +6,20 @@ solo en el mostrador: desde otra PC no hay base que copiar). Muestra cuándo se
 hacen solas, la última en esta PC y cómo anduvo cada una de las otras carpetas
 (otro disco, otra PC de la red); deja agregarlas y quitarlas, hacer una copia ya
 y guardar una suelta en un pendrive. Las reglas (cuándo, cuántas, dónde) viven en
-repositories/copias_repo.py.
+repositories/copias_repo.py. Copiar y probar una carpeta nueva corren en un hilo
+aparte (ui/en_segundo_plano.py): una carpeta de otra PC apagada o un pendrive lento
+tardan, y el mostrador no se puede trabar mientras tanto.
 """
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication, QDialog, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTableWidgetItem, QVBoxLayout,
+    QDialog, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QTableWidgetItem, QVBoxLayout,
 )
 
 from repositories import copias_repo
+from ui.en_segundo_plano import EnSegundoPlano
 from ui.utils import (
     aplicar_clase, confirmar, crear_tabla, encadenar_enter, fila_guardar_cancelar, formato_fecha_hora,
     manejar_errores, mostrar_error, mostrar_info, sin_boton_por_defecto,
@@ -31,17 +34,6 @@ def _cuando(momento) -> str:
     return formato_fecha_hora(momento.isoformat()) if momento else "todavía ninguna"
 
 
-class _Esperando:
-    """Reloj de arena mientras se copia: una carpeta de otra PC apagada tarda
-    unos segundos en contestar."""
-
-    def __enter__(self):
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-
-    def __exit__(self, *_):
-        QApplication.restoreOverrideCursor()
-
-
 class DialogoCopiasDeSeguridad(QDialog):
     def __init__(self, usuario, parent=None):
         super().__init__(parent)
@@ -49,6 +41,10 @@ class DialogoCopiasDeSeguridad(QDialog):
         self.setWindowTitle("Copias de Seguridad")
         self.resize(720, 520)
         self._armar_interfaz()
+        # Mientras se copia no se arranca otra copia ni se cambian las carpetas; Cerrar sí anda.
+        self._espera = EnSegundoPlano(
+            self, [self.boton_ahora, self.boton_pendrive, self.boton_agregar, self.boton_quitar]
+        )
         self._actualizar()
 
     def _armar_interfaz(self):
@@ -89,14 +85,14 @@ class DialogoCopiasDeSeguridad(QDialog):
         self.errores_extra = QLabel()
         self.errores_extra.setStyleSheet(_ESTILO_ERROR)
         self.errores_extra.setWordWrap(True)
-        boton_agregar = QPushButton("Agregar carpeta...")
-        boton_agregar.clicked.connect(self._agregar_carpeta)
+        self.boton_agregar = QPushButton("Agregar carpeta...")
+        self.boton_agregar.clicked.connect(self._agregar_carpeta)
         self.boton_abrir_extra = QPushButton("Abrir carpeta")
         self.boton_abrir_extra.clicked.connect(lambda: self._abrir(self._carpeta_elegida()))
         self.boton_quitar = QPushButton("Quitar")
         self.boton_quitar.clicked.connect(self._quitar_carpeta)
         botones_extra = QHBoxLayout()
-        botones_extra.addWidget(boton_agregar)
+        botones_extra.addWidget(self.boton_agregar)
         botones_extra.addWidget(self.boton_abrir_extra)
         botones_extra.addWidget(self.boton_quitar)
         botones_extra.addStretch()
@@ -108,20 +104,20 @@ class DialogoCopiasDeSeguridad(QDialog):
         layout_extra.addLayout(botones_extra)
         grupo_extra.setLayout(layout_extra)
 
-        boton_ahora = QPushButton("Hacer copia de seguridad ahora")
-        aplicar_clase(boton_ahora, "primario")
-        boton_ahora.clicked.connect(self._copiar_ahora)
-        boton_pendrive = QPushButton("Guardar una copia en un pendrive...")
-        boton_pendrive.setToolTip(
+        self.boton_ahora = QPushButton("Hacer copia de seguridad ahora")
+        aplicar_clase(self.boton_ahora, "primario")
+        self.boton_ahora.clicked.connect(self._copiar_ahora)
+        self.boton_pendrive = QPushButton("Guardar una copia en un pendrive...")
+        self.boton_pendrive.setToolTip(
             "Una copia suelta en la carpeta que elijas, con fecha y hora en el nombre. "
             "Esa no se borra nunca sola."
         )
-        boton_pendrive.clicked.connect(self._copiar_a_pendrive)
+        self.boton_pendrive.clicked.connect(self._copiar_a_pendrive)
         boton_cerrar = QPushButton("Cerrar")
         boton_cerrar.clicked.connect(self.accept)
         botones = QHBoxLayout()
-        botones.addWidget(boton_ahora)
-        botones.addWidget(boton_pendrive)
+        botones.addWidget(self.boton_ahora)
+        botones.addWidget(self.boton_pendrive)
         botones.addStretch()
         botones.addWidget(boton_cerrar)
 
@@ -201,9 +197,12 @@ class DialogoCopiasDeSeguridad(QDialog):
 
     @manejar_errores
     def _copiar_ahora(self):
+        self._espera.arrancar(copias_repo.hacer_copia_ahora, al_terminar=self._copia_hecha)
+
+    @manejar_errores
+    def _copia_hecha(self, respuesta):
         try:
-            with _Esperando():
-                resultado = copias_repo.hacer_copia_ahora()
+            resultado = respuesta.valor()
         finally:
             self._actualizar()
         fallaron = [r for r in resultado["extra"] if r["error"]]
@@ -224,7 +223,11 @@ class DialogoCopiasDeSeguridad(QDialog):
         carpeta = QFileDialog.getExistingDirectory(self, "Elegí dónde guardar la copia de seguridad")
         if not carpeta:
             return
-        ruta_final = copias_repo.guardar_copia_en(carpeta)
+        self._espera.arrancar(copias_repo.guardar_copia_en, carpeta, al_terminar=self._copia_en_pendrive_hecha)
+
+    @manejar_errores
+    def _copia_en_pendrive_hecha(self, respuesta):
+        ruta_final = respuesta.valor()
         mostrar_info(self, "Copia guardada", f"Se guardó la copia de seguridad en:\n{ruta_final}")
 
 
@@ -238,6 +241,8 @@ class DialogoAgregarCarpeta(QDialog):
         self.setWindowTitle("Agregar carpeta para las copias")
         self.resize(520, 260)
         self._armar_interfaz()
+        # Probar una carpeta de otra PC tarda si no contesta; Cancelar sí anda mientras tanto.
+        self._espera = EnSegundoPlano(self, [self.boton_agregar])
 
     def _armar_interfaz(self):
         self.campo_carpeta = QLineEdit()
@@ -269,7 +274,9 @@ class DialogoAgregarCarpeta(QDialog):
         layout.addLayout(formulario)
         layout.addWidget(ayuda)
         layout.addStretch()
-        layout.addLayout(fila_guardar_cancelar(self, self._guardar, "Agregar"))
+        fila_botones = fila_guardar_cancelar(self, self._guardar, "Agregar")
+        self.boton_agregar = fila_botones.itemAt(0).widget()  # el primero es el de guardar
+        layout.addLayout(fila_botones)
         self.setLayout(layout)
         encadenar_enter(self.campo_carpeta, self.campo_usuario, self.campo_clave, accion_final=self._guardar)
         sin_boton_por_defecto(self)
@@ -281,8 +288,14 @@ class DialogoAgregarCarpeta(QDialog):
 
     @manejar_errores
     def _guardar(self):
-        with _Esperando():
-            copias_repo.agregar_carpeta_extra(
-                self.usuario["id"], self.campo_carpeta.text(), self.campo_usuario.text(), self.campo_clave.text()
-            )
+        # Al hilo van los textos, no los campos (ver ui/en_segundo_plano.py).
+        self._espera.arrancar(
+            copias_repo.agregar_carpeta_extra,
+            self.usuario["id"], self.campo_carpeta.text(), self.campo_usuario.text(), self.campo_clave.text(),
+            al_terminar=self._carpeta_agregada,
+        )
+
+    @manejar_errores
+    def _carpeta_agregada(self, respuesta):
+        respuesta.valor()
         self.accept()

@@ -6,14 +6,16 @@ en el mostrador): prender o apagar que cada Cierre de Turno se asiente solo en l
 app de gastos del dueño (la PWA "Gestión Central"), ver cómo van los envíos,
 probar la conexión (y qué usuarios de acá no están escritos igual allá) y
 reintentar ya los que fallaron. Las reglas viven en repositories/envio_pwa_repo.py.
+Probar y reintentar salen a internet: corren en un hilo aparte (ui/en_segundo_plano.py)
+para no trabar el mostrador, y la ventana se puede cerrar mientras esperan.
 """
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QLabel, QTableWidgetItem, QVBoxLayout
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QTableWidgetItem, QVBoxLayout
 
 import dominio
 from repositories import envio_pwa_repo
+from ui.en_segundo_plano import EnSegundoPlano
 from ui.piezas_ventana import (
     TONO_GRIS, TONO_VERDE, agregar_pastilla, cabecera_oscura, panel_blanco, tecla, titulo_de_seccion,
 )
@@ -36,16 +38,6 @@ def _dia(fecha_iso: str) -> str:
     return "/".join(reversed(fecha_iso[:10].split("-")))
 
 
-class _Esperando:
-    """Reloj de arena mientras se habla con la app: un pedido puede tardar unos segundos."""
-
-    def __enter__(self):
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-
-    def __exit__(self, *_):
-        QApplication.restoreOverrideCursor()
-
-
 class DialogoEnvioPwa(QDialog):
     def __init__(self, usuario, parent=None):
         super().__init__(parent)
@@ -54,6 +46,8 @@ class DialogoEnvioPwa(QDialog):
         self.setWindowTitle("Cierres a la app de gastos")
         self.resize(780, 620)
         self._armar_interfaz()
+        # Mientras espera a la app no se prende, apaga, prueba ni reintenta; CERRAR sí anda.
+        self._espera = EnSegundoPlano(self, [self.tecla_probar, self.tecla_reintentar, self.tecla_interruptor])
         self._actualizar()
 
     def _armar_interfaz(self):
@@ -95,8 +89,10 @@ class DialogoEnvioPwa(QDialog):
         capa.addWidget(self.tabla, 1)
 
         pie = QHBoxLayout()
-        pie.addWidget(tecla("PROBAR LA CONEXIÓN", self._probar_conexion))
-        pie.addWidget(tecla("REINTENTAR AHORA", self._reintentar, "teclaAzul"))
+        self.tecla_probar = tecla("PROBAR LA CONEXIÓN", self._probar_conexion)
+        self.tecla_reintentar = tecla("REINTENTAR AHORA", self._reintentar, "teclaAzul")
+        pie.addWidget(self.tecla_probar)
+        pie.addWidget(self.tecla_reintentar)
         pie.addStretch()
         pie.addWidget(tecla("CERRAR", self.close, "teclaRoja"))
 
@@ -165,8 +161,11 @@ class DialogoEnvioPwa(QDialog):
 
     @manejar_errores
     def _probar_conexion(self):
-        with _Esperando():
-            resultado = envio_pwa_repo.probar_conexion()
+        self._espera.arrancar(envio_pwa_repo.probar_conexion, al_terminar=self._mostrar_prueba)
+
+    @manejar_errores
+    def _mostrar_prueba(self, respuesta):
+        resultado = respuesta.valor()
         nombres = ", ".join(resultado["nombres_app"]) or "(ninguno)"
         if resultado["faltan"]:
             mostrar_info(
@@ -187,8 +186,11 @@ class DialogoEnvioPwa(QDialog):
         if not self.estado["activado"]:
             mostrar_info(self, "Reintentar ahora", "El envío está apagado: prendelo para mandar lo pendiente.")
             return
-        with _Esperando():
-            resultado = envio_pwa_repo.reintentar_ahora()
+        self._espera.arrancar(envio_pwa_repo.reintentar_ahora, al_terminar=self._mostrar_reintento)
+
+    @manejar_errores
+    def _mostrar_reintento(self, respuesta):
+        resultado = respuesta.valor()
         self._actualizar()
         mostrar_info(
             self, "Reintentar ahora",
