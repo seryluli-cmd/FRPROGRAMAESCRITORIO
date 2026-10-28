@@ -33,6 +33,9 @@ este archivo se puede adjuntar tal cual.
 - Si el mostrador deja de contestar (se cortó la red, se cerró el programa del
   mostrador o se reinició), cada acción avisa que no lo encuentra; para
   conectarse espera 2 segundos como mucho y nunca pasa por un proxy de Windows.
+  Si el pedido ya había llegado y lo que se cortó fue la respuesta, el aviso es
+  otro: dice que el mostrador puede haberlo guardado igual y que te fijes antes
+  de repetirlo.
 - La operadora no ve nada ni se le traba la pantalla.
 
 ### Qué se puede hacer desde la otra PC
@@ -94,6 +97,12 @@ abre la base de esa carpeta: le habla al programa del mostrador.
 - **Se corta la red con la sesión abierta:** cada acción avisa que no encuentra
   el mostrador; cuando vuelve la red, sigue andando (si pasaron más de 3 horas,
   hay que cerrar sesión y volver a entrar).
+- **Se corta la red justo después de guardar algo** (o el mostrador tarda más de
+  un minuto en contestar): el aviso dice "Se cortó la comunicación con el
+  FRKiosko del mostrador..." y que puede haberlo guardado igual. Antes de
+  repetirlo, fijate si ya está (una compra, en los Movimientos del artículo o en
+  su stock; un precio, en Artículos): repetir una compra que sí se grabó la
+  carga dos veces y suma el stock doble.
 - **Se reinicia el programa del mostrador:** la sesión de la otra PC se pierde;
   la próxima acción avisa "La sesión desde esta PC se cerró": cerrás sesión y
   volvés a entrar.
@@ -122,6 +131,10 @@ abre la base de esa carpeta: le habla al programa del mostrador.
   mostrador; esa copia nunca crea una base propia.
 - Una prueba revisa las pantallas que se abren desde otra PC: si alguna empieza
   a usar una función que no está en la lista, falla y dice cuál.
+- Un mostrador de mentira que recibe el pedido y corta sin contestar (o se queda
+  callado más que la espera): el aviso no es el de "no encuentro el mostrador"
+  sino el de "puede haberlo guardado". Y una venta que choca con una lectura en
+  curso espera a que termine y se graba, en vez de fallar.
 
 ---
 
@@ -139,6 +152,10 @@ abre la base de esa carpeta: le habla al programa del mostrador.
   `listar_usuarios`/`autenticar_por_nombre` antes de entrar van por
   `/admin/usuarios` y `/admin/entrar`. Errores: `ValueError`/`PermissionError`
   del mostrador llegan con su mensaje; sin red, `SinConexion` (un `ValueError`).
+  Si falla al conectar o al mandar el pedido (urllib lo envuelve en `URLError`),
+  es `SinConexion` a secas; si falla después, esperando o leyendo la respuesta
+  (`TimeoutError`, conexión cortada, `http.client.HTTPException`), es
+  `SinRespuesta` (una `SinConexion`), con el aviso de que pudo haberse grabado.
 - `admin_remoto/servidor.py` (lo llama `servidor_red.do_POST` para `/admin/`;
   es lo único que atiende el servidor de red de este programa): token
   `secrets.token_urlsafe(32)` en memoria, atado a la IP del socket, vence a los
@@ -158,5 +175,9 @@ abre la base de esa carpeta: le habla al programa del mostrador.
 - Esquema: `sesiones.desde_ip` (viene en el esquema de una base nueva) e índice
   `idx_venta_pagos_venta`.
 - Concurrencia: el servidor corre en hilos con conexiones propias; SQLite sin
-  WAL, así que una lectura larga frena una escritura del mostrador hasta 5 s
-  (timeout por defecto) — por eso se midieron los reportes con un año de datos.
+  WAL, así que una lectura larga frena una escritura del mostrador mientras dura.
+  Cada conexión espera hasta 30 s a que se libere la base
+  (`database.ESPERA_BASE_OCUPADA_SEGUNDOS`; la espera de fábrica de 5 s hacía
+  FALLAR la venta con "database is locked"): la venta espera y se graba, pero el
+  mostrador queda trabado mientras tanto — por eso se midieron los reportes con
+  un año de datos.

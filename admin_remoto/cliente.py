@@ -21,7 +21,9 @@ Errores: un rechazo "de negocio" del mostrador (ValueError, PermissionError)
 llega como la misma excepción con el mismo mensaje, así las pantallas lo
 muestran igual que en el mostrador. Sin red, o con el mostrador cerrado, es
 SinConexion (un ValueError: las pantallas lo muestran como un aviso, no como un
-error del programa).
+error del programa). Si el pedido ya había salido y lo que se cortó fue la
+espera de la respuesta, es SinRespuesta (una SinConexion): el mostrador pudo
+haberlo hecho, y el aviso dice que se fije antes de repetirlo.
 """
 
 import http.client
@@ -69,8 +71,27 @@ class _ManejadorHttp(urllib.request.HTTPHandler):
 _abrir = urllib.request.build_opener(urllib.request.ProxyHandler({}), _ManejadorHttp).open
 
 
+def _mandar(pedido, espera: float) -> bytes:
+    """Manda el pedido y devuelve el cuerpo de la respuesta. Un 400/404/500 viene
+    igual con su explicación en JSON: se lee como cualquier otra respuesta."""
+    try:
+        with _abrir(pedido, timeout=espera) as respuesta:
+            return respuesta.read()
+    except urllib.error.HTTPError as error:
+        return error.read()
+
+
 class SinConexion(ValueError):
     """No se pudo hablar con el FRKiosko del mostrador."""
+
+
+class SinRespuesta(SinConexion):
+    """El pedido salió hacia el mostrador, pero se cortó la red (o pasaron los
+    segundos de espera) antes de que llegara la respuesta. A diferencia de
+    SinConexion a secas, el mostrador pudo haberlo hecho: repetir a ciegas una
+    compra (compras_repo.registrar_compra) la cargaría dos veces y sumaría el
+    stock doble. Es una SinConexion para que lo que ya atrapa SinConexion la siga
+    atrapando."""
 
 
 class _ErrorDelMostrador(Exception):
@@ -100,16 +121,25 @@ class ConexionConElMostrador:
         pedido = urllib.request.Request(
             self._base + ruta, data=datos, method="POST", headers={"Content-Type": "application/json"},
         )
+        # urllib separa las dos fallas que importan acá: lo que sale mal al
+        # conectar o al MANDAR el pedido llega envuelto en URLError (el mostrador
+        # no lo recibió entero, así que no hizo nada y se puede repetir); lo que
+        # sale mal DESPUÉS, esperando o leyendo la respuesta, llega suelto
+        # (TimeoutError, la conexión cortada, una respuesta a medias). En ese
+        # caso el pedido ya estaba allá y el mostrador pudo haberlo grabado.
         try:
-            with _abrir(pedido, timeout=espera) as respuesta:
-                contenido = respuesta.read()
-        except urllib.error.HTTPError as error:
-            # 400/404/500 vienen igual con su explicación en JSON.
-            contenido = error.read()
-        except (urllib.error.URLError, OSError) as error:
+            contenido = _mandar(pedido, espera)
+        except urllib.error.URLError as error:
             raise SinConexion(
                 f"No encuentro el FRKiosko del mostrador ({self.mostrador}). Fijate que esa PC esté "
                 "prendida, con el programa abierto, y que esta PC tenga red."
+            ) from error
+        except (OSError, http.client.HTTPException) as error:
+            raise SinRespuesta(
+                f"Se cortó la comunicación con el FRKiosko del mostrador ({self.mostrador}) mientras "
+                "esperaba su respuesta (se cayó la red o tardó demasiado).\n\n"
+                "Si estabas guardando algo (una compra, un precio, una anulación), puede que el "
+                "mostrador lo haya guardado igual: fijate antes de repetirlo, así no queda dos veces."
             ) from error
         try:
             respuesta = json.loads(contenido.decode("utf-8"))
