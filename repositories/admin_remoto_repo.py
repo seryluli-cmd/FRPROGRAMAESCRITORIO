@@ -18,7 +18,7 @@ pedido está en el paquete admin_remoto/; acá solo se decide quién entra:
 
 import dominio
 from database import conexion_db
-from repositories import usuarios_repo
+from repositories import config_repo, usuarios_repo
 
 _CLAVE_ACTIVO = "admin_remoto_activo"
 
@@ -26,10 +26,8 @@ _CLAVE_ACTIVO = "admin_remoto_activo"
 def esta_activo() -> bool:
     """Si se puede entrar desde otra PC (lo decide el Admin en el mostrador)."""
     with conexion_db() as conexion:
-        fila = conexion.execute(
-            "SELECT valor FROM configuracion WHERE clave = ?", (_CLAVE_ACTIVO,)
-        ).fetchone()
-    return fila is not None and fila["valor"] == "1"
+        valor = config_repo.leer(conexion, _CLAVE_ACTIVO)
+    return valor == "1"
 
 
 def activar(usuario_id: int, activo: bool):
@@ -37,10 +35,7 @@ def activar(usuario_id: int, activo: bool):
     (PermissionError si no, releyéndolo de la base)."""
     usuarios_repo.exigir_admin(usuario_id, "prender o apagar la entrada desde otra PC")
     with conexion_db() as conexion:
-        conexion.execute(
-            "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)",
-            (_CLAVE_ACTIVO, "1" if activo else "0"),
-        )
+        config_repo.guardar(conexion, _CLAVE_ACTIVO, "1" if activo else "0")
 
 
 def administradores_para_entrar() -> list:

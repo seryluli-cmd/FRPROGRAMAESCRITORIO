@@ -219,11 +219,22 @@ def inicializar_base_de_datos():
     from database_esquema import inicializar_base_de_datos as crear_esquema
     return crear_esquema()
 
+
+# Las claves de `configuracion` que siembra la primera vez. Viven acá y no en
+# config_repo (que las lee y graba con config_repo.leer/guardar) porque
+# database.py no puede importar un repo (regla 1 de CLAUDE.md). Las claves de
+# cada función (la entrada desde otra PC, las copias, el envío a la app de
+# gastos) están en su repo.
+CLAVE_FONDO_CAMBIO = "fondo_cambio"
+_CLAVE_RUBROS_INICIALES_CARGADOS = "rubros_iniciales_cargados"
+
+
 def _insertar_configuracion_si_falta(cursor: sqlite3.Cursor, clave: str, valor: str) -> bool:
     """
     Guarda `clave` en `configuracion` solo si todavía no existe, para no
     pisar lo que el Admin ya cambió. Devuelve True si la insertó. No hace
-    commit.
+    commit. Es el único SQL de esa tabla fuera de config_repo, por lo mismo que
+    las claves de arriba.
     """
     cursor.execute("SELECT COUNT(*) AS cantidad FROM configuracion WHERE clave = ?", (clave,))
     if cursor.fetchone()["cantidad"] != 0:
@@ -253,14 +264,14 @@ def _cargar_datos_iniciales(conexion: sqlite3.Connection):
         )
         conexion.commit()
 
-    _insertar_configuracion_si_falta(cursor, "fondo_cambio", "50000")
+    _insertar_configuracion_si_falta(cursor, CLAVE_FONDO_CAMBIO, "50000")
     conexion.commit()
 
     # Rubros de fábrica: se cargan UNA sola vez (se deja constancia en
     # "configuracion" de que ya se hizo). Si se gatillara en cada
     # arranque en vez de una sola vez, un rubro que el Admin borra a
     # propósito desde "Gestionar Rubros" volvería a aparecer solo.
-    if _insertar_configuracion_si_falta(cursor, "rubros_iniciales_cargados", "1"):
+    if _insertar_configuracion_si_falta(cursor, _CLAVE_RUBROS_INICIALES_CARGADOS, "1"):
         for nombre in ("BEBIDAS", "KIOSKO", "ARTÍCULOS DE LIMPIEZA", "INSUMOS DE PAPELERÍA"):
             cursor.execute("INSERT OR IGNORE INTO rubros (nombre) VALUES (?)", (nombre,))
         conexion.commit()

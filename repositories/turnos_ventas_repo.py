@@ -11,6 +11,9 @@ CLAUDE.md). turnos_repo las sigue ofreciendo con los mismos nombres.
 Ninguna mira la hora: reciben la ventana ya armada. Las fechas se comparan
 como texto ISO, igual que en turnos_repo.
 
+Acá vive también el pedazo de SQL con el efectivo y el digital de cada venta
+(_efectivo_y_digital_de_cada_venta), que usan además el detalle del día y
+Reportes > Por Operador.
 """
 
 import dominio
@@ -97,6 +100,31 @@ def _condicion_vigente(hasta: str, cierre_grabado: bool) -> tuple:
     return "ventas.estado = ?", (dominio.VENTA_CONFIRMADA,)
 
 
+def _efectivo_y_digital_de_cada_venta() -> tuple:
+    """
+    (sql, parámetros) de las columnas `efectivo` y `digital` de cada venta: lo
+    que entró por cada medio en ESA venta, sumando sus pagos (un cobro repartido
+    son dos filas de venta_pagos). Una venta sin pagos da 0 en las dos. Las
+    anuladas también traen sus pagos (anular no los borra): quién las cuenta lo
+    decide cada consulta. La de afuera tiene que leer de `ventas` sin alias, y
+    los parámetros van justo donde quedó el texto.
+
+    Es el único lugar con esta cuenta: la usan el detalle del día, Reportes > Por
+    Operador y el reparto de las impresiones, así una venta cobrada en los dos
+    medios dice lo mismo en los tres. Busca los pagos por idx_venta_pagos_venta
+    (sin ese índice, con un año de ventas, Por Operador tardaba minutos). Como en
+    _condicion_vigente, el sql es texto fijo: es seguro armarlo dentro de una
+    consulta.
+    """
+    return (
+        """(SELECT COALESCE(SUM(venta_pagos.monto), 0) FROM venta_pagos
+              WHERE venta_pagos.venta_id = ventas.id AND venta_pagos.metodo = ?) AS efectivo,
+            (SELECT COALESCE(SUM(venta_pagos.monto), 0) FROM venta_pagos
+              WHERE venta_pagos.venta_id = ventas.id AND venta_pagos.metodo = ?) AS digital""",
+        (dominio.PAGO_EFECTIVO, dominio.PAGO_DIGITAL),
+    )
+
+
 def _vendido_aparte_entre(conexion, desde: str, hasta: str, cierre_grabado: bool = False) -> dict:
     """
     {"impresiones": ...}: cuánta plata se vendió
@@ -143,16 +171,14 @@ def _aparte_por_metodo(conexion, desde: str, hasta: str, cierre_grabado: bool = 
     esto da justo lo demás: el efectivo del cajón no se toca.
     """
     vigente, parametros_vigente = _condicion_vigente(hasta, cierre_grabado)
+    pagos, parametros_pagos = _efectivo_y_digital_de_cada_venta()
     filas = conexion.execute(
         f"""
         SELECT
             (SELECT COALESCE(SUM(venta_detalle.subtotal), 0) FROM venta_detalle
               WHERE venta_detalle.venta_id = ventas.id
                 AND venta_detalle.articulo_codigo = ?) AS impresiones,
-            (SELECT COALESCE(SUM(venta_pagos.monto), 0) FROM venta_pagos
-              WHERE venta_pagos.venta_id = ventas.id AND venta_pagos.metodo = ?) AS efectivo,
-            (SELECT COALESCE(SUM(venta_pagos.monto), 0) FROM venta_pagos
-              WHERE venta_pagos.venta_id = ventas.id AND venta_pagos.metodo = ?) AS digital
+            {pagos}
         FROM ventas
         WHERE {vigente}
           AND ventas.origen = ?
@@ -161,7 +187,7 @@ def _aparte_por_metodo(conexion, desde: str, hasta: str, cierre_grabado: bool = 
           AND EXISTS (SELECT 1 FROM venta_detalle
                       WHERE venta_detalle.venta_id = ventas.id AND venta_detalle.articulo_codigo = ?)
         """,
-        (dominio.CODIGO_ARTICULO_IMPRESIONES, dominio.PAGO_EFECTIVO, dominio.PAGO_DIGITAL,
+        (dominio.CODIGO_ARTICULO_IMPRESIONES, *parametros_pagos,
          *parametros_vigente, dominio.ORIGEN_KIOSKO, desde, hasta, dominio.CODIGO_ARTICULO_IMPRESIONES),
     ).fetchall()
 

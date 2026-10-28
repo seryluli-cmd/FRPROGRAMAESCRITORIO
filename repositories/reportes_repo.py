@@ -13,6 +13,7 @@ from datetime import date, timedelta
 
 import dominio
 from database import conexion_db
+from repositories import turnos_ventas_repo
 from turnos import limites_de_los_dias, sql_dia_del_local
 
 # Todos los reportes de este archivo cuentan los días como el local: de 06:00 a
@@ -281,22 +282,20 @@ def ventas_de_operador(usuario_id: int, desde: str, hasta: str):
     "total", "efectivo", "digital" y "concepto": qué se vendió, en corto -- los
     artículos de kiosko ("2 x Coca 500").
     """
+    pagos, parametros_pagos = turnos_ventas_repo._efectivo_y_digital_de_cada_venta()
     with conexion_db() as conexion:
         return [dict(fila) for fila in conexion.execute(
-            """
+            f"""
             SELECT ventas.id, ventas.fecha, ventas.turno, ventas.estado,
                    ventas.total,
-                   COALESCE((SELECT SUM(monto) FROM venta_pagos
-                             WHERE venta_id = ventas.id AND metodo = ?), 0) AS efectivo,
-                   COALESCE((SELECT SUM(monto) FROM venta_pagos
-                             WHERE venta_id = ventas.id AND metodo = ?), 0) AS digital,
-                    COALESCE((SELECT GROUP_CONCAT(cantidad || ' x ' || descripcion, ', ')
-                              FROM venta_detalle WHERE venta_id = ventas.id), '') AS concepto
+                   {pagos},
+                   COALESCE((SELECT GROUP_CONCAT(cantidad || ' x ' || descripcion, ', ')
+                             FROM venta_detalle WHERE venta_id = ventas.id), '') AS concepto
             FROM ventas
             WHERE ventas.usuario_id = ?
               AND ventas.fecha >= ? AND ventas.fecha < ?
             ORDER BY ventas.fecha, ventas.id
             """,
-            (dominio.PAGO_EFECTIVO, dominio.PAGO_DIGITAL, usuario_id, *limites_de_los_dias(desde, hasta)),
+            (*parametros_pagos, usuario_id, *limites_de_los_dias(desde, hasta)),
         )]
 

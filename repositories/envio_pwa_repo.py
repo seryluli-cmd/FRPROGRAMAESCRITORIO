@@ -61,7 +61,7 @@ import database
 import dominio
 from database import conexion_db
 from errores import registrar_error
-from repositories import control_cierres_repo, usuarios_repo
+from repositories import config_repo, control_cierres_repo, usuarios_repo
 from turnos import etiqueta_turno, turno_para_la_app_de_gastos
 
 # La app de gastos: su proyecto de Firebase y la clave PÚBLICA con que entra cada
@@ -123,8 +123,7 @@ class FalloDeEnvio(ValueError):
 # ---------------------------------------------------------------------------
 
 def _activado(conexion) -> bool:
-    fila = conexion.execute("SELECT valor FROM configuracion WHERE clave = ?", (_CLAVE_ACTIVADO,)).fetchone()
-    return bool(fila) and fila["valor"] == "1"
+    return config_repo.leer(conexion, _CLAVE_ACTIVADO) == "1"
 
 
 def esta_activado() -> bool:
@@ -139,10 +138,7 @@ def activar(usuario_id: int, prendido: bool):
     if prendido and database.es_base_de_prueba():
         raise ValueError(_EN_LA_BASE_DE_PRUEBA)
     with conexion_db() as conexion:
-        conexion.execute(
-            "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)",
-            (_CLAVE_ACTIVADO, "1" if prendido else "0"),
-        )
+        config_repo.guardar(conexion, _CLAVE_ACTIVADO, "1" if prendido else "0")
 
 
 # ---------------------------------------------------------------------------
@@ -384,17 +380,15 @@ def explicar_respuesta(codigo: int, texto: str = "") -> str:
 
 def _leer_renovacion():
     with conexion_db() as conexion:
-        fila = conexion.execute("SELECT valor FROM configuracion WHERE clave = ?", (_CLAVE_RENOVACION,)).fetchone()
-    return fila["valor"] if fila and fila["valor"] else None
+        valor = config_repo.leer(conexion, _CLAVE_RENOVACION)
+    return valor or None  # vacía es lo mismo que no tenerla
 
 
 def _guardar_sesion(token: str, segundos: int, renovacion: str):
     _sesion["token"] = token
     _sesion["vence"] = time.monotonic() + segundos
     with conexion_db() as conexion:
-        conexion.execute(
-            "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (_CLAVE_RENOVACION, renovacion)
-        )
+        config_repo.guardar(conexion, _CLAVE_RENOVACION, renovacion)
 
 
 def _olvidar_sesion():

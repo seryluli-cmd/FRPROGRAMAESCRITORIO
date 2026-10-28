@@ -58,7 +58,7 @@ from datetime import datetime, timedelta
 import database
 from database import conexion_db
 from errores import registrar_error
-from repositories import usuarios_repo
+from repositories import config_repo, usuarios_repo
 
 HORAS_ENTRE_COPIAS = 8
 SEGUNDOS_ENTRE_REVISIONES = 60
@@ -192,11 +192,9 @@ def carpeta_local() -> str:
 def carpetas_extra() -> list:
     """Las otras carpetas donde va cada copia, en el orden en que se agregaron."""
     with conexion_db() as conexion:
-        fila = conexion.execute(
-            "SELECT valor FROM configuracion WHERE clave = ?", (_CLAVE_CARPETAS_EXTRA,)
-        ).fetchone()
+        valor = config_repo.leer(conexion, _CLAVE_CARPETAS_EXTRA)
     try:
-        carpetas = json.loads(fila["valor"]) if fila else []
+        carpetas = json.loads(valor) if valor is not None else []
     except (ValueError, TypeError):
         return []
     return [c for c in carpetas if isinstance(c, str) and c] if isinstance(carpetas, list) else []
@@ -204,10 +202,7 @@ def carpetas_extra() -> list:
 
 def _guardar_carpetas_extra(carpetas: list):
     with conexion_db() as conexion:
-        conexion.execute(
-            "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)",
-            (_CLAVE_CARPETAS_EXTRA, json.dumps(carpetas)),
-        )
+        config_repo.guardar(conexion, _CLAVE_CARPETAS_EXTRA, json.dumps(carpetas))
 
 
 def _misma_carpeta(una: str, otra: str) -> bool:

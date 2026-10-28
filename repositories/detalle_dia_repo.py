@@ -28,7 +28,7 @@ from datetime import datetime
 
 import dominio
 from database import conexion_db
-from repositories import turnos_repo
+from repositories import turnos_repo, turnos_ventas_repo
 from turnos import etiqueta_turno
 
 
@@ -48,14 +48,12 @@ def _sin_articulo(importe: float) -> tuple:
 
 
 def _ventas_entre(conexion, desde: str, hasta: str):
+    pagos, parametros_pagos = turnos_ventas_repo._efectivo_y_digital_de_cada_venta()
     return conexion.execute(
-        """
+        f"""
         SELECT ventas.id, ventas.fecha, ventas.estado, ventas.total, ventas.anulada_fecha,
                usuarios.nombre AS operador, cargadores.nombre AS cargada_por,
-               COALESCE((SELECT SUM(monto) FROM venta_pagos
-                         WHERE venta_id = ventas.id AND metodo = ?), 0) AS efectivo,
-               COALESCE((SELECT SUM(monto) FROM venta_pagos
-                         WHERE venta_id = ventas.id AND metodo = ?), 0) AS digital
+               {pagos}
         FROM ventas
         JOIN usuarios ON usuarios.id = ventas.usuario_id
         LEFT JOIN ventas_caja ON ventas_caja.venta_id = ventas.id
@@ -63,7 +61,7 @@ def _ventas_entre(conexion, desde: str, hasta: str):
         WHERE ventas.fecha > ? AND ventas.fecha <= ?
         ORDER BY ventas.fecha, ventas.id
         """,
-        (dominio.PAGO_EFECTIVO, dominio.PAGO_DIGITAL, desde, hasta),
+        (*parametros_pagos, desde, hasta),
     ).fetchall()
 
 
