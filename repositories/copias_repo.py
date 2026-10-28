@@ -16,9 +16,12 @@ mostrador) que revisa cada SEGUNDOS_ENTRE_REVISIONES. No depende de que haya
 alguien logueado ni de Qt, y nunca frena una venta: la copia usa la Online Backup
 API de SQLite (database._backup_consistente).
 
-Dónde: en data_fr/backups y, además, en las OTRAS CARPETAS que elija el Admin. El
-dueño eligió dos: una carpeta compartida de otra PC del local (con usuario y clave)
-y otro disco de la misma PC. Cada copia nueva se copia de data_fr/backups a cada una.
+Dónde: en data_fr/backups y, además, en las OTRAS CARPETAS que elija el Admin
+desde la pantalla (hasta MAXIMO_CARPETAS_EXTRA: otro disco o una carpeta
+compartida de otra PC, con usuario y clave). En el kiosko de FR van a ser dos
+carpetas de otras PCs (\\\\192.168.1.112\\Backups y \\\\192.168.1.113\\backups), pero no
+están escritas en el programa: se agregan y se quitan desde ahí. Cada copia nueva
+se copia de data_fr/backups a cada una.
 Si una no está (la otra PC apagada, el disco desconectado), la copia llega sola
 apenas vuelve: en cada revisión se mira que la última esté en todas.
 
@@ -31,10 +34,15 @@ Cuántas: las de los últimos DIAS_CON_TODAS_LAS_COPIAS días con copias, todas;
 atrás, la última de cada día hasta DIAS_CON_UNA_COPIA días con copias (ver
 nombres_a_borrar). Se cuentan días CON copias y no días del calendario: si el
 reloj de la PC salta o el programa pasa un mes cerrado, no se borra todo de golpe.
-Solo se tocan los archivos con el nombre de una copia automática
-(kiosko_AAAA-MM-DD_HHMMSS.db, o kiosko_AAAA-MM-DD.db de antes de este cambio): las
-copias "antes_de_..." de las migraciones (y las de Limpiar base, que existió hasta el
-2026-10-22) y las que se guardan a mano no se borran nunca.
+Solo se tocan los archivos con el nombre de una copia automática de ESTE programa
+(frkiosko_AAAA-MM-DD_HHMMSS.db): las copias "antes_de_..." de las migraciones, las
+que se guardan a mano y las de CYBERCONTROL no se borran nunca.
+
+Por qué "frkiosko_" y no "kiosko_" (2026-10-28): CYBERCONTROL también tiene una
+base kiosko.db y llama a sus copias kiosko_AAAA-MM-DD_HHMMSS.db, con la misma regla
+para borrar las que sobran. Con el mismo nombre, si los dos programas guardaran en
+la misma carpeta, cada uno tomaría las copias del otro como propias y las iría
+borrando. Con otro prefijo, ninguno reconoce las del otro.
 """
 
 import json
@@ -69,7 +77,7 @@ PUERTO_CARPETAS_COMPARTIDAS = 445
 SEGUNDOS_PARA_CONTESTAR = 3
 
 _CLAVE_CARPETAS_EXTRA = "carpetas_copias_extra"
-_PATRON_COPIA = re.compile(r"^kiosko_(\d{4}-\d{2}-\d{2})(?:_(\d{6}))?\.db$")
+_PATRON_COPIA = re.compile(r"^frkiosko_(\d{4}-\d{2}-\d{2})_(\d{6})\.db$")
 _SUFIJO_A_MEDIAS = ".parcial"
 
 # Lo que dice Windows cuando no se puede entrar a una carpeta (winerror), en
@@ -100,13 +108,13 @@ def momento_de_la_copia(nombre: str):
         return None
     dia, hora = coincidencia.groups()
     try:
-        return datetime.strptime(f"{dia} {hora or '000000'}", "%Y-%m-%d %H%M%S")
+        return datetime.strptime(f"{dia} {hora}", "%Y-%m-%d %H%M%S")
     except ValueError:
         return None
 
 
 def nombre_de_copia(momento: datetime) -> str:
-    return f"kiosko_{momento.strftime('%Y-%m-%d_%H%M%S')}.db"
+    return f"frkiosko_{momento.strftime('%Y-%m-%d_%H%M%S')}.db"
 
 
 def toca_copia(ultima_copia, ultimo_cierre, ahora: datetime) -> bool:
@@ -138,12 +146,12 @@ def nombres_a_borrar(nombres) -> list:
 
 
 def es_carpeta_de_red(carpeta: str) -> bool:
-    """Una carpeta compartida de otra PC (\\\\192.168.1.111\\backups)."""
+    """Una carpeta compartida de otra PC (\\\\192.168.1.112\\Backups)."""
     return carpeta.startswith("\\\\")
 
 
 def servidor_de(carpeta: str) -> str:
-    """La PC de una carpeta de red: "192.168.1.111" en \\\\192.168.1.111\\backups."""
+    """La PC de una carpeta de red: "192.168.1.112" en \\\\192.168.1.112\\Backups."""
     return carpeta.lstrip("\\").split("\\")[0]
 
 
@@ -220,13 +228,13 @@ def agregar_carpeta_extra(usuario_id: int, carpeta: str, usuario_red: str = "", 
     usuarios_repo.exigir_admin(usuario_id, "elegir dónde se guardan las copias de seguridad")
     carpeta = (carpeta or "").strip().rstrip("\\/")
     if not carpeta:
-        raise ValueError("Escribí la carpeta (por ejemplo D:\\BACKUPS o \\\\192.168.1.111\\backups).")
+        raise ValueError("Escribí la carpeta (por ejemplo D:\\BACKUPS o \\\\192.168.1.112\\Backups).")
     if re.fullmatch(r"[A-Za-z]:", carpeta):
         carpeta += "\\"  # "D:" solo es "la carpeta en uso de D:", no la raíz del disco
     carpeta = carpeta if es_carpeta_de_red(carpeta) else os.path.normpath(carpeta)
     if es_carpeta_de_red(carpeta) and len([p for p in carpeta.split("\\") if p]) < 2:
         raise ValueError("A una carpeta de otra PC le falta el nombre de la carpeta compartida "
-                         "(por ejemplo \\\\192.168.1.111\\backups).")
+                         "(por ejemplo \\\\192.168.1.112\\Backups).")
     datos = os.path.normcase(os.path.abspath(database.DATA_DIR))
     if not es_carpeta_de_red(carpeta):
         if not os.path.isabs(carpeta):

@@ -21,10 +21,13 @@ El programa guarda solo una copia de la base, sin cerrarse: después de
 cada Cierre de Turno y, si no hubo ninguno, cada 8 horas. Quedan en
 data_fr\backups (todas las de los últimos 3 días y una por día hasta 30
 días). En Usuarios > Copias de Seguridad el Admin ve la última copia,
-agrega otras carpetas donde se guarda cada copia (por ejemplo D:\BACKUPS o
-la carpeta compartida de otra PC, con su usuario y clave: se los pasa a
-Windows, no quedan en el programa), hace una copia en el momento o guarda
-una suelta en un pendrive.
+agrega o quita otras carpetas donde se guarda cada copia, hasta 5 (por
+ejemplo D:\BACKUPS o la carpeta compartida de otra PC, como
+\\192.168.1.112\Backups, con su usuario y clave: se los pasa a Windows, no
+quedan en el programa), hace una copia en el momento o guarda una suelta en
+un pendrive. Las copias se llaman frkiosko_... y no kiosko_... como las de
+CYBERCONTROL: si los dos programas guardan en la misma carpeta, ninguno toca
+las copias del otro.
 
 RECUPERAR UNA COPIA
 -------------------
@@ -35,8 +38,9 @@ stock, y también usuarios nuevos y claves cambiadas: vuelve la clave vieja).
    Copias de Seguridad > "Abrir carpeta") y en las otras carpetas que
    agregaste ahí (por ejemplo D:\BACKUPS o la otra PC). Si se rompió el
    disco de esta PC, usá una de esas o la del pendrive. El nombre dice
-   cuándo se hizo: kiosko_2026-10-27_140512.db (o, la del pendrive,
-   kiosko_backup_20261027_140512.db) es del 27/10 a las 14:05.
+   cuándo se hizo: frkiosko_2026-10-27_140512.db (o, la del pendrive,
+   frkiosko_backup_20261027_140512.db) es del 27/10 a las 14:05. Las que
+   empiezan con kiosko_ (sin "fr") son de CYBERCONTROL: no sirven acá.
    Conviene la de justo después del último Cierre de Turno bueno (se hace
    sola al minuto de cada cierre): si la copia tiene una caja abierta de un
    turno que ya terminó, apenas entre alguien (también el Administrador) el

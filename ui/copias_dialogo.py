@@ -230,7 +230,7 @@ class DialogoCopiasDeSeguridad(QDialog):
 
 class DialogoAgregarCarpeta(QDialog):
     """Una carpeta más para las copias: de otro disco (D:\\BACKUPS) o de otra PC
-    de la red (\\\\192.168.1.111\\backups), con el usuario y la clave que pide."""
+    de la red (\\\\192.168.1.112\\Backups), con el usuario y la clave que pide."""
 
     def __init__(self, usuario, parent=None):
         super().__init__(parent)
@@ -241,7 +241,7 @@ class DialogoAgregarCarpeta(QDialog):
 
     def _armar_interfaz(self):
         self.campo_carpeta = QLineEdit()
-        self.campo_carpeta.setPlaceholderText("D:\\BACKUPS  o  \\\\192.168.1.111\\backups")
+        self.campo_carpeta.setPlaceholderText("D:\\BACKUPS  o  \\\\192.168.1.112\\Backups")
         boton_buscar = QPushButton("Buscar...")
         boton_buscar.clicked.connect(self._buscar)
         fila_carpeta = QHBoxLayout()

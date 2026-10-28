@@ -155,7 +155,7 @@ def copiar_backup_a(carpeta_destino: str) -> str:
     copiado, para poder mostrarla en un cartel de confirmación.
     """
     ahora = datetime.now().strftime("%Y%m%d_%H%M%S")
-    destino = os.path.join(carpeta_destino, f"kiosko_backup_{ahora}.db")
+    destino = os.path.join(carpeta_destino, f"frkiosko_backup_{ahora}.db")
     _backup_consistente(destino)
     return destino
 

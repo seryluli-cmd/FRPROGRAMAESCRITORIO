@@ -140,12 +140,15 @@ crea en `50000`. Si no corrió antes, siembra los 4 rubros default.
 
 **Backups** (`repositories/copias_repo.py`): un hilo que arranca `main.py` en
 el mostrador revisa cada minuto y copia `data_fr/kiosko.db` →
-`data_fr/backups/kiosko_AAAA-MM-DD_HHMMSS.db` en caliente (Online Backup API
+`data_fr/backups/frkiosko_AAAA-MM-DD_HHMMSS.db` en caliente (Online Backup API
 de SQLite) después de cada Cierre de Turno y, si no hubo ninguno, cada 8 horas.
-Cada copia va además a las "otras carpetas" que elige el Admin (otro disco, una
-carpeta compartida de otra PC; usuario y clave de red se le pasan a Windows con
-`cmdkey`, no se guardan). Quedan todas las de los últimos 3 días con copias y
-una por día hasta 30. Pantalla: Usuarios → "Copias de Seguridad"
+Cada copia va además a las "otras carpetas" que elige el Admin desde la pantalla,
+hasta 5 (otro disco, una carpeta compartida de otra PC como
+`\\192.168.1.112\Backups`; usuario y clave de red se le pasan a Windows con
+`cmdkey`, no se guardan). El prefijo `frkiosko_` es a propósito: CYBERCONTROL
+llama a las suyas `kiosko_...` con la misma regla de borrado, y con el mismo
+nombre dos programas en una misma carpeta se borraban las copias entre sí.
+Quedan todas las de los últimos 3 días con copias y una por día hasta 30. Pantalla: Usuarios → "Copias de Seguridad"
 (`ui/copias_dialogo.py`), con "Hacer copia de seguridad ahora" y una copia
 suelta a un pendrive (`database.copiar_backup_a`).
 

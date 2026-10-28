@@ -36,7 +36,7 @@ from base import BaseConBaseTemporal  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
-_CARPETA_DE_RED = "\\\\192.168.1.111\\backups"
+_CARPETA_DE_RED = "\\\\192.168.1.112\\Backups"
 _CLAVE_DE_PRUEBA = "clave-de-prueba-que-no-se-guarda"
 
 
@@ -51,17 +51,18 @@ def _windows_acepta(*_args, **_kwargs):
 class TestReglas(unittest.TestCase):
     def test_el_nombre_dice_cuando_se_hizo(self):
         self.assertEqual(
-            copias_repo.momento_de_la_copia("kiosko_2026-10-19_140530.db"), datetime(2026, 10, 19, 14, 5, 30)
+            copias_repo.momento_de_la_copia("frkiosko_2026-10-19_140530.db"), datetime(2026, 10, 19, 14, 5, 30)
         )
-        # las de antes de este cambio, una por día
-        self.assertEqual(copias_repo.momento_de_la_copia("kiosko_2026-10-08.db"), datetime(2026, 10, 8))
         self.assertEqual(
-            copias_repo.nombre_de_copia(datetime(2026, 10, 19, 14, 5, 30)), "kiosko_2026-10-19_140530.db"
+            copias_repo.nombre_de_copia(datetime(2026, 10, 19, 14, 5, 30)), "frkiosko_2026-10-19_140530.db"
         )
 
     def test_lo_que_no_es_una_copia_automatica_no_se_toca(self):
-        for nombre in ("kiosko_backup_20261019_140530.db", "antes_de_limpiar_base_20261019_140530.db",
-                       "kiosko.db", "kiosko_2026-10-19_140530.db.parcial", "notas.txt", "kiosko_2026-13-45.db"):
+        for nombre in ("frkiosko_backup_20261019_140530.db", "antes_de_migrar_20261019_140530.db",
+                       "kiosko.db", "frkiosko_2026-10-19_140530.db.parcial", "notas.txt",
+                       "frkiosko_2026-13-45_000000.db", "frkiosko_2026-10-19.db",
+                       # las de CYBERCONTROL (su base también se llama kiosko.db)
+                       "kiosko_2026-10-19_140530.db", "kiosko_2026-10-08.db", "kiosko_backup_20261019_140530.db"):
             self.assertIsNone(copias_repo.momento_de_la_copia(nombre), nombre)
 
     def test_cuando_toca_una_copia(self):
@@ -79,7 +80,7 @@ class TestReglas(unittest.TestCase):
         nombres = [
             copias_repo.nombre_de_copia(inicio + timedelta(days=dia, hours=hora))
             for dia in range(40) for hora in (6, 14, 22)
-        ] + ["antes_de_migrar_20260101_000000.db", "kiosko_backup_20260101_000000.db"]
+        ] + ["antes_de_migrar_20260101_000000.db", "frkiosko_backup_20260101_000000.db"]
         a_borrar = set(copias_repo.nombres_a_borrar(nombres))
         quedan = [n for n in nombres if n not in a_borrar and copias_repo.momento_de_la_copia(n)]
 
@@ -90,7 +91,7 @@ class TestReglas(unittest.TestCase):
             if momento.date() not in ultimos_3:
                 self.assertEqual(momento.hour, 22, nombre)  # la última de ese día
         self.assertNotIn("antes_de_migrar_20260101_000000.db", a_borrar)
-        self.assertNotIn("kiosko_backup_20260101_000000.db", a_borrar)
+        self.assertNotIn("frkiosko_backup_20260101_000000.db", a_borrar)
 
     def test_se_cuentan_dias_con_copias_y_no_dias_del_calendario(self):
         # Un mes con el programa cerrado no borra las copias de antes: siguen
@@ -102,7 +103,7 @@ class TestReglas(unittest.TestCase):
     def test_carpetas_de_red(self):
         self.assertTrue(copias_repo.es_carpeta_de_red(_CARPETA_DE_RED))
         self.assertFalse(copias_repo.es_carpeta_de_red("D:\\BACKUPS"))
-        self.assertEqual(copias_repo.servidor_de(_CARPETA_DE_RED), "192.168.1.111")
+        self.assertEqual(copias_repo.servidor_de(_CARPETA_DE_RED), "192.168.1.112")
 
     @unittest.skipUnless(os.name == "nt", "los códigos de error son los de Windows")
     def test_los_errores_de_windows_en_palabras(self):
@@ -110,7 +111,7 @@ class TestReglas(unittest.TestCase):
             return copias_repo.explicar_error(OSError(None, "x", None, codigo), _CARPETA_DE_RED)
         self.assertIn("¿está prendida esa PC", error(53))
         self.assertIn("El usuario o la clave", error(1326))
-        self.assertIn("ya está conectada a 192.168.1.111 con otro usuario", error(1219))
+        self.assertIn("ya está conectada a 192.168.1.112 con otro usuario", error(1219))
         self.assertIn("No hay más lugar", error(112))
         self.assertIn("No se encuentra la carpeta", copias_repo.explicar_error(FileNotFoundError(2, "x"), "D:\\X"))
 
@@ -236,7 +237,7 @@ class TestCopiasAutomaticas(_ConCopias):
         copias_repo.agregar_carpeta_extra(self.admin_id, self.disco)
         inicio = datetime(2026, 1, 1, 22)
         viejas = [copias_repo.nombre_de_copia(inicio + timedelta(days=d)) for d in range(40)]
-        otras = ["antes_de_limpiar_base_20260101_000000.db", "kiosko_backup_20260101_000000.db", "notas.txt"]
+        otras = ["antes_de_migrar_20260101_000000.db", "frkiosko_backup_20260101_000000.db", "notas.txt"]
         os.makedirs(copias_repo.carpeta_local())
         for carpeta in (copias_repo.carpeta_local(), self.disco):
             for nombre in viejas + otras:
@@ -248,6 +249,32 @@ class TestCopiasAutomaticas(_ConCopias):
             for nombre in otras:
                 self.assertIn(nombre, quedan)
             self.assertEqual(len(_copias(carpeta)), copias_repo.DIAS_CON_UNA_COPIA)
+
+    def test_no_toca_las_copias_de_cybercontrol_en_una_carpeta_compartida(self):
+        # CYBERCONTROL llama a las suyas kiosko_AAAA-MM-DD_HHMMSS.db y borra las que
+        # sobran con la misma regla: con el mismo nombre, dos programas guardando
+        # en la misma carpeta se borraban las copias entre sí.
+        copias_repo.agregar_carpeta_extra(self.admin_id, self.otra_pc)
+        inicio = datetime(2026, 1, 1)
+        de_cybercontrol = [
+            f"kiosko_{(inicio + timedelta(days=dia, hours=hora)).strftime('%Y-%m-%d_%H%M%S')}.db"
+            for dia in range(40) for hora in (6, 14, 22)
+        ]
+        for nombre in de_cybercontrol:
+            open(os.path.join(self.otra_pc, nombre), "wb").close()
+
+        resultado = copias_repo.hacer_copia_ahora()
+        self.assertIsNone(resultado["extra"][0]["error"])
+        quedan = os.listdir(self.otra_pc)
+        self.assertEqual(sorted(n for n in quedan if n.startswith("kiosko_")), sorted(de_cybercontrol))
+        self.assertEqual(_copias(self.otra_pc), [os.path.basename(resultado["local"])])
+
+    def test_la_copia_al_pendrive_tiene_nombre_propio_y_no_se_borra_sola(self):
+        pendrive = os.path.join(self._otras.name, "pendrive")
+        os.makedirs(pendrive)
+        ruta = copias_repo.guardar_copia_en(pendrive)
+        self.assertTrue(os.path.basename(ruta).startswith("frkiosko_backup_"))
+        self.assertIsNone(copias_repo.momento_de_la_copia(os.path.basename(ruta)))
 
     def test_hacer_una_copia_ahora(self):
         resultado = copias_repo.hacer_copia_ahora()
@@ -308,7 +335,7 @@ class TestOtrasCarpetas(_ConCopias):
                 mock.patch("repositories.copias_repo._probar_que_se_puede_guardar"):
             copias_repo.agregar_carpeta_extra(self.admin_id, _CARPETA_DE_RED + "\\", "usuario_de_prueba", _CLAVE_DE_PRUEBA)
         argumentos = cmdkey.call_args[0][0]
-        self.assertEqual(argumentos[:3], ["cmdkey", "/add:192.168.1.111", "/user:usuario_de_prueba"])
+        self.assertEqual(argumentos[:3], ["cmdkey", "/add:192.168.1.112", "/user:usuario_de_prueba"])
         self.assertEqual(argumentos[3], f"/pass:{_CLAVE_DE_PRUEBA}")
         self.assertEqual(copias_repo.carpetas_extra(), [_CARPETA_DE_RED])
         with database.conexion_db() as conexion:
@@ -354,7 +381,7 @@ class TestOtrasCarpetas(_ConCopias):
 
     def test_a_la_carpeta_de_red_le_falta_la_carpeta_compartida(self):
         with self.assertRaises(ValueError):
-            copias_repo.agregar_carpeta_extra(self.admin_id, "\\\\192.168.1.111")
+            copias_repo.agregar_carpeta_extra(self.admin_id, "\\\\192.168.1.112")
 
 
 class TestPantallaDeCopias(_ConCopias):

@@ -415,8 +415,11 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   compara `MAX(fecha_cierre)` con la última copia) y cada 8 horas, y lleva la
   última a cada "otra carpeta" en cada revisión. Reglas que no hay que romper:
   (1) una copia se graba como `.parcial` y se renombra al final; (2) solo se
-  borran archivos con nombre de copia automática
-  (`kiosko_AAAA-MM-DD[_HHMMSS].db`): nunca las manuales; (3) las copias cuentan
+  borran archivos con nombre de copia automática de ESTE programa
+  (`frkiosko_AAAA-MM-DD_HHMMSS.db`): nunca las manuales ni las de CYBERCONTROL,
+  que se llaman `kiosko_...` y borran con la misma regla (con el mismo prefijo,
+  los dos programas en una misma carpeta se borraban las copias entre sí; no
+  vuelvas a `kiosko_`, lo vigila `tests/test_copias.py`); (3) las copias cuentan
   días CON copias, no días del calendario; (4) una carpeta de otra PC se
   pregunta primero con `_que_conteste` (3 s al puerto 445): con esa PC apagada
   Windows tarda ~50 s; (5) el usuario y la clave de una carpeta de red se le
