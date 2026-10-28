@@ -1,15 +1,14 @@
 """
 database_esquema_cajas.py
 ==========================
-Las tablas de las cajas con número (pedido del dueño, 2026-10-18). Viven en un
-archivo aparte (en CYBERCONTROL database_esquema.py ya pasaba las 600 líneas,
-CLAUDE.md regla 12); las crea database_esquema.inicializar_base_de_datos.
+Las tablas de las cajas con número viven en este archivo; las crea
+database_esquema.inicializar_base_de_datos.
 
 Una caja es lo que tiene a cargo UNA persona por vez: se abre contando el cambio
 del cajón, puede pasar de mano en un relevo (quien llega cuenta todo el cajón) y
 se cierra con el Cierre de Turno de siempre (cierres_turno). Todo se agrega con
-CREATE TABLE IF NOT EXISTS: una base vieja recibe las tablas vacías y sus
-ventas y cierres anteriores quedan tal cual, sin caja (ver relevo_repo).
+CREATE TABLE IF NOT EXISTS: al agregarlas a una base existente, sus ventas y
+cierres anteriores quedan tal cual, sin caja (ver relevo_repo).
 
 Lo que se vende NO se le suma a la caja por estas tablas: la plata de un cierre
 sigue saliendo de la ventana entre cierres (turnos_repo). `ventas_caja` es el

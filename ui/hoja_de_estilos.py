@@ -253,8 +253,7 @@ HOJA_DE_ESTILOS = """
         border: 1px solid #E1E4EA;
         border-radius: 14px;
     }
-    /* Barra de arriba oscura, estilo cyber (pedido del dueño en CYBERCONTROL,
-       2026-10-19: "no parecen ni botones"). */
+    /* Barra superior oscura del mostrador. */
     #encabezadoInicio {
         background-color: #1E2330;
         border: 1px solid #2B3242;
@@ -433,7 +432,7 @@ HOJA_DE_ESTILOS = """
         margin-right: 9px;
     }
 
-    /* Menús (clic derecho en una PC) y avisos flotantes. */
+    /* Menús contextuales y avisos flotantes. */
     QMenu {
         background-color: #FFFFFF;
         border: 1px solid #D3D8E0;

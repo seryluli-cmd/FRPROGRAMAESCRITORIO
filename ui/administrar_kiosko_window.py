@@ -1,11 +1,9 @@
 """
 ui/administrar_kiosko_window.py
 ===============================
-La ventana "Administrar Kiosko" (botón 🛠️ ADMIN KIOSKO de la barra). Estaba en
-ui/main_window.py y se mudó acá el 2026-10-26, cuando el dueño pidió que tuviera el
-mismo diseño que Configuración ADMIN ("usa el mismo criterio que en los anteriores
-diseños"): cabecera oscura y tarjetas agrupadas, con las piezas de
-ui/piezas_ventana.py. Los botones hacen lo mismo que antes.
+La ventana "Administrar Kiosko" (botón 🛠️ ADMIN KIOSKO de la barra) agrupa sus
+accesos en tarjetas con cabecera oscura. Comparte las piezas visuales de
+ui/piezas_ventana.py con Configuración ADMIN.
 """
 
 from PySide6.QtWidgets import QDialog, QGridLayout, QHBoxLayout, QVBoxLayout
@@ -34,8 +32,8 @@ class AdministrarKioskoWindow(QDialog):
     ("Administrar Kiosko"), que solo abren los encargados (ver
     MainWindow._es_encargado). Un Admin las usa todas; una Empleada solo las
     que tenga habilitadas en usuarios_repo.PERMISOS_EMPLEADA. Las demás las ve en
-    gris y con candado (desde el 2026-10-26, como en Configuración ADMIN; antes no
-    aparecían). "Usuarios" es solo del Admin: no se delega con ningún permiso.
+    gris y con candado. "Usuarios" es solo del Admin: no se delega con ningún
+    permiso.
     """
 
     def __init__(self, usuario, es_admin, parent=None):

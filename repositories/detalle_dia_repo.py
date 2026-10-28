@@ -12,6 +12,11 @@ cerrar: el cierre guardó una foto con ella adentro; acá se la marca).
 Qué se vendió en cada venta sale de venta_detalle. Impresiones conserva el
 detalle de cada renglón tal como se cobró.
 
+El rubro de cada cosa (pedido del dueño, 2026-10-28) es el que tiene HOY su
+artículo en Artículos: venta_detalle no lo guarda, así que si se le cambia el
+rubro a un artículo (o se renombra el rubro), sus ventas viejas se ven con el
+nuevo. Un artículo sin rubro sale como SIN_RUBRO.
+
 Cada venta trae además sus `lineas`, renglón por renglón tal cual se cobró (con el
 código del artículo), para el listado "Renglón por renglón" que se imprime (pedido
 del dueño, 2026-10-18: "si se cobran 14 impresiones juntas, que diga 14; si se
@@ -27,6 +32,9 @@ from repositories import turnos_repo
 from turnos import etiqueta_turno
 
 
+SIN_RUBRO = "Sin rubro"
+
+
 def _texto_cantidad(cantidad) -> str:
     return str(int(cantidad)) if float(cantidad).is_integer() else str(cantidad)
 
@@ -34,7 +42,7 @@ def _texto_cantidad(cantidad) -> str:
 def _sin_articulo(importe: float) -> tuple:
     """Descripción de respaldo para una venta que no tiene renglones."""
     return (
-        "(sin detalle)", [("(sin detalle)", 1, importe)],
+        SIN_RUBRO, "(sin detalle)", [(SIN_RUBRO, "(sin detalle)", 1, importe)],
         [{"codigo": "", "descripcion": "(sin detalle)", "cantidad": 1, "importe": round(importe, 2)}],
     )
 
@@ -61,10 +69,12 @@ def _ventas_entre(conexion, desde: str, hasta: str):
 
 def _que_se_vendio_entre(conexion, desde: str, hasta: str) -> dict:
     """
-    {venta_id: (detalle, renglones, lineas)} de las ventas de (desde, hasta]
-    que tienen algo vendido anotado. `renglones` es [(producto, cantidad,
-    importe)] para sumar por producto; `lineas` es lo cobrado tal cual,
-    [{"codigo", "descripcion", "cantidad", "importe"}].
+    {venta_id: (rubro, detalle, renglones, lineas)} de las ventas de (desde,
+    hasta] que tienen algo vendido anotado. `rubro` nombra los rubros de lo que
+    se vendió, sin repetir y en el orden de los renglones ("BEBIDAS, KIOSKO");
+    `renglones` es [(rubro, producto, cantidad, importe)] para sumar por
+    producto; `lineas` es lo cobrado tal cual, [{"codigo", "descripcion",
+    "cantidad", "importe"}].
     """
     rango = (desde, hasta)
     resultado = {}
@@ -73,17 +83,21 @@ def _que_se_vendio_entre(conexion, desde: str, hasta: str) -> dict:
     for fila in conexion.execute(
         """
         SELECT venta_detalle.venta_id, venta_detalle.articulo_codigo AS codigo, venta_detalle.descripcion,
-               venta_detalle.cantidad, venta_detalle.subtotal
+               venta_detalle.cantidad, venta_detalle.subtotal, rubros.nombre AS rubro
         FROM venta_detalle JOIN ventas ON ventas.id = venta_detalle.venta_id
+        LEFT JOIN articulos ON articulos.codigo = venta_detalle.articulo_codigo
+        LEFT JOIN rubros ON rubros.id = articulos.rubro_id
         WHERE ventas.fecha > ? AND ventas.fecha <= ?
         ORDER BY venta_detalle.id
         """, rango,
     ):
         lineas.setdefault(fila["venta_id"], []).append(fila)
     for venta_id, filas in lineas.items():
+        rubros = [f["rubro"] or SIN_RUBRO for f in filas]
         resultado[venta_id] = (
+            ", ".join(dict.fromkeys(rubros)),
             ", ".join(f"{_texto_cantidad(f['cantidad'])} x {f['descripcion']}" for f in filas),
-            [(f["descripcion"], f["cantidad"], f["subtotal"]) for f in filas],
+            [(rubro, f["descripcion"], f["cantidad"], f["subtotal"]) for rubro, f in zip(rubros, filas)],
             [{"codigo": f["codigo"], "descripcion": f["descripcion"], "cantidad": f["cantidad"],
               "importe": round(f["subtotal"], 2)} for f in filas],
         )
@@ -93,17 +107,23 @@ def _que_se_vendio_entre(conexion, desde: str, hasta: str) -> dict:
 
 def _por_producto(ventas: list) -> list:
     """Cuánto se vendió de cada cosa (solo las ventas no anuladas): una fila
-    {"producto", "cantidad", "importe"} por producto, de la que más se vendió
-    a la que menos."""
+    {"rubro", "producto", "cantidad", "importe"} por producto, agrupadas por
+    rubro (de la A a la Z, SIN_RUBRO al final) y, dentro de cada rubro, de la
+    que más se vendió a la que menos."""
     acumulado = {}
     for venta in ventas:
         if venta["anulada"]:
             continue
-        for producto, cantidad, importe in venta["renglones"]:
-            fila = acumulado.setdefault(producto, {"producto": producto, "cantidad": 0, "importe": 0.0})
+        for rubro, producto, cantidad, importe in venta["renglones"]:
+            fila = acumulado.setdefault((rubro, producto), {"rubro": rubro, "producto": producto,
+                                                            "cantidad": 0, "importe": 0.0})
             fila["cantidad"] += cantidad
             fila["importe"] = round(fila["importe"] + importe, 2)
-    return sorted(acumulado.values(), key=lambda f: (-f["cantidad"], f["producto"]))
+    # El nombre tal cual desempata dos rubros que sin_acentos deja iguales
+    # ("BEBIDAS" y "Bebidas"): sin eso sus productos quedaban intercalados.
+    return sorted(acumulado.values(), key=lambda f: (
+        f["rubro"] == SIN_RUBRO, dominio.sin_acentos(f["rubro"]), f["rubro"], -f["cantidad"], f["producto"],
+    ))
 
 
 def _por_operador(ventas: list) -> list:
@@ -150,7 +170,7 @@ def detalle_del_dia(dia) -> dict:
     "totales"} (solo los turnos que tienen un cierre o están abiertos, en el
     orden del día). Cada venta: {"id", "fecha", "turno", "etiqueta_turno",
     "operador", "cargada_por" (quien la cobró si no fue el operador, o None),
-    "detalle", "efectivo", "digital", "total", "anulada",
+    "rubro", "detalle", "efectivo", "digital", "total", "anulada",
     "anulada_despues_del_cierre", "renglones", "lineas"}. "totales" y los
     resúmenes cuentan solo las ventas no anuladas.
     """
@@ -164,7 +184,7 @@ def detalle_del_dia(dia) -> dict:
             etiqueta = etiqueta_turno(dia, ventana["turno"])
             for fila in _ventas_entre(conexion, ventana["desde"], ventana["hasta"]):
                 anulada = fila["estado"] == dominio.VENTA_ANULADA
-                detalle, renglones, lineas = vendido.get(fila["id"], _sin_articulo(fila["total"]))
+                rubro, detalle, renglones, lineas = vendido.get(fila["id"], _sin_articulo(fila["total"]))
                 ventas_por_turno.setdefault(ventana["turno"], []).append({
                     "id": fila["id"],
                     "fecha": fila["fecha"],
@@ -172,6 +192,7 @@ def detalle_del_dia(dia) -> dict:
                     "etiqueta_turno": etiqueta,
                     "operador": fila["operador"],
                     "cargada_por": fila["cargada_por"],
+                    "rubro": rubro,
                     "detalle": detalle,
                     "efectivo": round(fila["efectivo"], 2),
                     "digital": round(fila["digital"], 2),

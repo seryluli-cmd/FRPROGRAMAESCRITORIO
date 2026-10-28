@@ -11,17 +11,14 @@ Pantallas relacionadas con la plata del día a día:
   ui/tarjeta_cierre.py, la misma que muestra Control de Cierres para cada
   cierre ya hecho.
 
-Las dos pantallas para controlar los cierres después (ControlCierresWindow y
-DialogoDetalleCierre) viven en ui/control_cierres_window.py desde el
-2026-10-18 y se reexportan acá con el mismo nombre.
+ControlCierresWindow y DialogoDetalleCierre viven en
+ui/control_cierres_window.py y se reexportan acá para mantener los imports.
 
-Desde el 2026-10-18 cada cierre es el de una caja con número (ver
+Cada cierre corresponde a una caja con número (ver
 repositories/relevo_repo.py): las pantallas muestran el número y quién la tenía.
 
-Desde el 2026-10-26 las dos tienen el diseño de Configuración ADMIN (el dueño las vio
-"muy vulgares" y pidió un diseño de alto nivel): cabecera oscura, las dos cifras que
-importan en grande y la tabla de dónde vino la plata (ui/tarjeta_cierre.py). Muestran
-los mismos datos que antes y los botones hacen lo mismo.
+Caja y Cierre de Turno usan una cabecera oscura, las cifras principales en
+grande y la tabla de dónde vino la plata (ui/tarjeta_cierre.py).
 """
 
 from datetime import datetime

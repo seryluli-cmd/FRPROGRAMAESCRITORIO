@@ -7,8 +7,7 @@ la tecla marcada aparte ("F5" en un recuadro azul y "Código" al lado), el códi
 de barras de adentro del campo de escaneo y el renglón del carrito con el código
 y el precio por unidad chiquitos debajo del producto.
 
-Se dibujan con QPainter: un emoji puede salir como un rectángulo en el Windows
-del mostrador (pasó en CYBERCONTROL con el copo de nieve de DESCONGELAR).
+Se dibujan con QPainter porque algunos emojis salen como rectángulos en Windows.
 """
 
 from PySide6.QtCore import QRectF, QSize, Qt

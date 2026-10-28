@@ -66,9 +66,6 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         self.assertFalse(tabla.verticalHeader().isVisible())
 
     def test_la_pantalla_de_ingreso_se_llama_frkiosko(self):
-        # Pedido del dueño (2026-10-10, en CYBERCONTROL): el título de la primera
-        # pantalla es la marca, no "Sistema de Kiosko", y escrita igual en la barra
-        # de la ventana. Acá la marca es FRKiosko.
         ventana = LoginWindow(lambda usuario: None)
         self.addCleanup(ventana.deleteLater)
 

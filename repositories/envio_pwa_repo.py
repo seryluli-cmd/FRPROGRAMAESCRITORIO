@@ -4,9 +4,7 @@ envio_pwa_repo.py
 Mandar cada Cierre de Turno a la app de gastos del dueño -- la PWA "Gestión
 Central" (fradministracion.netlify.app, repo FRWEB) -- para que quede asentado
 allá como el cierre de caja de ese turno, a nombre de la responsable de la caja,
-sin que nadie lo cargue a mano desde el celular (pedido del dueño, 2026-10-26,
-hecho primero en CYBERCONTROL; la propuesta está en
-PROPUESTA_CIERRE_A_PWA_CYBERBIOS.md, en la carpeta de los proyectos).
+sin que nadie lo cargue a mano desde el celular.
 
 Cómo se habla con la app: igual que un celular. La PWA guarda sus datos en
 Firestore (Firebase) y entra con un "login anónimo" usando la clave PÚBLICA que

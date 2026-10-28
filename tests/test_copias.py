@@ -3,7 +3,7 @@ tests/test_copias.py
 ======================
 Las copias de seguridad automáticas (repositories/copias_repo.py y
 ui/copias_dialogo.py, pedido del dueño 2026-10-19): una después de cada Cierre
-de Turno y cada 8 horas con el programa abierto, en data/backups y en las otras
+de Turno y cada 8 horas con el programa abierto, en data_fr/backups y en las otras
 carpetas (otro disco, otra PC de la red con usuario y clave); cuántas quedan; que
 una copia a medias nunca parezca buena; que con una carpeta que no está la copia
 llegue sola cuando vuelve; que la clave de una carpeta de red no se guarde; y que

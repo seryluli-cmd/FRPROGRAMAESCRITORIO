@@ -22,7 +22,6 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    # Nombre propio para que el ejecutable del Kiosko independiente no pise CyberBios.exe.
     name='FRKiosko',
     debug=False,
     bootloader_ignore_signals=False,

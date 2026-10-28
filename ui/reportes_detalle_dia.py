@@ -5,7 +5,8 @@ El detalle de lo vendido en un día, abajo de los turnos de Reportes > Resumen
 del Día (pedido del dueño, 2026-10-18): renglón por renglón tal cual se cobró
 (hora, turno, operador, código, descripción, cantidad y total; se imprime con
 "Imprimir", como la planilla de su programa anterior), venta por venta (con el
-medio de pago), cuánto se vendió de cada cosa y cuánto vendió cada operador.
+medio de pago y el rubro de lo vendido), cuánto se vendió de cada cosa (agrupado
+por rubro) y cuánto vendió cada operador.
 Muestra el día entero o el turno que se toque arriba.
 
 Los datos los arma repositories/detalle_dia_repo.py (con los mismos turnos que
@@ -23,6 +24,10 @@ from ui.utils import crear_tabla, formato_pesos
 
 _COLOR_ANULADA = QColor("#C62828")
 _COLOR_GRIS = QColor("#7A869A")
+# Tope de la columna Rubro en "Venta por venta": una venta con muchos rubros no
+# puede dejar sin lugar a "Qué se vendió" en todas las filas del día. Lo que no
+# entra termina en "..." y se lee entero al pasar el mouse.
+_ANCHO_MAXIMO_RUBRO = 180
 
 
 def _texto_hora(venta, dia) -> str:
@@ -84,9 +89,9 @@ class PanelDetalleDelDia(QWidget):
     operador) sobre el detalle de detalle_dia_repo.detalle_del_dia, del día
     entero o de un turno, y el botón para imprimir el renglón por renglón."""
 
-    _COLUMNAS_VENTAS = ["Nº", "Hora", "Turno", "Operador", "Qué se vendió",
+    _COLUMNAS_VENTAS = ["Nº", "Hora", "Turno", "Operador", "Rubro", "Qué se vendió",
                         "Efectivo", "Digital", "Total", "Estado"]
-    _COLUMNAS_PRODUCTOS = ["Producto", "Cantidad", "Importe"]
+    _COLUMNAS_PRODUCTOS = ["Rubro", "Producto", "Cantidad", "Importe"]
     _COLUMNAS_OPERADORES = ["Operador", "Ventas", "Anuladas", "Efectivo", "Digital", "Total"]
 
     def __init__(self):
@@ -102,8 +107,8 @@ class PanelDetalleDelDia(QWidget):
         self._a_la_vista = None
 
         self.tabla_renglones = crear_tabla(_COLUMNAS_RENGLONES, estirar=_COLUMNA_DESCRIPCION)
-        self.tabla_ventas = crear_tabla(self._COLUMNAS_VENTAS, estirar=4)
-        self.tabla_productos = crear_tabla(self._COLUMNAS_PRODUCTOS, estirar=0)
+        self.tabla_ventas = crear_tabla(self._COLUMNAS_VENTAS, estirar=5)
+        self.tabla_productos = crear_tabla(self._COLUMNAS_PRODUCTOS, estirar=1)
         self.tabla_operadores = crear_tabla(self._COLUMNAS_OPERADORES, estirar=0)
         self.pestañas = QTabWidget()
         self.pestañas.addTab(self.tabla_renglones, "Renglón por renglón")
@@ -215,25 +220,28 @@ class PanelDetalleDelDia(QWidget):
         for fila, venta in enumerate(ventas):
             valores = [
                 str(venta["id"]), _texto_hora(venta, dia), venta["etiqueta_turno"], _texto_operador(venta),
-                venta["detalle"], formato_pesos(venta["efectivo"]),
+                venta["rubro"], venta["detalle"], formato_pesos(venta["efectivo"]),
                 formato_pesos(venta["digital"]), formato_pesos(venta["total"]), _texto_estado(venta),
             ]
             self._poner(tabla, fila, valores, None, color=_COLOR_ANULADA if venta["anulada"] else None)
-            for columna in (5, 6, 7):
+            for columna in (6, 7, 8):
                 tabla.item(fila, columna).setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            tabla.item(fila, 4).setToolTip(venta["detalle"])
+            tabla.item(fila, 4).setToolTip(venta["rubro"])
+            tabla.item(fila, 5).setToolTip(venta["detalle"])
         tabla.resizeColumnsToContents()
+        tabla.setColumnWidth(4, min(tabla.columnWidth(4), _ANCHO_MAXIMO_RUBRO))
 
     def _llenar_productos(self, productos):
         tabla = self.tabla_productos
         tabla.setRowCount(0)
         for fila, producto in enumerate(productos):
             self._poner(tabla, fila, [
-                producto["producto"], _texto_cantidad(producto["cantidad"]), formato_pesos(producto["importe"]),
-            ], 1)
+                producto["rubro"], producto["producto"], _texto_cantidad(producto["cantidad"]),
+                formato_pesos(producto["importe"]),
+            ], 2)
         self._poner(tabla, len(productos), [
-            "TOTAL", "", formato_pesos(sum(producto["importe"] for producto in productos)),
-        ], 1, negrita=True)
+            "TOTAL", "", "", formato_pesos(sum(producto["importe"] for producto in productos)),
+        ], 2, negrita=True)
         tabla.resizeColumnsToContents()
 
     def _llenar_operadores(self, operadores):

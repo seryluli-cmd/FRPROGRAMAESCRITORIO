@@ -257,7 +257,8 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   otro día" cuando corresponde; y abajo el **detalle de todo lo vendido**,
   `ui/reportes_resumen_dia.py` + `ui/reportes_detalle_dia.py` con datos de
   `detalle_dia_repo.detalle_del_dia`: renglón por renglón tal cual se cobró, con
-  Imprimir, venta por venta, por producto y por operador), **Por Turno**,
+  Imprimir, venta por venta y por producto con el rubro que tiene HOY cada
+  artículo, y por operador), **Por Turno**,
   **Totales** (`reportes_repo.resumen_por_origen`: Kiosko / Impresiones / Total
   por turno, día, semana o rango; las impresiones NO están sumadas en Kiosko),
   **Ranking de Ventas** (`reportes_repo.ranking_ventas`, por cantidad o monto) y

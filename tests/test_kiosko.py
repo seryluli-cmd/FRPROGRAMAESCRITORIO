@@ -5,7 +5,7 @@ Tests de las reglas de negocio más sensibles del sistema: las que
 tocan plata y stock (turnos, ventas, anulaciones), la protección del
 borrado de artículos, y la migración de contraseñas al formato con
 salt. Todos corren contra una base de datos SQLite temporal — nunca
-contra data/kiosko.db — así se pueden correr las veces que haga falta
+contra data_fr/kiosko.db — así se pueden correr las veces que haga falta
 sin riesgo de tocar datos reales.
 
 Se ejecutan con:

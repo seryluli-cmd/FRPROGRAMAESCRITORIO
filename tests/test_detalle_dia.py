@@ -29,7 +29,7 @@ from repositories import (  # noqa: E402
     articulos_repo, detalle_dia_repo, relevo_repo, turnos_repo, usuarios_repo, ventas_repo,
 )
 from ui import imprimir  # noqa: E402
-from ui.reportes_detalle_dia import _COLUMNAS_RENGLONES, _renglones  # noqa: E402
+from ui.reportes_detalle_dia import _COLUMNAS_RENGLONES, PanelDetalleDelDia, _renglones  # noqa: E402
 from ui.reportes_resumen_dia import PestañaResumenDelDia  # noqa: E402
 from ui.utils import formato_pesos  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
@@ -108,7 +108,9 @@ class TestCadaVentaDiceQueSeVendio(_UnDiaConDeTodo):
         detalle = detalle_dia_repo.detalle_del_dia(self.dia)
         esperado = {self.v_kiosko: "2 x Coca 500", self.v_alfajor: "1 x Alfajor"}
         for venta_id, texto in esperado.items():
-            self.assertEqual(self._venta(detalle, venta_id)["detalle"], texto)
+            venta = self._venta(detalle, venta_id)
+            # Los artículos de esta prueba no tienen rubro.
+            self.assertEqual((venta["rubro"], venta["detalle"]), (detalle_dia_repo.SIN_RUBRO, texto))
 
     def test_operador_turno_hora_y_medio_de_pago(self):
         detalle = detalle_dia_repo.detalle_del_dia(self.dia)
@@ -164,10 +166,10 @@ class TestElDetalleSumaLoMismoQueLosTurnos(_UnDiaConDeTodo):
 
     def test_lo_vendido_por_producto_y_por_operador(self):
         cerrado = self._turno_cerrado(detalle_dia_repo.detalle_del_dia(self.dia))
-        productos = {p["producto"]: (p["cantidad"], p["importe"]) for p in cerrado["por_producto"]}
+        productos = {(p["rubro"], p["producto"]): (p["cantidad"], p["importe"]) for p in cerrado["por_producto"]}
         # 2 Cocas de Lucía; las 3 anuladas y la del Administrador (anulada después) no cuentan.
-        self.assertEqual(productos["Coca 500"], (2, 2000.0))
-        self.assertEqual(productos["Alfajor"], (1, 800.0))
+        self.assertEqual(productos[(detalle_dia_repo.SIN_RUBRO, "Coca 500")], (2, 2000.0))
+        self.assertEqual(productos[(detalle_dia_repo.SIN_RUBRO, "Alfajor")], (1, 800.0))
         self.assertEqual(sum(importe for _, importe in productos.values()), cerrado["totales"]["total"])
 
         operadores = {o["operador"]: o for o in cerrado["por_operador"]}
@@ -181,6 +183,107 @@ class TestElDetalleSumaLoMismoQueLosTurnos(_UnDiaConDeTodo):
         detalle = detalle_dia_repo.detalle_del_dia("2020-01-01")
         self.assertEqual((detalle["turnos"], detalle["ventas"]), ([], []))
         self.assertEqual(detalle["totales"]["total"], 0)
+
+
+class TestRubroDeLoVendido(BaseConBaseTemporal):
+    """El rubro de cada cosa vendida (pedido del dueño, 2026-10-28): el que tiene
+    hoy su artículo en Artículos, con los dos nombres si una venta lleva cosas de
+    dos rubros."""
+
+    def setUp(self):
+        super().setUp()
+        self.toby_id = usuarios_repo.crear_usuario("TOBY", "4321", dominio.ROL_EMPLEADA)
+        # Con la caja abierta el día sale de la caja y no del reloj: sin ella, una
+        # prueba que cruzara las 06:00 buscaba las ventas en el día equivocado.
+        relevo_repo.abrir_caja(self.toby_id, cambio_contado=5000.0)
+        self.bebidas_id = articulos_repo.crear_rubro("BEBIDAS")
+        kiosko_id = articulos_repo.crear_rubro("KIOSKO")
+        varios_id = articulos_repo.crear_rubro("VARIOS")  # después de "Sin rubro" en el abecedario
+        articulos_repo.crear_articulo("COCA", "Coca 500", None, self.bebidas_id, 1000.0, 500.0, 0)
+        articulos_repo.crear_articulo("AGUA", "Agua", None, self.bebidas_id, 700.0, 350.0, 0)
+        articulos_repo.crear_articulo("ALFAJOR", "Alfajor", None, kiosko_id, 800.0, 400.0, 0)
+        articulos_repo.crear_articulo("PILAS", "Pilas", None, varios_id, 500.0, 250.0, 0)
+        articulos_repo.crear_articulo("CHICLE", "Chicle", None, None, 100.0, 50.0, 0)
+        # El Alfajor primero: los rubros de una venta van en el orden de sus
+        # renglones, no en el del abecedario.
+        self.v_mezcla = ventas_repo.confirmar_venta(self.toby_id, [
+            {"codigo": "ALFAJOR", "descripcion": "Alfajor", "cantidad": 1, "precio_unitario": 800.0},
+            {"codigo": "COCA", "descripcion": "Coca 500", "cantidad": 2, "precio_unitario": 1000.0},
+            {"codigo": "COCA", "descripcion": "Coca 500", "cantidad": 1, "precio_unitario": 1000.0},
+        ], _efectivo(3800.0))
+        self.v_chicle = ventas_repo.confirmar_venta(
+            self.toby_id, [{"codigo": "CHICLE", "descripcion": "Chicle", "cantidad": 3, "precio_unitario": 100.0}],
+            _digital(300.0),
+        )
+        ventas_repo.confirmar_venta(self.toby_id, [
+            {"codigo": "PILAS", "descripcion": "Pilas", "cantidad": 1, "precio_unitario": 500.0},
+            {"codigo": "AGUA", "descripcion": "Agua", "cantidad": 1, "precio_unitario": 700.0},
+        ], _efectivo(1200.0))
+        with conexion_db() as conexion:
+            self.dia = turnos_repo._ventana_en_curso(conexion)["dia"]
+
+    def _ventas(self):
+        return {venta["id"]: venta for venta in detalle_dia_repo.detalle_del_dia(self.dia)["ventas"]}
+
+    def test_una_venta_nombra_sus_rubros_sin_repetir(self):
+        ventas = self._ventas()
+        self.assertEqual(ventas[self.v_mezcla]["rubro"], "KIOSKO, BEBIDAS")
+        self.assertEqual(ventas[self.v_chicle]["rubro"], detalle_dia_repo.SIN_RUBRO)
+
+    def test_lo_vendido_va_agrupado_por_rubro_y_sin_rubro_al_final(self):
+        por_producto = detalle_dia_repo.detalle_del_dia(self.dia)["por_producto"]
+        # Dentro de cada rubro, de la que más se vendió a la que menos.
+        self.assertEqual(
+            [(p["rubro"], p["producto"], p["cantidad"]) for p in por_producto],
+            [("BEBIDAS", "Coca 500", 3), ("BEBIDAS", "Agua", 1), ("KIOSKO", "Alfajor", 1),
+             ("VARIOS", "Pilas", 1), (detalle_dia_repo.SIN_RUBRO, "Chicle", 3)],
+        )
+
+    def test_dos_rubros_que_solo_cambian_en_mayusculas_no_se_mezclan(self):
+        otro_id = articulos_repo.crear_rubro("Bebidas")
+        articulos_repo.crear_articulo("SPRITE", "Sprite", None, otro_id, 1000.0, 500.0, 0)
+        ventas_repo.confirmar_venta(
+            self.toby_id, [{"codigo": "SPRITE", "descripcion": "Sprite", "cantidad": 2, "precio_unitario": 1000.0}],
+            _efectivo(2000.0),
+        )
+        por_producto = detalle_dia_repo.detalle_del_dia(self.dia)["por_producto"]
+        self.assertEqual(
+            [(p["rubro"], p["producto"]) for p in por_producto[:3]],
+            [("BEBIDAS", "Coca 500"), ("BEBIDAS", "Agua"), ("Bebidas", "Sprite")],
+        )
+
+    def test_es_el_rubro_que_el_articulo_tiene_hoy(self):
+        articulos_repo.renombrar_rubro(self.bebidas_id, "GASEOSAS")
+        self.assertEqual(self._ventas()[self.v_mezcla]["rubro"], "KIOSKO, GASEOSAS")
+
+    def test_la_pantalla_muestra_el_rubro(self):
+        panel = PanelDetalleDelDia()
+        self.addCleanup(panel.deleteLater)
+        panel.mostrar(detalle_dia_repo.detalle_del_dia(self.dia))
+        self.assertEqual(panel.tabla_ventas.horizontalHeaderItem(4).text(), "Rubro")
+        rubros = {panel.tabla_ventas.item(fila, 0).text(): panel.tabla_ventas.item(fila, 4).text()
+                  for fila in range(panel.tabla_ventas.rowCount())}
+        self.assertEqual(rubros[str(self.v_mezcla)], "KIOSKO, BEBIDAS")
+        self.assertEqual(panel.tabla_productos.horizontalHeaderItem(0).text(), "Rubro")
+        self.assertEqual(panel.tabla_productos.item(0, 0).text(), "BEBIDAS")
+
+    def test_muchos_rubros_en_una_venta_no_aplastan_que_se_vendio(self):
+        renglones = []
+        for numero, nombre in enumerate(("ARTÍCULOS DE LIMPIEZA", "INSUMOS DE PAPELERÍA", "GOLOSINAS",
+                                         "CIGARRILLOS", "ALMACÉN", "PERFUMERÍA")):
+            rubro_id = articulos_repo.crear_rubro(nombre)
+            codigo = f"R{numero}"
+            articulos_repo.crear_articulo(codigo, f"Cosa {numero}", None, rubro_id, 100.0, 50.0, 0)
+            renglones.append({"codigo": codigo, "descripcion": f"Cosa {numero}", "cantidad": 1, "precio_unitario": 100.0})
+        larga = ventas_repo.confirmar_venta(self.toby_id, renglones, _efectivo(600.0))
+        panel = PanelDetalleDelDia()
+        self.addCleanup(panel.deleteLater)
+        panel.mostrar(detalle_dia_repo.detalle_del_dia(self.dia))
+        tabla = panel.tabla_ventas
+        fila = next(f for f in range(tabla.rowCount()) if tabla.item(f, 0).text() == str(larga))
+        self.assertLessEqual(tabla.columnWidth(4), 180)
+        # Lo que no entra se lee entero al pasar el mouse.
+        self.assertEqual(tabla.item(fila, 4).toolTip(), self._ventas()[larga]["rubro"])
 
 
 class TestPantallaDelDetalle(_UnDiaConDeTodo):
@@ -201,9 +304,9 @@ class TestPantallaDelDetalle(_UnDiaConDeTodo):
         cerrado = self._turno_cerrado(detalle)
         self.assertTrue(panel.titulo.text().startswith(cerrado["etiqueta"]))
         self.assertEqual(panel.tabla_ventas.rowCount(), len(cerrado["ventas"]))
-        textos = [panel.tabla_ventas.item(fila, 4).text() for fila in range(panel.tabla_ventas.rowCount())]
+        textos = [panel.tabla_ventas.item(fila, 5).text() for fila in range(panel.tabla_ventas.rowCount())]
         self.assertIn("1 x Alfajor", textos)
-        estados = [panel.tabla_ventas.item(fila, 8).text() for fila in range(panel.tabla_ventas.rowCount())]
+        estados = [panel.tabla_ventas.item(fila, 9).text() for fila in range(panel.tabla_ventas.rowCount())]
         self.assertIn("ANULADA después del cierre", estados)
         self.assertEqual(panel.tabla_operadores.item(0, 0).text(), "LUCIA")
 
