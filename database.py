@@ -140,6 +140,17 @@ def conexion_db():
         conexion.close()
 
 
+def carpeta_de_copias() -> str:
+    """
+    data_fr/backups: donde quedan las copias automáticas (copias_repo) y la de
+    antes de actualizar la base (database_migraciones). Vive acá y no en
+    copias_repo porque las migraciones son de esta capa y no pueden importar un
+    repo (CLAUDE.md, regla 1). Se resuelve en cada llamada (no al importar) para
+    respetar la base temporal de los tests.
+    """
+    return os.path.join(DATA_DIR, "backups")
+
+
 def _backup_consistente(destino: str):
     """
     Copia la base de datos a `destino` usando la Online Backup API de

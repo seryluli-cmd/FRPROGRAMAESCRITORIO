@@ -184,9 +184,9 @@ def explicar_error(error: OSError, carpeta: str) -> str:
 # ---------------------------------------------------------------------------
 
 def carpeta_local() -> str:
-    """data_fr/backups. Se resuelve en cada llamada (no al importar) para respetar
-    la base temporal de los tests."""
-    return os.path.join(database.DATA_DIR, "backups")
+    """data_fr/backups (database.carpeta_de_copias: la misma carpeta donde queda la
+    copia de antes de actualizar la base)."""
+    return database.carpeta_de_copias()
 
 
 def carpetas_extra() -> list:
