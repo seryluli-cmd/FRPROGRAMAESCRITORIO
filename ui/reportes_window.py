@@ -236,7 +236,7 @@ class PestañaTotales(QWidget):
     def _buscar(self, _=None):
         # El "_=None" no se usa: absorbe el índice que manda
         # `currentIndexChanged` (ver ControlCierresWindow._ver_detalle en
-        # caja_window.py).
+        # control_cierres_window.py).
         desde, hasta = rango_de_fechas(self.fecha_desde, self.fecha_hasta)
         agrupar_por = self.combo_agrupar.currentData()
         filas = reportes_repo.resumen_por_origen(desde, hasta, agrupar_por)

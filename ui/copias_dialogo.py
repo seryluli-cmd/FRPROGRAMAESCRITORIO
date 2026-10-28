@@ -70,7 +70,7 @@ class DialogoCopiasDeSeguridad(QDialog):
         fila_local = QHBoxLayout()
         fila_local.addWidget(self.etiqueta_local, 1)
         fila_local.addWidget(boton_abrir_local)
-        grupo_local = QGroupBox("En esta PC (carpeta del programa, data\\backups)")
+        grupo_local = QGroupBox("En esta PC (carpeta del programa, data_fr\\backups)")
         layout_local = QVBoxLayout()
         layout_local.addLayout(fila_local)
         layout_local.addWidget(self.error_local)

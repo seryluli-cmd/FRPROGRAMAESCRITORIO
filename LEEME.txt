@@ -28,11 +28,57 @@ una suelta en un pendrive.
 
 RECUPERAR UNA COPIA
 -------------------
-Si hay que volver a una copia, cerrá FRKiosko en el mostrador y en las otras
-PCs. Guardá aparte una copia completa de la carpeta data_fr actual. Después
-copiá el archivo elegido de data_fr\backups a la carpeta data_fr que está junto
-al FRKiosko.exe instalado y llamalo kiosko.db, reemplazando el archivo actual.
-Abrí el programa y comprobá los datos antes de volver a atender.
+Sirve si la base se dañó o se perdió algo grave. Ojo: se pierde todo lo que
+se hizo después de la hora de la copia (ventas, cierres, compras, precios,
+stock, y también usuarios nuevos y claves cambiadas: vuelve la clave vieja).
+1. Elegí la copia. Están en data_fr\backups (Administrar Kiosko > Usuarios >
+   Copias de Seguridad > "Abrir carpeta") y en las otras carpetas que
+   agregaste ahí (por ejemplo D:\BACKUPS o la otra PC). Si se rompió el
+   disco de esta PC, usá una de esas o la del pendrive. El nombre dice
+   cuándo se hizo: kiosko_2026-10-27_140512.db (o, la del pendrive,
+   kiosko_backup_20261027_140512.db) es del 27/10 a las 14:05.
+   Conviene la de justo después del último Cierre de Turno bueno (se hace
+   sola al minuto de cada cierre): si la copia tiene una caja abierta de un
+   turno que ya terminó, apenas entre alguien (también el Administrador) el
+   programa la cierra solo. Nunca uses un archivo que termine en .parcial:
+   es una copia que quedó a medias.
+2. Si los Cierres se mandaban a la app de gastos, sacales captura en la app
+   a los cierres posteriores a la hora de la copia: allá siguen, pero acá se
+   pierden (ver el paso 6).
+3. Cerrá FRKiosko en el mostrador, y también en la otra PC si alguien estaba
+   administrando desde ahí. Tiene que estar cerrado de verdad: Windows deja
+   reemplazar el archivo aunque el programa esté abierto.
+4. Copiá la carpeta data_fr ENTERA a otro lado (por ejemplo al escritorio,
+   como "data_fr antes de restaurar"). Si algo sale mal, se vuelve a esto.
+5. En la carpeta data_fr que está junto a FRKiosko.exe (si es una PC nueva,
+   creala):
+   - Borrá kiosko.db.
+   - Si hay un archivo kiosko.db-journal, borralo también. Es importante: si
+     queda, al abrir el programa lo mezcla con la copia y la deja dañada sin
+     avisar. (Los dos ya quedaron guardados en el paso 4.)
+   - Pegá la copia elegida y cambiale el nombre a kiosko.db. Antes prendé en
+     el Explorador Ver (o Vista) > Mostrar > Extensiones de nombre de
+     archivo: si no, Windows esconde el .db y queda kiosko.db.db.
+6. Abrí FRKiosko y entrá como Administrador. Si los Cierres se mandaban a la
+   app de gastos, lo PRIMERO, enseguida, es ir a Configuración ADMIN >
+   Cierres a la app de gastos y dejarlo apagado (APAGAR; si ya figura
+   apagado, no lo prendas): mientras esa ventana está abierta, el programa
+   no cierra ninguna caja solo. Es que los próximos cierres vuelven a usar
+   los números de los que se perdieron y, si son del mismo día del local
+   (de 6 a 6), pisarían en la app al que estaba. Dejalo apagado hasta que
+   se cierre la caja de la Noche de ese día (a la mañana siguiente, después
+   de las 6). Los cierres de mientras, cargalos a mano en la app; no los
+   mandes con "Mandar este cierre a la PWA" (Control de Cierres): pisarían
+   los que estaban.
+7. Antes de volver a atender, fijate en Administrar Kiosko > Control de
+   Cierres de Turno que el último cierre sea el que esperabas (si la copia
+   tenía una caja abierta de un turno vencido, arriba aparece además un
+   cierre forzoso nuevo). Si el programa aparece vacío (solo el usuario
+   Administrador con clave 1234), el nombre quedó mal: cerralo y revisá el
+   paso 5. Si la copia da error al abrir, repetí los pasos 5 a 7 con una más
+   vieja (el paso 4 no: lo que guardaste ahí tiene que quedar como estaba).
+   Si el error dice que la base es de CYBERCONTROL, la sacaste de la carpeta
+   equivocada: tiene que ser una copia de FRKiosko.
 
 LA CAJA (cada persona con su caja)
 ----------------------------------

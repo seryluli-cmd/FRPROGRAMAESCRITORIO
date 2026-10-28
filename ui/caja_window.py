@@ -12,7 +12,8 @@ Pantallas relacionadas con la plata del día a día:
   cierre ya hecho.
 
 ControlCierresWindow y DialogoDetalleCierre viven en
-ui/control_cierres_window.py y se reexportan acá para mantener los imports.
+ui/control_cierres_window.py. ControlCierresWindow se reexporta acá porque
+Administrar Kiosko y varias pruebas la importan desde este módulo.
 
 Cada cierre corresponde a una caja con número (ver
 repositories/relevo_repo.py): las pantallas muestran el número y quién la tenía.
@@ -26,7 +27,7 @@ from datetime import datetime
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout
 
 from repositories import turnos_repo
-from ui.control_cierres_window import ControlCierresWindow, DialogoDetalleCierre  # noqa: F401 (API de main_window y las pruebas)
+from ui.control_cierres_window import ControlCierresWindow  # noqa: F401 (lo importan administrar_kiosko_window y las pruebas)
 from ui.envio_pwa_progreso import DialogoEnviandoCierre
 from ui.piezas_ventana import (
     TONO_AZUL, TONO_GRIS, TONO_VERDE, agregar_pastilla, cabecera_oscura, cifra_destacada, tecla,

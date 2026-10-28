@@ -66,6 +66,9 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         self.assertFalse(tabla.verticalHeader().isVisible())
 
     def test_la_pantalla_de_ingreso_se_llama_frkiosko(self):
+        # El dueño quiere la marca como título de la primera pantalla, no "Sistema
+        # de Kiosko" (aunque README y CLAUDE.md lo digan), y escrita igual en la
+        # barra de la ventana.
         ventana = LoginWindow(lambda usuario: None)
         self.addCleanup(ventana.deleteLater)
 

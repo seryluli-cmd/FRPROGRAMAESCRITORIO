@@ -88,7 +88,7 @@ class ArticulosWindow(QDialog):
     @manejar_errores
     def _cargar_grilla(self, _=None):
         # El "_=None" no se usa: absorbe el texto que manda `textChanged`
-        # (ver ControlCierresWindow._ver_detalle en caja_window.py, que
+        # (ver ControlCierresWindow._ver_detalle en control_cierres_window.py, que
         # explica por qué hace falta con @manejar_errores).
         texto = self.campo_buscar.text().strip()
         llenar_tabla_de_articulos(self.tabla, articulos_repo.listar_articulos(texto))

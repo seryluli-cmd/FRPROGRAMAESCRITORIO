@@ -1,8 +1,9 @@
 """
 database_esquema_cajas.py
 ==========================
-Las tablas de las cajas con número viven en este archivo; las crea
-database_esquema.inicializar_base_de_datos.
+Las tablas de las cajas con número. Van en un archivo aparte como en
+CYBERCONTROL, donde database_esquema.py ya pasaba las 600 líneas (regla 12 de
+CLAUDE.md); las crea database_esquema.inicializar_base_de_datos.
 
 Una caja es lo que tiene a cargo UNA persona por vez: se abre contando el cambio
 del cajón, puede pasar de mano en un relevo (quien llega cuenta todo el cajón) y

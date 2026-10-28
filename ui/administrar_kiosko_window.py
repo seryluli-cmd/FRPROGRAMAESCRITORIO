@@ -1,9 +1,9 @@
 """
 ui/administrar_kiosko_window.py
 ===============================
-La ventana "Administrar Kiosko" (botón 🛠️ ADMIN KIOSKO de la barra) agrupa sus
-accesos en tarjetas con cabecera oscura. Comparte las piezas visuales de
-ui/piezas_ventana.py con Configuración ADMIN.
+La ventana "Administrar Kiosko" (botón 🛠️ Admin Kiosko de la barra): una
+cabecera oscura arriba y los accesos en tarjetas, con las piezas visuales de
+ui/piezas_ventana.py (las mismas que Configuración ADMIN).
 """
 
 from PySide6.QtWidgets import QDialog, QGridLayout, QHBoxLayout, QVBoxLayout
@@ -32,8 +32,8 @@ class AdministrarKioskoWindow(QDialog):
     ("Administrar Kiosko"), que solo abren los encargados (ver
     MainWindow._es_encargado). Un Admin las usa todas; una Empleada solo las
     que tenga habilitadas en usuarios_repo.PERMISOS_EMPLEADA. Las demás las ve en
-    gris y con candado. "Usuarios" es solo del Admin: no se delega con ningún
-    permiso.
+    gris y con candado. "Usuarios" y "Control de Stock" son solo del Admin: no
+    se delegan con ningún permiso.
     """
 
     def __init__(self, usuario, es_admin, parent=None):
@@ -52,8 +52,8 @@ class AdministrarKioskoWindow(QDialog):
         )
         agregar_pastilla(cabecera, "ADMIN" if self.es_admin else "ENCARGADO", TONO_AZUL if self.es_admin else TONO_GRIS)
 
-        # (permiso que la habilita, dibujito, título, para qué es, qué abre). Usuarios
-        # no tiene permiso: es solo del Admin.
+        # (permiso que la habilita, dibujito, título, para qué es, qué abre). Las que
+        # no tienen permiso (Control de Stock y Usuarios) son solo del Admin.
         grupos = [
             ("Mercadería", [
                 ("permiso_articulos", "📦", "Artículos", "Precios, stock, rubros y marcas", self._abrir_articulos),

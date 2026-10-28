@@ -517,9 +517,12 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   respuestas al usuario. El usuario no es programador: explicá los
   cambios en términos del kiosko, no de la implementación.
 - **Stack:** Python 3.10+, PySide6, SQLite. Sin ORM, sin frameworks.
-- **Git:** rama por cambio, después mergear a `main` (la rama principal de este repo). El repo es público:
-  nunca una clave real en el código, en un test ni en un doc.
-- **Empaquetado:** `python -m PyInstaller Kiosko.spec --clean --noconfirm`
+- **Git:** rama por cambio, después mergear a `main` (la rama principal de este repo). Puede haber otro
+  agente (Codex/ChatGPT) en la misma carpeta: antes de `git add` mirá el `git diff` de cada archivo y
+  subí solo lo tuyo (nunca `git add -A` ni `git commit -a`). El repo es público: nunca una clave real
+  en el código, en un test ni en un doc.
+- **Empaquetado (solo cuando el dueño lo pide):** `python -m PyInstaller Kiosko.spec --clean --noconfirm`,
+  con el Python instalado en la PC (no el que trae un agente como Codex),
   genera `dist/FRKiosko.exe`. Ojo: `dist/data_fr/` sería la base *real* de la
   copia empaquetada si se abre desde ahí.
 - **Dos repos hermanos:** un arreglo a cajas, turnos, cierres, ventas o stock

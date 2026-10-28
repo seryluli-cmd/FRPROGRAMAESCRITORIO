@@ -230,7 +230,7 @@ class PestañaResumenDelDia(QWidget):
     @manejar_errores
     def _buscar(self, _=None):
         # El "_=None" no se usa: absorbe la fecha que manda `dateChanged` (ver
-        # ControlCierresWindow._ver_detalle en caja_window.py).
+        # ControlCierresWindow._ver_detalle en control_cierres_window.py).
         dia = self.fecha.date()
         resumen = turnos_repo.resumen_del_dia(fecha_iso(dia))
         self.etiqueta_titulo.setText(f"{self._DIAS[dia.dayOfWeek() - 1]} {dia.toString('dd/MM/yyyy')}")

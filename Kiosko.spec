@@ -1,21 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from pathlib import Path
-import ssl
-
-
-datos = [('assets', 'assets')]
-# El intérprete auxiliar puede necesitar este PEM al crear conexiones HTTPS.
-certificado_ssl = Path(ssl.__file__).with_name('codex-rejected-cas.pem')
-if certificado_ssl.is_file():
-    datos.append((str(certificado_ssl), '.'))
-
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=datos,
+    datas=[('assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -32,6 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
+    # Nombre propio para que el ejecutable del Kiosko independiente no pise CyberBios.exe.
     name='FRKiosko',
     debug=False,
     bootloader_ignore_signals=False,
