@@ -56,11 +56,10 @@ class CajaWindow(QDialog):
         # A qué hora se tomaron los números: la pantalla no se actualiza sola.
         self.pastilla_hora = agregar_pastilla(self.cabecera, "", TONO_GRIS)
 
-        # Los mismos datos que el Cierre de Turno (pedido del dueño, 2026-10-20), con
-        # CAJA ACTUAL en vez de A RETIRAR. Desde el 2026-10-26 la Caja Actual es solo el
-        # efectivo cobrado, SIN el cambio (pedido del dueño: "que no esté sumado"; hasta
-        # ese día decía "Incluye el cambio"): es lo mismo que A RETIRAR del cierre, y por eso
-        # lee resumen["monto_a_retirar"]. Lo que tiene que haber en el cajón contando el
+        # Los mismos datos que el Cierre de Turno, con CAJA ACTUAL en vez de A RETIRAR.
+        # La Caja Actual es solo el efectivo cobrado, SIN el cambio (el dueño no quiere
+        # verlo sumado): es lo mismo que A RETIRAR del cierre, y por eso lee
+        # resumen["monto_a_retirar"]. Lo que tiene que haber en el cajón contando el
         # cambio sigue siendo resumen["caja_actual"], que usa el relevo de una caja (relevo_repo).
         actual = cifra_destacada("CAJA ACTUAL (solo efectivo)", "Sin el cambio: lo cobrado en efectivo", TONO_VERDE)
         total = cifra_destacada("TOTAL (EFECTIVO + DIGITAL)", "Lo cobrado en el turno, sin el cambio", TONO_AZUL)

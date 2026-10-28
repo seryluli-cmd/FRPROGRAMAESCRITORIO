@@ -242,17 +242,21 @@ class DialogoAgregarCarpeta(QDialog):
         self.resize(520, 260)
         self._armar_interfaz()
         # Probar una carpeta de otra PC tarda si no contesta. Mientras tanto Cancelar
-        # también se apaga (y Esc y la cruz no cierran, ver reject).
-        self._espera = EnSegundoPlano(self, [self.boton_agregar, self.boton_cancelar])
+        # también se apaga (y Esc y la cruz no cierran, ver reject), y los campos y
+        # "Buscar..." también: lo que se cambie ahí ya no es lo que se está probando.
+        self._espera = EnSegundoPlano(self, [
+            self.boton_agregar, self.boton_cancelar, self.boton_buscar,
+            self.campo_carpeta, self.campo_usuario, self.campo_clave,
+        ])
 
     def _armar_interfaz(self):
         self.campo_carpeta = QLineEdit()
         self.campo_carpeta.setPlaceholderText("D:\\BACKUPS  o  \\\\192.168.1.112\\Backups")
-        boton_buscar = QPushButton("Buscar...")
-        boton_buscar.clicked.connect(self._buscar)
+        self.boton_buscar = QPushButton("Buscar...")
+        self.boton_buscar.clicked.connect(self._buscar)
         fila_carpeta = QHBoxLayout()
         fila_carpeta.addWidget(self.campo_carpeta, 1)
-        fila_carpeta.addWidget(boton_buscar)
+        fila_carpeta.addWidget(self.boton_buscar)
 
         self.campo_usuario = QLineEdit()
         self.campo_clave = QLineEdit()

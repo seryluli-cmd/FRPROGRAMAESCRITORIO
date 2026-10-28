@@ -32,8 +32,11 @@ from repositories import (
 )
 
 # Sube si cambia CÓMO se hablan las dos copias (no la lista): las dos tienen que
-# hablar igual. Entra en la huella.
-VERSION_DEL_PROTOCOLO = 1
+# hablar igual. Entra en la huella. También sube si una pantalla pasa a leer una
+# clave nueva de lo que devuelve una función de la lista (como monto_a_retirar de
+# turnos_repo.resumen_turno_actual, que lee Caja): un mostrador con el programa
+# viejo no la mandaría y la pantalla fallaría sin explicar por qué.
+VERSION_DEL_PROTOCOLO = 2
 
 _MODULOS = {
     "articulos_repo": articulos_repo,

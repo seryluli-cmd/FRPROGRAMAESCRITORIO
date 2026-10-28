@@ -12,8 +12,8 @@ class TestRegistroDeErrores(BaseConBaseTemporal):
         try:
             raise RuntimeError("falló la consulta")
         except RuntimeError as error:
-            registrar_error(error, "Servidor de red: leer estado de PC")
+            registrar_error(error, "Servidor de red: pedido desde otra PC")
 
         contenido = (Path(database.DATA_DIR) / "errores.log").read_text(encoding="utf-8")
-        self.assertIn("Servidor de red: leer estado de PC", contenido)
+        self.assertIn("Servidor de red: pedido desde otra PC", contenido)
         self.assertIn("RuntimeError: falló la consulta", contenido)

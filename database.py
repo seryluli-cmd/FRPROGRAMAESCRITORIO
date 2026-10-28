@@ -202,7 +202,19 @@ def copiar_backup_a(carpeta_destino: str) -> str:
     """
     ahora = datetime.now().strftime("%Y%m%d_%H%M%S")
     destino = os.path.join(carpeta_destino, f"frkiosko_backup_{ahora}.db")
-    _backup_consistente(destino)
+    # Se graba con otro nombre y toma el suyo recién al final, como las copias
+    # automáticas (copias_repo): si se cierra el programa, se llena o se saca el
+    # pendrive en el medio, lo que quedó no parece una copia que se puede usar.
+    a_medias = destino + ".parcial"
+    try:
+        _backup_consistente(a_medias)
+        os.replace(a_medias, destino)
+    except BaseException:
+        try:
+            os.remove(a_medias)
+        except OSError:
+            pass  # no llegó a crearse, o el pendrive ya no está
+        raise
     return destino
 
 

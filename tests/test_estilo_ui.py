@@ -50,7 +50,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
     def test_aplicar_estilo_fija_el_esquema_claro_y_la_hoja_de_estilos(self):
         # La plataforma "offscreen" de las pruebas no aplica el esquema de color, así
         # que acá se verifica lo que se le pide a Qt (en Windows real se comprobó
-        # dibujando las pantallas: con el modo oscuro puesto, el log salía negro).
+        # dibujando las pantallas: con el modo oscuro puesto, los cuadros que la hoja de
+        # estilos no pinta salían negros).
         app = mock.Mock()
 
         programa.aplicar_estilo(app)

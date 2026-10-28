@@ -226,7 +226,7 @@ def fila_guardar_cancelar(dialogo, al_guardar=None, texto_guardar: str = "Guarda
     La fila de botones de un formulario: "Guardar" (azul, la acción
     principal) y "Cancelar" (cierra el diálogo con `reject`). `al_guardar`
     es lo que hace el primero (por defecto, aceptar el diálogo tal cual) y
-    `texto_guardar` cómo se llama ("Ingresar", "Cobrar y cargar saldo"...).
+    `texto_guardar` cómo se llama ("Ingresar", "Agregar"...).
     Devuelve el layout, para agregarlo al del diálogo.
     """
     boton_guardar = QPushButton(texto_guardar)

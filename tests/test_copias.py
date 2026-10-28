@@ -497,6 +497,7 @@ class TestCopiaEnOtraCarpeta(BaseConBaseTemporal):
 
         self.assertEqual(os.path.dirname(ruta), self._pendrive.name)
         self.assertRegex(os.path.basename(ruta), r"^frkiosko_backup_\d{8}_\d{6}\.db$")
+        self.assertEqual(os.listdir(self._pendrive.name), [os.path.basename(ruta)])  # sin .parcial
         conexion = sqlite3.connect(ruta)
         try:
             self.assertEqual(conexion.execute("PRAGMA integrity_check").fetchone()[0], "ok")
@@ -506,6 +507,20 @@ class TestCopiaEnOtraCarpeta(BaseConBaseTemporal):
         self.assertEqual(copia, self._contenido_de_la_base(database.DB_PATH))
         self.assertEqual(len(copia["cierres_turno"]), 1)
         self.assertIn("Empleada", self._nombres_de_usuarios(ruta))
+
+    def test_si_la_copia_se_corta_no_queda_nada_con_nombre_de_copia_buena(self):
+        # Un pendrive que se llena o se saca en el medio: lo que alcanzó a grabarse no
+        # puede quedar con el nombre de una copia que se puede usar.
+        def se_corta(destino):
+            with open(destino, "wb") as archivo:
+                archivo.write(b"SQLite format 3")
+            raise OSError(28, "No queda espacio en el disco")
+
+        with mock.patch.object(database, "_backup_consistente", se_corta):
+            with self.assertRaises(OSError):
+                database.copiar_backup_a(self._pendrive.name)
+
+        self.assertEqual(os.listdir(self._pendrive.name), [])
 
     def test_lo_que_esta_a_medio_grabar_no_entra_en_la_copia(self):
         # Otra conexión empezó a grabar y todavía no terminó (como una venta a

@@ -1,7 +1,8 @@
 """
 tests/test_config_repo.py
 ==========================
-Dos pedazos de SQL que estaban copiados y hoy viven en un solo lugar:
+Dos pedazos de SQL que viven en un solo lugar, para que una corrección no quede
+a medias en una copia:
 
 - La tabla `configuracion`: config_repo.leer y config_repo.guardar (con la
   clave que no está, el UPDATE que no la crea y la conexión de quien llama), el
@@ -140,7 +141,8 @@ class TestCambioFijo(BaseConBaseTemporal):
 
 class TestCadaRepoConSuClave(BaseConBaseTemporal):
     """Qué hace cada repo que guarda algo en `configuracion` si su clave no
-    está o tiene algo raro (lo mismo que hacía con su propio SQL)."""
+    está o tiene algo raro: cada uno conserva su valor por defecto y su manera de
+    grabar (crear la clave o no)."""
 
     def setUp(self):
         super().setUp()

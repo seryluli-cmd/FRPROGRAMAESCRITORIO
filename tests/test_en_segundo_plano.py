@@ -42,6 +42,7 @@ import database  # noqa: E402
 import dominio  # noqa: E402
 from repositories import copias_repo, envio_pwa_repo, usuarios_repo  # noqa: E402
 from ui.copias_dialogo import DialogoAgregarCarpeta, DialogoCopiasDeSeguridad  # noqa: E402
+from ui import en_segundo_plano  # noqa: E402
 from ui.en_segundo_plano import EnSegundoPlano, _lleva_un_objeto_de_qt  # noqa: E402
 from ui.envio_pwa_dialogo import DialogoEnvioPwa  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
@@ -295,7 +296,8 @@ class TestCierresALaAppDeGastos(_ConVentanas):
         error.assert_called_once_with(ventana, "No se pudo completar", "No contesta")
         self.assertIsNone(repo.ultimo_error())
 
-        # Y si la ventana ya se cerró, nadie lo saca del dict: se tiene que ir con el hilo.
+        # Y si la ventana ya se cerró, el error lo saca del dict _anotar_si_fallo (sin
+        # cartel): tampoco queda nada dando vueltas.
         repo = self._que_tarda(error=lambda: _ErrorDePrueba("No contesta"))
         ventana = self._envio()
         ventana.show()
@@ -539,6 +541,8 @@ class TestCopiasDeSeguridad(_ConVentanas):
             agregar.campo_carpeta.setText(red)
             agregar.boton_agregar.click()
             vista["Cancelar prendido"] = agregar.boton_cancelar.isEnabled()
+            vista["Buscar o un campo prendido"] = any(cosa.isEnabled() for cosa in (
+                agregar.boton_buscar, agregar.campo_carpeta, agregar.campo_usuario, agregar.campo_clave))
             formas_de_cerrar = {
                 "Cancelar": agregar.boton_cancelar.click,
                 "Esc": lambda: QTest.keyClick(agregar, Qt.Key_Escape),
@@ -561,7 +565,8 @@ class TestCopiasDeSeguridad(_ConVentanas):
             esperar_la_respuesta(copias)  # y después la copia que prueba la carpeta nueva
         seguro.stop()
 
-        self.assertEqual(vista, {"Cancelar prendido": False, "Cancelar": "sigue abierta",
+        self.assertEqual(vista, {"Cancelar prendido": False, "Buscar o un campo prendido": False,
+                                 "Cancelar": "sigue abierta",
                                  "Esc": "sigue abierta", "la cruz": "sigue abierta", "Copias tapada": True})
         error.assert_not_called()
         self.assertEqual(prueba.llamadas, [(red,)])
@@ -593,6 +598,26 @@ class TestLaPieza(_ConVentanas):
         datos = (copias_repo.agregar_carpeta_extra, 1, "D:\\BACKUPS", ["a", 2], {"x": (1, 2)},
                  functools.partial(len, "abc"))
         self.assertFalse(any(_lleva_un_objeto_de_qt(cosa) for cosa in datos))
+
+    def test_el_hilo_no_deja_un_ciclo_entre_el_error_y_donde_lo_anota(self):
+        # El error guarda en su traceback el renglón de _correr. Si ese renglón siguiera
+        # guardando el dict, el dict y el error se sostendrían entre sí y, con el
+        # recolector apagado (main.py), no se liberarían nunca.
+        gc.disable()
+        self.addCleanup(gc.enable)
+
+        class Anotador(dict):
+            pass  # a un dict común no se le puede tomar una referencia débil
+
+        def falla():
+            raise _ErrorDePrueba("No contesta")
+
+        resultado = Anotador()
+        en_segundo_plano._correr(falla, (), resultado)
+        self.assertIsInstance(resultado["error"], _ErrorDePrueba)
+        vigilado = weakref.ref(resultado)
+        del resultado
+        self.assertIsNone(vigilado())
 
     def test_el_hilo_es_daemon_y_lleva_solo_la_funcion_y_datos(self):
         repo = self._que_tarda(valor="D:\\BACKUPS")
