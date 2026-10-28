@@ -124,7 +124,13 @@ def _revisar_que_los_pagos_sumen_el_total(total: float, pagos: list):
     Se compara lo que se va a GRABAR (cada monto redondeado, como en
     _insertar_pagos y _insertar_cabecera_venta): es lo que suman después
     Reportes y el Cierre de Turno.
+
+    Un pago negativo se rechaza aunque la suma dé: $ 5.000 en efectivo y
+    -$ 2.000 digital "suman" una venta de $ 3.000, pero la Caja esperaría
+    $ 5.000 en el cajón. La ventana de cobro nunca arma uno así.
     """
+    if any(round(pago["monto"], 2) < 0 for pago in pagos):
+        raise ValueError("Un pago no puede ser negativo. No se grabó nada: volvé a cobrar.")
     cobrado = round(sum(round(pago["monto"], 2) for pago in pagos), 2)
     if abs(round(cobrado - round(total, 2), 2)) > DIFERENCIA_MAXIMA_DE_PAGOS:
         raise ValueError(

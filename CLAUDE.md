@@ -101,17 +101,36 @@ que reconstruya la tabla (ver regla 6).
 ### Cómo se tratan los datos
 
 **6. El esquema se cambia con migración, nunca a mano.**
-Hoy la base arranca de cero (`database_migraciones.VERSION_ESQUEMA` = 1, y
-`comprobar_base_kiosko` no deja abrir una base de CYBERCONTROL por error). En
-cuanto el programa esté en uso en el kiosko habrá una base con datos reales:
-toda columna o tabla nueva se agrega como un paso idempotente en
-`database_migraciones.py` (seguro de correr dos veces) y se sube
-`VERSION_ESQUEMA`. Nunca "borrá el .db y volvé a empezar". Una tabla MADRE
-(`ventas`, `articulos`, `usuarios`) no se reconstruye con un RENAME primero:
-SQLite re-apunta las claves foráneas de las hijas a la renombrada; el orden es
-crear `<tabla>_nueva`, copiar, borrar la vieja y recién ahí renombrar, con las
-claves foráneas apagadas y todo en UNA transacción (en CYBERCONTROL está hecho
-en `_migrar_check_origen_en_ventas`).
+La versión de la base vive en el archivo (`PRAGMA user_version`). Hoy es la 1
+(`database_migraciones.VERSION_ESQUEMA`, sin ningún paso). Antes de crear nada,
+`comprobar_base_kiosko` no deja abrir una base de CYBERCONTROL ni una de un
+FRKiosko más nuevo (versión mayor que `VERSION_ESQUEMA`): un programa viejo podría
+dañarla. En cuanto el programa esté en uso en el kiosko habrá una base con datos
+reales: toda columna nueva, índice sobre ella o tabla reconstruida se agrega como
+un paso con el molde de `database_migraciones.py`:
+(1) escribir `_paso_N(conexion)` idempotente: mira con `PRAGMA table_info`/`sqlite_master`
+si ya está hecho, porque corre también sobre una base nueva;
+(2) sumarlo a `PASOS = {N: _paso_N}` y subir `VERSION_ESQUEMA` a N. Van las dos
+cosas: un paso sin subir la versión no corre nunca, `tests/test_migraciones.py`
+exige un paso por versión, y una base en uso a la que le falte un paso no se marca
+como nueva (`migrar_base` frena);
+(3) el paso no hace commit ni rollback, no usa `executescript` (hace COMMIT antes
+de correr y lo de antes ya no se deshace) y no toca `PRAGMA foreign_keys`:
+`migrar_base` corre cada paso pendiente en orden, en su propia transacción (BEGIN
+explícito, claves foráneas apagadas ANTES del BEGIN), con la versión anotada en esa
+misma transacción, y lo rechaza si deja referencias rotas. Antes del primero deja
+la copia `data_fr/backups/antes_de_migrar_v<versión>_AAAAMMDD_HHMMSS.db`, que nunca
+se borra;
+(4) su prueba: una base de la versión anterior, con datos, pasa a la nueva sin
+perder nada.
+Un índice sobre una columna nueva va en el paso, no en `database_esquema.py`: ese
+corre antes, y en una base vieja la columna todavía no existe. Nunca "borrá el .db
+y volvé a empezar". Una tabla MADRE (`ventas`, `articulos`, `usuarios`) no se
+reconstruye con un RENAME primero, porque SQLite re-apunta las claves foráneas de
+las hijas a la renombrada: dentro del paso, el orden es crear `<tabla>_nueva`,
+copiar, borrar la vieja y recién ahí renombrar (en CYBERCONTROL está hecho en
+`_migrar_check_origen_en_ventas`). Las trampas de SQLite que el molde ya resuelve
+están explicadas, y probadas, arriba de `database_migraciones.py`.
 
 **7. Nada se borra: se marca.**
 Una venta anulada cambia de estado y guarda quién, cuándo y por qué —
@@ -167,8 +186,10 @@ sobra; uno que explica por qué esa línea es así vale oro.
 **14. Regla de negocio nueva, test nuevo.**
 `tests/` cubre turnos, stock, ORDENAR Stock, marcas, cierres, cajas con
 número, el detalle del día, el cobro con Enter, impresiones, reportes,
-administrar desde otra PC, copias de seguridad, los envíos a la app de gastos,
-la vuelta sola del Admin, el formato de pesos y el aspecto de las pantallas.
+administrar desde otra PC, copias de seguridad, las migraciones de la base (con
+pasos de mentira, `tests/test_migraciones.py`), los envíos a la app de gastos,
+la vuelta sola del Admin, que siempre quede un Administrador activo, la base de
+prueba, el formato de pesos y el aspecto de las pantallas.
 Todo lo que se calcule con plata, fechas o turnos entra ahí antes de darse por
 terminado. La UI se prueba a mano; la lógica, no.
 
@@ -220,23 +241,25 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `dominio.es_admin(usuario)` | se pregunta si alguien es Administrador |
 | `ventas_repo.subtotal_linea(linea)` | se calcula lo que se cobra por un renglón |
 | `ventas_repo.total_carrito(lineas)` | se suma el total de una venta en curso |
-| `ventas_repo._grabar_venta_kiosko(...)` | se graba una venta de kiosko sobre una conexión abierta (`confirmar_venta` e `impresiones_repo.cobrar_impresiones`): el único INSERT en `venta_detalle` y el único descuento de stock por una venta |
+| `ventas_repo._grabar_venta_kiosko(...)` | se graba una venta de kiosko sobre una conexión abierta (`confirmar_venta` e `impresiones_repo.cobrar_impresiones`): el único INSERT en `venta_detalle`, el único descuento de stock por una venta y el único lugar que revisa que los pagos (netos de vuelto, ninguno negativo) sumen el total, con un centavo de tolerancia (`DIFERENCIA_MAXIMA_DE_PAGOS`); si no, no graba nada |
 | `impresiones_repo.cobrar_impresiones(...)` · `.articulo_impresiones()` | se cobran impresiones desde el botón de la barra: venta de kiosko común del artículo, con el precio leído en la misma transacción |
 | `dominio.CODIGO_ARTICULO_IMPRESIONES` | se decide qué artículo de kiosko es "Impresiones" (el código "4"), para mostrarlo como renglón propio en Reportes, Caja y Cierre de Turno |
 | `dominio.cuenta_del_cobro(total, efectivo, digital, paga_con)` · `.lo_que_falta_para(total, monto)` | se calcula el cobro: la parte en efectivo y la digital, el billete que da el cliente, el vuelto, lo que falta y los pagos que quedan en la caja; y lo que completa el otro medio al escribir en uno |
 | `ui.dialogo_pago.cobrar(parent, monto)` | se cobra algo que no es una venta de kiosko con la ventana de cobro de Ventas (medio, reparto y vuelto). Devuelve los pagos netos de vuelto, o None si se canceló. Hoy no la usa ninguna pantalla; una pantalla nueva que cobre la usa a ella |
-| `database.conexion_db()` | se abre una transacción contra la base |
+| `database.conexion_db()` | se abre una transacción contra la base. Todo lo que graba la abre así (con `get_connection`, que espera `ESPERA_BASE_OCUPADA_SEGUNDOS`, 30 s, si otra conexión la tiene ocupada; con la espera de fábrica de 5 s la venta fallaba con "database is locked"). La única conexión suelta es la de `_backup_consistente`, que solo lee (y `Connection.backup` reintenta solo) |
 | `database.DATA_DIR` / `DB_PATH` · `.usar_carpeta_de_datos(carpeta)` · `.es_base_de_prueba()` | se resuelve dónde viven los datos (código vs `.exe`): `data_fr/` al lado del programa, u otra carpeta con `python main.py --base <carpeta>` (la base de prueba de `armar_base_de_prueba.py`, marcada con `ARCHIVO_DE_BASE_DE_PRUEBA`). Todos leen `database.DATA_DIR` en el momento: nunca `from database import DB_PATH` |
 | `database.hash_clave()` / `verificar_clave()` | se maneja una contraseña |
-| `database_migraciones.comprobar_base_kiosko(conexion)` · `.migrar_base(conexion)` | se rechaza una base de CYBERCONTROL y se lleva la versión del esquema (`VERSION_ESQUEMA`) |
+| `database_migraciones.comprobar_base_kiosko(conexion)` · `.migrar_base(conexion)` · `.PASOS` | se rechaza una base de CYBERCONTROL o de un FRKiosko más nuevo, antes de crear ninguna tabla, y se lleva la base a `VERSION_ESQUEMA` corriendo en orden los pasos que le faltan. Cada paso va en su transacción, y antes del primero pendiente queda la copia `antes_de_migrar_v<versión>_...` (regla 6) |
 | `usuarios_repo.tiene_permiso(usuario, clave)` | se decide si alguien puede entrar a algo |
-| `usuarios_repo.exigir_admin(usuario_id, para)` · `.usuario_habilitado(usuario_id)` | un repo exige que quien opera siga activo (y sea Admin), releyéndolo de la base: un usuario dado de baja con la sesión abierta no puede seguir. Lo usan ORDENAR Stock, las marcas, Control de Stock, anular una venta |
+| `usuarios_repo.exigir_admin(usuario_id, para)` · `.usuario_habilitado(usuario_id)` | un repo exige que quien opera siga activo (y sea Admin), releyéndolo de la base: un usuario dado de baja con la sesión abierta no puede seguir. Lo usan ORDENAR Stock, las marcas, Control de Stock, anular una venta (que además exige un motivo escrito) |
+| `usuarios_repo._exigir_que_quede_otro_admin(conexion, usuario_id, que_se_quiere)` | se decide que siempre quede al menos un Administrador activo: `modificar_usuario` (al pasarlo a Empleada), `desactivar_usuario` y `borrar_usuario` lo llaman con el permiso de escritura ya tomado (`BEGIN IMMEDIATE`: dos Admins que se bajan a la vez, uno desde otra PC, no dejan cero) y rechazan con ValueError tocar al único. Sin Admin nadie vuelve a entrar a Usuarios, anular ventas ni usar ORDENAR Stock sin tocar la base a mano. No cambia quién puede hacer qué; "no te podés borrar a vos mismo" sigue en `ui/usuarios_window.py`. Ver `TestSiempreQuedaUnAdministrador` |
 | `config_repo.obtener_fondo_cambio()` | se lee el fondo de cambio del turno |
 | `admin_remoto_repo.esta_activo()` · `.activar(...)` · `.entrar(nombre, clave, ip)` · `.exigir_admin_habilitado(id)` | se decide quién administra desde otra PC del local: viene apagado, solo un ADMIN activo, cada ingreso en `sesiones.desde_ip` |
 | `admin_remoto.lista_blanca.FUNCIONES` · `.ACTOR` · `.huella()` | qué funciones de los repos se pueden pedir desde otra PC, qué parámetro es "quién lo hizo" (lo completa el mostrador) y la huella que tienen que compartir las dos copias del .exe |
 | `admin_remoto.modo.direccion_del_mostrador()` · `.es_copia_remota()` | se decide si esta copia es la del mostrador o una abierta por la red (y a qué PC le habla), y las pantallas esconden lo que solo se hace en el mostrador |
 | `ui.utils.solo_en_el_mostrador` · `.avisar_que_es_en_el_mostrador(padre)` | se decide qué hace desde otra PC un botón que vende, cobra o cierra: está igual que en el mostrador y avisa "Esto se hace en el mostrador". En el mostrador no cambia nada |
 | `copias_repo.copia_automatica_si_corresponde()` · `.toca_copia(...)` · `.nombres_a_borrar(...)` · `.agregar_carpeta_extra(...)` | se decide cuándo se hace una copia de seguridad (después de cada Cierre de Turno y cada `HORAS_ENTRE_COPIAS`, con el programa abierto; lo corre el hilo de `iniciar_copias_automaticas`), cuántas quedan y en qué otras carpetas se guarda. La pantalla es `ui/copias_dialogo.py` (Usuarios > "Copias de Seguridad") |
+| `database.carpeta_de_copias()` | se decide en qué carpeta de esta PC quedan las copias (data_fr/backups): la usan `copias_repo.carpeta_local()` y la copia de antes de migrar. Está en `database.py` porque las migraciones no pueden importar un repo (regla 1) |
 | `envio_pwa_repo.encolar(conexion, cierre_id)` · `.enviar_pendientes(ahora, transporte)` · `.datos_del_cierre(conexion, cierre_id)` · `.mandar_cierre(usuario_id, cierre_id)` · `.activar(usuario_id, prendido)` · `.probar_conexion()` · `.estado()` | se manda cada Cierre de Turno a la app de gastos de FR ("Gestión Central", proyecto `frkioskos`, negocio `gestionfr`): la cola `envios_pwa` se llena en la transacción de `turnos_repo.cerrar_turno` solo con el envío prendido (Configuración ADMIN > "Cierres a la app de gastos", solo Admin y solo en el mostrador; viene apagado), un hilo la manda cada minuto con reintentos, y lo que viaja es lo que carga una empleada a mano más el desglose de la tarjeta del cierre (`dominio.NEGOCIOS_DEL_CIERRE`). Se habla con Firestore como un celular: login anónimo con la clave pública de la PWA y REST con `urllib` |
 | `vuelta_admin_repo.volver(usuario_id)` · `ui.vuelta_del_admin.VueltaDelAdmin` | se decide si la sesión del Administrador vuelve sola a la empleada: a los `dominio.MINUTOS_ADMIN_VUELVE_SOLO` de entrar, en silencio (sin cartel: el dueño pidió sacarlo; no lo vuelvas a poner), vuelve a quien dejó el mostrador con "🔄 Operador" sin pedirle la clave, solo si su caja sigue abierta a su nombre y en hora; si no, a la pantalla de ingreso. Nunca corta un cobro ni un formulario abierto. Solo en el mostrador |
 | `errores.registrar_error(excepcion, contexto)` | la UI y el servidor guardan fallos inesperados en `data_fr/errores.log` sin depender de Qt |
@@ -331,9 +354,9 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   seguro.** Cualquiera con acceso al archivo `data_fr/kiosko.db` lee y
   modifica todo. No le prometas al usuario que esto protege datos.
 - **Todo se cobra con la misma ventana de cobro, nunca con un combo "Medio de
-  pago"** (pedido del dueño, 2026-10-18: "a todo"). Ventas abre
-  `ui.dialogo_pago.DialogoPago`; Impresiones y cualquier pantalla nueva que
-  cobre la abren con `ui.dialogo_pago.cobrar`. Un pago repartido entre los dos
+  pago"** (pedido del dueño, 2026-10-18: "a todo"). Ventas e Impresiones abren
+  `ui.dialogo_pago.DialogoPago`; una pantalla nueva que cobre algo que no es una
+  venta de kiosko usa `ui.dialogo_pago.cobrar` (hoy no la usa ninguna). Un pago repartido entre los dos
   medios se graba como dos filas reales de `PAGO_EFECTIVO`/`PAGO_DIGITAL`: no
   existe un método "mixto". No lo sumes a `METODOS_PAGO` ni al `CHECK` de
   `venta_pagos.metodo`: Caja y Cierre de Turno no sabrían cuánto de un pago
@@ -353,7 +376,7 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   origen no figura en `turnos_ventas_repo._PREFIJO_COLUMNAS_POR_ORIGEN` (y en
   las columnas de `cierres_turno`), su plata desaparece del efectivo esperado en
   el cajón sin ningún error visible — el dueño usa este desglose para auditar
-  faltantes. El test `TestCadaOrigenSumaEnLaCaja` lo atrapa. `ventas.origen`
+  faltantes. El test `TestCadaOrigenSumaEnLaCaja` (`tests/test_cajas.py`) lo atrapa. `ventas.origen`
   tiene un CHECK: agregar un origen a una base ya en uso exige una migración
   que reconstruya `ventas` (ver regla 6). Hoy el único origen es KIOSKO.
 - **El turno de un cierre sale de la hora del cierre ANTERIOR, con 40 minutos
@@ -407,9 +430,21 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   demás pantallas se esconden con `modo.es_copia_remota()`; (4) el cierre
   forzoso de la caja y la vuelta sola del Admin los hace solo el mostrador;
   (5) una consulta de reporte lenta frena las ventas del mostrador mientras dura
-  (SQLite no deja grabar mientras otro lee): todo lo que se lee desde otra PC
-  tiene que andar rápido con un año de ventas (sin `idx_venta_pagos_venta`, Por
-  Operador tardaba 6 minutos).
+  (sin WAL, SQLite no deja grabar mientras otro lee): cada conexión de
+  `get_connection` espera hasta 30 s (`database.ESPERA_BASE_OCUPADA_SEGUNDOS`;
+  con la espera de fábrica de 5 s la venta FALLABA con "database is locked"), así
+  que la venta espera y se graba, pero el mostrador queda trabado mientras tanto, y
+  pasados los 30 s falla igual. Todo lo que se lee desde otra PC tiene que andar
+  rápido con un año de ventas (sin `idx_venta_pagos_venta`, Por Operador tardaba 6
+  minutos; con la base de prueba se mide). No pases la base a WAL sin hablarlo:
+  deja archivos -wal/-shm y cambia la receta de "Recuperar una copia" del LEEME;
+  (6) si la red se corta DESPUÉS de mandar un pedido (se perdió la respuesta o
+  pasó la espera), el mostrador pudo haberlo grabado: `admin_remoto/cliente.py`
+  lo distingue (`SinRespuesta`, una `SinConexion`) y avisa que se fije antes de
+  repetirlo. No lo juntes con el "No encuentro el FRKiosko del mostrador", que es
+  solo para cuando el pedido no llegó (repetir a ciegas una compra la carga dos
+  veces y suma el stock doble; lo vigila `TestSeCortaEsperandoLaRespuesta`). El
+  saludo y el ingreso no graban nada: ahí un corte da un aviso neutro.
 - **El servidor de red no debe tocar Qt.** Usa conexiones SQLite propias desde
   sus hilos y registra fallos inesperados con `errores.registrar_error`, sin
   incluir claves ni el cuerpo de los pedidos en el contexto del log. Su puerto
@@ -422,7 +457,8 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   última a cada "otra carpeta" en cada revisión. Reglas que no hay que romper:
   (1) una copia se graba como `.parcial` y se renombra al final; (2) solo se
   borran archivos con nombre de copia automática de ESTE programa
-  (`frkiosko_AAAA-MM-DD_HHMMSS.db`): nunca las manuales ni las de CYBERCONTROL,
+  (`frkiosko_AAAA-MM-DD_HHMMSS.db`): nunca las manuales, las `antes_de_migrar_...`
+  (las deja `database_migraciones` antes de un paso) ni las de CYBERCONTROL,
   que se llaman `kiosko_...` y borran con la misma regla (con el mismo prefijo,
   los dos programas en una misma carpeta se borraban las copias entre sí; no
   vuelvas a `kiosko_`, lo vigila `tests/test_copias.py`); (3) las copias cuentan
@@ -553,7 +589,7 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 555 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 611 pruebas
 al 2026-10-28 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.

@@ -47,7 +47,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 | Archivo | Contenido |
 |---|---|
 | [main.py](main.py) | Entry point. Clase `Aplicacion` alterna `LoginWindow` ↔ `MainWindow` (para poder cambiar de operador sin cerrar el programa). `aplicar_estilo(app)` pone la hoja de estilos Qt global ([ui/hoja_de_estilos.py](ui/hoja_de_estilos.py): botones `primario`/`peligro`/`barra` vía `setProperty("clase", ...)`) y fija el esquema de color CLARO. Instancia única por PC (un socket en el puerto 8908 como candado). `sys.excepthook` propio: cualquier excepción no capturada se loguea en `data_fr/errores.log` y muestra un cartel. Arranca las copias automáticas, el hilo de envíos a la app de gastos y el servidor de administración remota. |
-| [database.py](database.py) · [database_esquema.py](database_esquema.py) · [database_esquema_cajas.py](database_esquema_cajas.py) · [database_esquema_envios.py](database_esquema_envios.py) · [database_migraciones.py](database_migraciones.py) | Conexiones, claves y copias; creación de tablas e índices (las de las cajas con número y la cola de envíos, en su propio archivo); la versión del esquema (`VERSION_ESQUEMA`, hoy 1) y el cerrojo que no deja abrir una base de CYBERCONTROL (`comprobar_base_kiosko`). Ver modelo de datos abajo. |
+| [database.py](database.py) · [database_esquema.py](database_esquema.py) · [database_esquema_cajas.py](database_esquema_cajas.py) · [database_esquema_envios.py](database_esquema_envios.py) · [database_migraciones.py](database_migraciones.py) | Conexiones, claves y copias; creación de tablas e índices (las de las cajas con número y la cola de envíos, en su propio archivo); la versión del esquema (`VERSION_ESQUEMA`, hoy 1) con los pasos que llevan una base vieja a la nueva (`PASOS`, hoy ninguno; antes del primero queda una copia `antes_de_migrar_...` en data_fr/backups) y el cerrojo que no deja abrir una base de CYBERCONTROL ni una de un FRKiosko más nuevo (`comprobar_base_kiosko`). `get_connection` espera hasta 30 s si la base está ocupada. Ver modelo de datos abajo. |
 | [turnos.py](turnos.py) · [dominio.py](dominio.py) | Calendario del local y constantes/reglas puras de negocio (roles, estados de venta, métodos de pago, turnos, el origen KIOSKO, la cuenta del cobro, el formato de pesos). |
 | [repositories/](repositories/) | Capa de datos, un archivo por tema: artículos, compras, configuración, impresiones, reportes, el detalle del día, turnos (con turnos faltantes y lo vendido en la ventana de un turno, `turnos_ventas_repo.py`), cajas con número (`cajas_repo.py` los datos, `relevo_repo.py` las reglas al entrar y el cierre forzoso, `control_cierres_repo.py` lo que se controla después), copias de seguridad, envíos a la app de gastos, la vuelta sola del Admin, administración remota, usuarios y ventas. |
 | [ui/](ui/) | Una ventana/diálogo por pantalla — ver detalle abajo. `ui/hoja_de_estilos.py` es la hoja de estilos de todo el programa. `ui/utils.py` tiene los helpers compartidos (formato de pesos, decorador de manejo de errores, encadenar Enter entre campos). Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno usan el diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26: las piezas están en `ui/piezas_ventana.py` y los colores en `ui/hoja_de_estilos.py`, siempre por objectName o "clase". |
@@ -251,8 +251,9 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   Confirmar llama a `compras_repo.registrar_compra` con todo el lote junto.
 - **Consulta de Ventas** (`consulta_ventas_window.py`,
   `ConsultaVentasWindow`) — últimas 100 ventas, resalta ANULADA. "Anular venta"
-  (solo Admin) pide motivo y llama a `ventas_repo.anular_venta`, que **repone el
-  stock** y marca `estado='ANULADA'` con auditoría.
+  (solo Admin) pide motivo y llama a `ventas_repo.anular_venta`, que vuelve a
+  exigir un Admin activo (`usuarios_repo.exigir_admin`) y un motivo escrito,
+  **repone el stock** y marca `estado='ANULADA'` con auditoría.
 - **Reportes** (`reportes_window.py`, `ReportesWindow`) — 6 pestañas:
   **Resumen de Ventas** (`reportes_repo.resumen_ventas`), **Resumen del Día**
   (`turnos_repo.resumen_del_dia`: un día abierto por turno con estado, quién
@@ -305,6 +306,10 @@ atendiendo. Diseño y decisiones en [docs/ADMIN_REMOTO.md](docs/ADMIN_REMOTO.md)
   `admin_remoto/lista_blanca.py` por un representante que manda la llamada; las
   pantallas no se enteran. Por eso **ninguna pantalla importa una función suelta
   de un repo** (un test lo vigila). Los datos van con `admin_remoto/codec.py`.
+  Si no se puede conectar o mandar el pedido, avisa que no encuentra el
+  mostrador (`SinConexion`); si el pedido ya salió y se cortó la respuesta, avisa
+  que el mostrador pudo haberlo guardado y que se fije antes de repetirlo
+  (`SinRespuesta`).
 - **Quién entra** (`repositories/admin_remoto_repo.py`): viene apagado; solo un
   ADMIN activo; cada ingreso queda en `sesiones.desde_ip`. El servidor
   (`admin_remoto/servidor.py`) da una sesión al azar atada a la IP, que vence a
@@ -370,8 +375,13 @@ Nunca corta un cobro ni un formulario abierto. Solo en el mostrador. Tests:
 Login por **nombre + clave** (`login_window.py`, vía
 `usuarios_repo.autenticar_por_nombre`) — ignora mayúsculas/minúsculas y
 espacios de más al comparar (en Python, no con el `LOWER()` de SQLite, que no
-pliega acentos). `crear_usuario`/`modificar_usuario` rechazan que dos usuarios
-**activos** compartan nombre. Protección contra fuerza bruta en memoria: 5
+pliega acentos). `crear_usuario`/`modificar_usuario` rechazan un nombre vacío
+(o de puros espacios) y que dos usuarios **activos** compartan nombre;
+`crear_usuario` rechaza una clave vacía (en `modificar_usuario` la clave vacía
+quiere decir "no cambiarla"). Siempre queda al menos un Administrador activo:
+`modificar_usuario` (pasarlo a Empleada), `desactivar_usuario` y `borrar_usuario`
+rechazan tocar al único (`usuarios_repo._exigir_que_quede_otro_admin`); "no te
+podés borrar a vos mismo" sigue en la pantalla. Protección contra fuerza bruta en memoria: 5
 intentos fallidos → bloqueo de 60 s para ese nombre. No hay sesión persistida:
 el dict `usuario` se pasa por parámetro a cada ventana.
 
@@ -433,15 +443,17 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-555 tests al 2026-10-28. Cubren turnos, caja y cajas con número
+611 tests al 2026-10-28. Cubren turnos, caja y cajas con número
 (`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
 ORDENAR Stock, marcas, ventas y anulaciones, el cobro con Enter, impresiones,
 reportes, administrar desde otra PC (`tests/test_admin_remoto.py`, con un
 mostrador de prueba en otro proceso: `tests/mostrador_de_prueba.py`), las copias
-de seguridad, los cierres que se mandan a la app de gastos
+de seguridad, las migraciones de la base (`tests/test_migraciones.py`, con pasos
+de mentira), los cierres que se mandan a la app de gastos
 (`tests/test_envio_pwa.py`, con una app de mentira en vez de Google), la vuelta
-sola del Admin, el formato de pesos y el aspecto de las pantallas (Qt
-"offscreen").
+sola del Admin, que siempre quede un Administrador activo, la base de prueba
+(`tests/test_base_de_prueba.py`), el formato de pesos y el aspecto de las
+pantallas (Qt "offscreen").
 
 ## Empaquetado (.exe)
 

@@ -21,9 +21,10 @@ tabla para cambiarle un CHECK):
   2. Sumarlo a PASOS ({N: _paso_N}) y subir VERSION_ESQUEMA a N. Hay que hacer
      las dos cosas: un paso sin subir la versión no corre nunca, y
      tests/test_migraciones.py exige un paso por versión.
-  3. El paso no hace commit ni rollback ni toca PRAGMA foreign_keys: corre dentro
-     de la transacción que abre _correr_paso, con las claves foráneas ya
-     apagadas. Si falla, levanta la excepción y no queda nada a medias.
+  3. El paso no hace commit ni rollback, no usa executescript (ver la trampa d) y
+     no toca PRAGMA foreign_keys: corre dentro de la transacción que abre
+     _correr_paso, con las claves foráneas ya apagadas, una sentencia por
+     conexion.execute. Si falla, levanta la excepción y no queda nada a medias.
   4. Su prueba (regla 14): una base de la versión anterior, con datos, pasa a la
      nueva sin perder nada, y correrlo dos veces no cambia nada.
 
@@ -44,6 +45,11 @@ Trampas de SQLite (probadas con un script el 2026-10-28, Python 3.12.3 y SQLite
       que agrega un paso va en el paso, no ahí: en una base vieja la columna
       todavía no existe, el CREATE INDEX falla con "no such column" y el programa
       no abre.
+  (d) conexion.executescript() hace COMMIT de lo que esté abierto ANTES de
+      correr, aunque se haya hecho el BEGIN: lo que el paso hizo hasta ahí queda
+      grabado, y si después falla, el rollback ya no lo deshace (la base queda a
+      medio cambiar y con la versión vieja). En un paso, nada de executescript.
+      _correr_paso se da cuenta (ver "hizo commit por su cuenta") y lo dice.
 """
 
 import os
@@ -130,10 +136,17 @@ def migrar_base(conexion):
     actual = version_de_la_base(conexion)
     pendientes = pasos_pendientes(actual)
     if pendientes and actual > 0:
-        _copia_antes_de_migrar()
+        _copia_antes_de_migrar(actual)
     for version, paso in pendientes:
         _correr_paso(conexion, version, paso)
     if version_de_la_base(conexion) < VERSION_ESQUEMA:
+        if actual > 0:
+            # Se subió VERSION_ESQUEMA sin sumar su paso a PASOS: anotarla sin
+            # correr nada dejaría la base marcada como nueva sin los cambios.
+            raise RuntimeError(
+                f"A la base le falta un paso para llegar a la versión {VERSION_ESQUEMA} "
+                f"(llegó hasta la {version_de_la_base(conexion)}): no se tocó."
+            )
         # Una base nueva sin pasos que correr: database_esquema.py ya la creó con
         # el esquema de este programa.
         conexion.execute(f"PRAGMA user_version = {int(VERSION_ESQUEMA)}")
@@ -166,8 +179,17 @@ def _correr_paso(conexion, version: int, paso):
                 )
             conexion.execute(f"PRAGMA user_version = {int(version)}")
             conexion.commit()
-        except BaseException:
+        except BaseException as error:
+            seguia_abierta = conexion.in_transaction
             conexion.rollback()
+            if not seguia_abierta and not isinstance(error, RuntimeError):
+                # Falló DESPUÉS de un commit propio (un executescript, trampa d): lo
+                # de antes del commit quedó grabado y el rollback ya no lo deshace.
+                raise RuntimeError(
+                    f"El paso {version} de la base hizo commit por su cuenta y después falló: "
+                    "lo que alcanzó a hacer quedó grabado. Volvé a la copia antes_de_migrar_ "
+                    "de data_fr/backups."
+                ) from error
             raise
     finally:
         conexion.execute("PRAGMA foreign_keys = ON")
@@ -178,10 +200,13 @@ def _referencias_rotas(conexion) -> int:
     return len(conexion.execute("PRAGMA foreign_key_check").fetchall())
 
 
-def _copia_antes_de_migrar():
+def _copia_antes_de_migrar(version: int):
     """
-    Copia de la base tal como está, antes del primer paso que le falta, en la
-    carpeta de las copias (data_fr/backups). Los pasos corren sobre la base real
+    Copia de la base antes del primer paso que le falta, en la carpeta de las
+    copias (data_fr/backups), con la versión en el nombre
+    (antes_de_migrar_v1_AAAAMMDD_HHMMSS.db). Ojo: database_esquema.py ya corrió,
+    así que puede traer las tablas nuevas que se crean sin paso, vacías (un
+    programa viejo las ignora). Los pasos corren sobre la base real
     del kiosko, con la plata adentro: si un paso tiene un error de lógica (copia
     mal una columna) el rollback no lo ve, y esta copia es la vuelta atrás.
 
@@ -194,9 +219,13 @@ def _copia_antes_de_migrar():
     hacer (disco lleno, sin permiso) queda anotado en data_fr/errores.log y se
     sigue, en vez de dejar el kiosko sin poder abrir el programa. Devuelve la ruta
     de la copia, o None si no se pudo.
+
+    Si un paso falla, cada arranque vuelve a copiar la base entera (y estas
+    copias no se borran solas): si se reintenta muchas veces, conviene borrar a
+    mano las repetidas de la misma versión.
     """
     carpeta = database.carpeta_de_copias()
-    nombre = f"{PREFIJO_COPIA_ANTES_DE_MIGRAR}{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    nombre = f"{PREFIJO_COPIA_ANTES_DE_MIGRAR}v{int(version)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     destino = os.path.join(carpeta, f"{nombre}.db")
     otra = 2
     while os.path.exists(destino):

@@ -209,6 +209,7 @@ class TestConPasosDeMentira(_ConCarpetaTemporal):
 
         copias = self._copias_antes_de_migrar()
         self.assertEqual(len(copias), 1)
+        self.assertTrue(copias[0].startswith("antes_de_migrar_v1_"), copias[0])  # dice de qué versión es
         ruta = os.path.join(copias_repo.carpeta_local(), copias[0])
         # Es la base de ANTES del paso: versión 1, sin la columna nueva y con sus datos.
         self.assertEqual(self._version(ruta), 1)
@@ -334,6 +335,48 @@ class TestConPasosDeMentira(_ConCarpetaTemporal):
         # No se anota y no sigue con el 3: el próximo arranque lo vuelve a correr.
         self.assertEqual(self._version(), 1)
         self.assertEqual(self.corridas, [])
+
+    def test_un_paso_con_executescript_que_falla_lo_avisa(self):
+        # executescript hace COMMIT antes de correr (trampa d): la tabla queda
+        # grabada aunque el INSERT de después falle, y el rollback ya no la saca.
+        def paso_con_executescript(conexion):
+            conexion.executescript(
+                "CREATE TABLE avisos (id INTEGER PRIMARY KEY); INSERT INTO no_existe VALUES (1);"
+            )
+
+        self._usar_pasos({2: paso_con_executescript})
+        with self.assertRaisesRegex(RuntimeError, "hizo commit por su cuenta y después falló"):
+            database.inicializar_base_de_datos()
+        self.assertEqual(self._version(), 1)
+
+    def test_subir_la_version_sin_su_paso_no_la_anota(self):
+        # Una base en uso no puede quedar marcada como nueva sin los cambios.
+        for parche in (mock.patch.object(migraciones, "VERSION_ESQUEMA", 2),
+                       mock.patch.dict(migraciones.PASOS, {}, clear=True)):
+            parche.start()
+            self.addCleanup(parche.stop)
+        with self.assertRaisesRegex(RuntimeError, "le falta un paso"):
+            database.inicializar_base_de_datos()
+        self.assertEqual(self._version(), 1)
+
+    def test_un_paso_que_falla_deja_la_conexion_como_estaba(self):
+        # Llamando a migrar_base directo (sin el rollback de inicializar_base_de_datos):
+        # ni una transacción abierta ni las claves foráneas apagadas.
+        def paso_que_se_corta(conexion):
+            conexion.execute("CREATE TABLE a_medias (id INTEGER PRIMARY KEY)")
+            raise RuntimeError("se cortó la luz")
+
+        self._usar_pasos({2: paso_que_se_corta})
+        conexion = database.get_connection()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "se cortó la luz"):
+                migraciones.migrar_base(conexion)
+            self.assertFalse(conexion.in_transaction)
+            self.assertEqual(conexion.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+        finally:
+            conexion.close()
+        self.assertEqual(self._version(), 1)
+        self.assertNotIn("a_medias", self._tablas())
 
     def test_si_la_copia_no_se_puede_hacer_se_sigue_y_queda_en_el_log(self):
         def copia_que_se_queda_sin_lugar(destino):

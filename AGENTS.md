@@ -14,7 +14,9 @@ Reglas esenciales:
 - La UI no escribe SQL ni abre conexiones. Los repositorios contienen las
   reglas de negocio; `database.py` administra conexiones, claves y copias;
   `database_esquema.py` (+ `_cajas` y `_envios`) crea tablas e índices, y
-  `database_migraciones.py` lleva la versión del esquema.
+  `database_migraciones.py` lleva la versión del esquema y los pasos que llevan
+  una base vieja a la nueva (`PASOS`; cómo se agrega uno, en la regla 6 de
+  CLAUDE.md).
 - Los estados, métodos de pago, turnos y orígenes viven en dominio.py.
 - Cada operación que mueve plata o stock se guarda en una transacción.
 - No toques data_fr/ ni la base real para desarrollar o probar. Los tests usan

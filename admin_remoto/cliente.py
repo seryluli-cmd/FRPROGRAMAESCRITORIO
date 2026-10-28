@@ -116,7 +116,11 @@ class ConexionConElMostrador:
 
     # --- el ida y vuelta ---------------------------------------------------
 
-    def _pedir(self, ruta: str, cuerpo: dict, espera: float) -> dict:
+    def _pedir(self, ruta: str, cuerpo: dict, espera: float, puede_haber_grabado: bool = True) -> dict:
+        """`puede_haber_grabado`: False en lo que nunca graba nada del negocio
+        (el saludo y el ingreso). Ahí una respuesta cortada no deja nada que
+        revisar, y avisar "puede haberlo guardado" confundiría a quien solo estaba
+        abriendo el programa."""
         datos = json.dumps(cuerpo).encode("utf-8")
         pedido = urllib.request.Request(
             self._base + ruta, data=datos, method="POST", headers={"Content-Type": "application/json"},
@@ -127,6 +131,9 @@ class ConexionConElMostrador:
         # sale mal DESPUÉS, esperando o leyendo la respuesta, llega suelto
         # (TimeoutError, la conexión cortada, una respuesta a medias). En ese
         # caso el pedido ya estaba allá y el mostrador pudo haberlo grabado.
+        # Una sola excepción: http.client.InvalidURL (el nombre del mostrador con un
+        # espacio, en un acceso directo con --mostrador "PC MOSTRADOR") sale ANTES
+        # de mandar nada, pero urllib no la envuelve porque no es un OSError.
         try:
             contenido = _mandar(pedido, espera)
         except urllib.error.URLError as error:
@@ -134,7 +141,17 @@ class ConexionConElMostrador:
                 f"No encuentro el FRKiosko del mostrador ({self.mostrador}). Fijate que esa PC esté "
                 "prendida, con el programa abierto, y que esta PC tenga red."
             ) from error
+        except http.client.InvalidURL as error:
+            raise SinConexion(
+                f"\"{self.mostrador}\" no sirve como nombre del mostrador (no puede tener espacios). "
+                "Usá la IP de esa PC, por ejemplo --mostrador 192.168.0.10."
+            ) from error
         except (OSError, http.client.HTTPException) as error:
+            if not puede_haber_grabado:
+                raise SinConexion(
+                    f"El FRKiosko del mostrador ({self.mostrador}) no contestó a tiempo. "
+                    "Probá de nuevo en un momento."
+                ) from error
             raise SinRespuesta(
                 f"Se cortó la comunicación con el FRKiosko del mostrador ({self.mostrador}) mientras "
                 "esperaba su respuesta (se cayó la red o tardó demasiado).\n\n"
@@ -154,13 +171,14 @@ class ConexionConElMostrador:
 
     def hola(self) -> dict:
         """{"activo", "misma_version"} del mostrador (SinConexion si no está)."""
-        return self._pedir("hola", {"huella": self._huella}, ESPERA_HOLA_SEGUNDOS)
+        return self._pedir("hola", {"huella": self._huella}, ESPERA_HOLA_SEGUNDOS, puede_haber_grabado=False)
 
     def nombres_para_entrar(self) -> list:
         """Los Administradores del mostrador, para la lista de la pantalla de
         ingreso."""
         try:
-            return self._pedir("usuarios", {"huella": self._huella}, ESPERA_HOLA_SEGUNDOS)["nombres"]
+            return self._pedir("usuarios", {"huella": self._huella}, ESPERA_HOLA_SEGUNDOS,
+                               puede_haber_grabado=False)["nombres"]
         except _ErrorDelMostrador as error:
             raise PermissionError(error.mensaje) from None
 
@@ -171,6 +189,7 @@ class ConexionConElMostrador:
         try:
             respuesta = self._pedir(
                 "entrar", {"huella": self._huella, "nombre": nombre, "clave": clave}, ESPERA_HOLA_SEGUNDOS,
+                puede_haber_grabado=False,
             )
         except _ErrorDelMostrador as error:
             if error.tipo == "Clave":
@@ -186,7 +205,7 @@ class ConexionConElMostrador:
         if token is None:
             return
         try:
-            self._pedir("salir", {"token": token}, ESPERA_HOLA_SEGUNDOS)
+            self._pedir("salir", {"token": token}, ESPERA_HOLA_SEGUNDOS, puede_haber_grabado=False)
         except (SinConexion, _ErrorDelMostrador):
             pass
 

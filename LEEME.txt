@@ -41,6 +41,9 @@ stock, y también usuarios nuevos y claves cambiadas: vuelve la clave vieja).
    cuándo se hizo: frkiosko_2026-10-27_140512.db (o, la del pendrive,
    frkiosko_backup_20261027_140512.db) es del 27/10 a las 14:05. Las que
    empiezan con kiosko_ (sin "fr") son de CYBERCONTROL: no sirven acá.
+   Las antes_de_migrar_v1_AAAAMMDD_HHMMSS.db son la base justo antes de
+   que un FRKiosko más nuevo la actualizara: sirven si algo salió mal
+   apenas se cambió el programa.
    Conviene la de justo después del último Cierre de Turno bueno (se hace
    sola al minuto de cada cierre): si la copia tiene una caja abierta de un
    turno que ya terminó, apenas entre alguien (también el Administrador) el
@@ -79,7 +82,8 @@ stock, y también usuarios nuevos y claves cambiadas: vuelve la clave vieja).
    tenía una caja abierta de un turno vencido, arriba aparece además un
    cierre forzoso nuevo). Si el programa aparece vacío (solo el usuario
    Administrador con clave 1234), el nombre quedó mal: cerralo y revisá el
-   paso 5. Si la copia da error al abrir, repetí los pasos 5 a 7 con una más
+   paso 5. Si dice que la base es de un FRKiosko más nuevo, abrila con el
+   FRKiosko más nuevo (con uno viejo se podría dañar). Si la copia da error al abrir, repetí los pasos 5 a 7 con una más
    vieja (el paso 4 no: lo que guardaste ahí tiene que quedar como estaba).
    Si el error dice que la base es de CYBERCONTROL, la sacaste de la carpeta
    equivocada: tiene que ser una copia de FRKiosko.
@@ -191,6 +195,11 @@ sobres, usuarios, control de stock), Configuración ADMIN y mirar la Caja.
 Lo que guardes queda guardado en el mostrador al instante.
 Vender, cobrar y cerrar el turno se hacen solo en el mostrador.
 Para que funcione, el programa del mostrador tiene que estar abierto.
+Si se corta la red justo después de guardar algo desde la otra PC, el
+aviso dice que el mostrador puede haberlo guardado igual: antes de
+repetirlo, fijate si ya está (una compra, en los Movimientos del artículo
+o en su stock; un precio, en Artículos). Si repetís una compra que ya se
+grabó, queda cargada dos veces.
 Al terminar, cerrá sesión o cerrá el programa en la otra PC: mientras
 quede abierto, la sesión sigue abierta.
 Las empleadas no pueden entrar desde otra PC. Cada vez que entrás queda

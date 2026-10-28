@@ -423,6 +423,9 @@ class TestUnaLecturaLargaNoTiraUnaVenta(BaseConBaseTemporal):
             self.assertEqual(conexion.execute("PRAGMA busy_timeout").fetchone()[0], 30000)
 
     def test_una_venta_espera_a_que_termine_la_lectura_y_se_graba(self):
+        # Muestra el mecanismo (la venta espera y se graba), pero con una lectura
+        # de 0,3 s también pasaría con la espera de fábrica de 5 s: lo que vigila
+        # que sean 30 s es la prueba de arriba (PRAGMA busy_timeout).
         from repositories import articulos_repo
         rubro = articulos_repo.listar_rubros()[0]["id"]
         articulos_repo.crear_articulo("111", "Chicle", None, rubro, 100.0, 50.0, 0)
@@ -625,6 +628,26 @@ class TestSeCortaEsperandoLaRespuesta(unittest.TestCase):
         with mock.patch.object(cliente, "ESPERA_LLAMADA_SEGUNDOS", 0.5):
             mensaje = self._cargar_una_compra()
         self.assertIn("fijate antes de repetirlo", mensaje)
+
+    def test_al_entrar_no_habla_de_algo_guardado(self):
+        # El saludo y el ingreso no graban nada del negocio: si se corta la
+        # respuesta, no hay nada que revisar antes de repetirlo.
+        for pedir in (self.conexion.hola, self.conexion.nombres_para_entrar,
+                      lambda: self.conexion.entrar("Admin", "1234")):
+            with self.subTest(pedir=pedir), self.assertRaises(cliente.SinConexion) as error:
+                pedir()
+            self.assertNotIsInstance(error.exception, cliente.SinRespuesta)
+            self.assertIn("no contestó a tiempo", str(error.exception))
+
+    def test_un_nombre_de_mostrador_con_espacios_no_dice_que_pudo_guardar(self):
+        # http.client lo rechaza antes de mandar nada (no es un corte de la red).
+        conexion = cliente.ConexionConElMostrador("PC MOSTRADOR", self.mostrador.server_address[1])
+        conexion._token = "sesion de prueba"
+        with self.assertRaises(cliente.SinConexion) as error:
+            conexion.llamar("compras_repo", "registrar_compra", (1, []), {})
+        self.assertNotIsInstance(error.exception, cliente.SinRespuesta)
+        self.assertIn("no puede tener espacios", str(error.exception))
+        self.assertEqual(self.mostrador.pedidos, [])
 
     def test_las_pantallas_lo_muestran_como_un_aviso(self):
         # Es una SinConexion (un ValueError): manejar_errores lo muestra con su

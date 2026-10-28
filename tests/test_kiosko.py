@@ -14,6 +14,9 @@ Se ejecutan con:
 """
 
 import hashlib
+import sqlite3
+import threading
+import time
 import unittest
 from datetime import date, datetime, timedelta
 from unittest import mock
@@ -587,6 +590,33 @@ class TestSiempreQuedaUnAdministrador(BaseConBaseTemporal):
         self.assertIsNone(usuarios_repo.obtener_usuario(jefa_id))
         self.assertFalse(usuarios_repo.obtener_usuario(self.admin_id)["activo"])
 
+    def test_dos_administradores_que_se_bajan_a_la_vez_no_dejan_al_kiosko_sin_ninguno(self):
+        # Uno en el mostrador y otro desde otra PC: el segundo pedido llega cuando
+        # el primero ya bajó a B pero todavía no guardó. Sin el BEGIN IMMEDIATE de
+        # usuarios_repo, los dos veían "hay otro Admin" y quedaban cero.
+        b_id = usuarios_repo.crear_usuario("Sergio", "1234", dominio.ROL_ADMIN)
+        primero = sqlite3.connect(database.DB_PATH, isolation_level=None)
+        resultado = {}
+
+        def segundo_pedido():
+            try:
+                usuarios_repo.modificar_usuario(self.admin_id, "Administrador", dominio.ROL_EMPLEADA)
+            except ValueError as error:
+                resultado["error"] = error
+
+        try:
+            primero.execute("BEGIN IMMEDIATE")
+            primero.execute("UPDATE usuarios SET rol = ? WHERE id = ?", (dominio.ROL_EMPLEADA, b_id))
+            hilo = threading.Thread(target=segundo_pedido)
+            hilo.start()
+            time.sleep(0.5)  # el segundo queda esperando el permiso de escritura
+            primero.execute("COMMIT")
+            hilo.join(10)
+        finally:
+            primero.close()
+        self.assertIn("error", resultado)
+        self.assertEqual(self._rol(self.admin_id), dominio.ROL_ADMIN)
+
     def test_las_empleadas_se_dan_de_baja_igual_que_siempre(self):
         lucia_id = usuarios_repo.crear_usuario("Lucia", "1234", dominio.ROL_EMPLEADA)
         rocio_id = usuarios_repo.crear_usuario("Rocío", "1234", dominio.ROL_EMPLEADA)
@@ -689,6 +719,13 @@ class TestLosPagosSumanElTotal(BaseConBaseTemporal):
         with self.assertRaises(ValueError):
             self._vender([{"metodo": dominio.PAGO_EFECTIVO, "monto": 3000.0},
                           {"metodo": dominio.PAGO_DIGITAL, "monto": 500.0}])
+        self._no_se_grabo_nada()
+
+    def test_un_pago_negativo_que_compensa_a_otro_tampoco(self):
+        # Suma justo $ 3.000, pero la Caja esperaría $ 5.000 en el cajón.
+        with self.assertRaisesRegex(ValueError, "no puede ser negativo"):
+            self._vender([{"metodo": dominio.PAGO_EFECTIVO, "monto": 5000.0},
+                          {"metodo": dominio.PAGO_DIGITAL, "monto": -2000.0}])
         self._no_se_grabo_nada()
 
     def test_el_pago_justo_repartido_en_los_dos_medios_se_graba(self):
