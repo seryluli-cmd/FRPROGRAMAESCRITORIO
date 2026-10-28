@@ -48,9 +48,9 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 |---|---|
 | [main.py](main.py) | Entry point. Clase `Aplicacion` alterna `LoginWindow` ↔ `MainWindow` (para poder cambiar de operador sin cerrar el programa). `aplicar_estilo(app)` pone la hoja de estilos Qt global ([ui/hoja_de_estilos.py](ui/hoja_de_estilos.py): botones `primario`/`peligro`/`barra` vía `setProperty("clase", ...)`) y fija el esquema de color CLARO. Instancia única por PC (un socket en el puerto 8908 como candado). `sys.excepthook` propio: cualquier excepción no capturada se loguea en `data_fr/errores.log` y muestra un cartel. Arranca las copias automáticas, el hilo de envíos a la app de gastos y el servidor de administración remota. |
 | [database.py](database.py) · [database_esquema.py](database_esquema.py) · [database_esquema_cajas.py](database_esquema_cajas.py) · [database_esquema_envios.py](database_esquema_envios.py) · [database_migraciones.py](database_migraciones.py) | Conexiones, claves y copias; creación de tablas e índices (las de las cajas con número y la cola de envíos, en su propio archivo); la versión del esquema (`VERSION_ESQUEMA`, hoy 1) con los pasos que llevan una base vieja a la nueva (`PASOS`, hoy ninguno; antes del primero queda una copia `antes_de_migrar_...` en data_fr/backups) y el cerrojo que no deja abrir una base de CYBERCONTROL ni una de un FRKiosko más nuevo (`comprobar_base_kiosko`). `get_connection` espera hasta 30 s si la base está ocupada. Ver modelo de datos abajo. |
-| [turnos.py](turnos.py) · [dominio.py](dominio.py) | Calendario del local y constantes/reglas puras de negocio (roles, estados de venta, métodos de pago, turnos, el origen KIOSKO, la cuenta del cobro, el formato de pesos). |
+| [turnos.py](turnos.py) · [dominio.py](dominio.py) | Calendario del local y constantes/reglas puras de negocio (roles, estados de venta, métodos de pago, turnos, el origen KIOSKO, la cuenta del cobro, el formato de pesos, el margen de Artículos, el stock bajo el mínimo y la suma de la fila TOTAL de Reportes). |
 | [repositories/](repositories/) | Capa de datos, un archivo por tema: artículos, compras, configuración, impresiones, reportes, el detalle del día, turnos (con turnos faltantes y lo vendido en la ventana de un turno, `turnos_ventas_repo.py`), cajas con número (`cajas_repo.py` los datos, `relevo_repo.py` las reglas al entrar y el cierre forzoso, `control_cierres_repo.py` lo que se controla después), copias de seguridad, envíos a la app de gastos, la vuelta sola del Admin, administración remota, usuarios y ventas. |
-| [ui/](ui/) | Una ventana/diálogo por pantalla — ver detalle abajo. `ui/hoja_de_estilos.py` es la hoja de estilos de todo el programa. `ui/utils.py` tiene los helpers compartidos (formato de pesos, decorador de manejo de errores, encadenar Enter entre campos). Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno usan el diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26: las piezas están en `ui/piezas_ventana.py` y los colores en `ui/hoja_de_estilos.py`, siempre por objectName o "clase". |
+| [ui/](ui/) | Una ventana/diálogo por pantalla — ver detalle abajo. `ui/hoja_de_estilos.py` es la hoja de estilos de todo el programa. `ui/utils.py` tiene los helpers compartidos (formato de pesos, decorador de manejo de errores, encadenar Enter entre campos). `ui/en_segundo_plano.py` corre en un hilo aparte lo que espera la red (la app de gastos, una carpeta de otra PC), para que la pantalla no se trabe. Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno usan el diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26: las piezas están en `ui/piezas_ventana.py` y los colores en `ui/hoja_de_estilos.py`, siempre por objectName o "clase". |
 | [admin_remoto/](admin_remoto/) · [repositories/admin_remoto_repo.py](repositories/admin_remoto_repo.py) · [ui/admin_remoto_dialogo.py](ui/admin_remoto_dialogo.py) | Administrar desde otra PC del local (ver la sección propia más abajo). |
 | [servidor_red.py](servidor_red.py) · [errores.py](errores.py) | El servidor HTTP del mostrador (puerto 8909, distinto del 8899 de CYBERCONTROL para que los dos programas convivan en una PC): solo atiende `POST /admin/...` de la administración remota; y el registro de fallos compartido con la UI. |
 | [tests/](tests/) | Tests de repositorios, servidor y UI sobre bases SQLite temporales (no tocan `data_fr/kiosko.db`). |
@@ -116,7 +116,9 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 - **`configuracion`** — tabla genérica clave/valor: el fondo de cambio, el
   indicador de rubros iniciales, si está prendida la entrada desde otra PC, si
   está prendido el envío a la app de gastos y su sesión, las otras carpetas de
-  copias. Las claves exactas están en los repositorios que las usan.
+  copias. Las claves exactas están en los repositorios que las usan (la del
+  fondo de cambio, `database.CLAVE_FONDO_CAMBIO`), y todos la leen y graban con
+  `config_repo.leer` / `config_repo.guardar`.
 - **`calcular_turno(fecha_hora)`** (`turnos.py`) — Mañana 06-14, Tarde
   14-22, Noche 22-06 (cruza medianoche). ⚠️ **Los domingos son distintos**: 2
   turnos de 12 hs (Mañana 06-18 y Noche 18-06 del lunes), que se muestran como
@@ -151,7 +153,11 @@ llama a las suyas `kiosko_...` con la misma regla de borrado, y con el mismo
 nombre dos programas en una misma carpeta se borraban las copias entre sí.
 Quedan todas las de los últimos 3 días con copias y una por día hasta 30. Pantalla: Usuarios → "Copias de Seguridad"
 (`ui/copias_dialogo.py`), con "Hacer copia de seguridad ahora" y una copia
-suelta a un pendrive (`database.copiar_backup_a`).
+suelta a un pendrive (`database.copiar_backup_a`). Esos dos botones y "Agregar"
+otra carpeta corren en un hilo aparte (`ui/en_segundo_plano.py`): con una PC de
+la red apagada la pantalla no se traba. Mientras prueba una carpeta nueva, la
+ventana "Agregar carpeta" no se cierra hasta que la carpeta contesta: así no se
+pisa la lista de carpetas.
 
 ## Pantallas (`ui/`)
 
@@ -200,7 +206,8 @@ ingreso (el Admin se queda). Si hay un cobro a medias, espera.
 - **Caja** (`caja_window.py`, `CajaWindow`) — solo lectura, resumen del turno
   en curso vía `turnos_repo.resumen_turno_actual()`: número de caja y
   responsable, caja inicial (el cambio con que arrancó), caja actual (solo el
-  efectivo cobrado), ventas efectivo/digital y la tabla de dónde vino la plata
+  efectivo cobrado: `resumen["monto_a_retirar"]`, lo mismo que A RETIRAR),
+  ventas efectivo/digital y la tabla de dónde vino la plata
   (Kiosko e Impresiones, cada uno con su efectivo y digital; `TablaDeNegocios`
   de `ui/tarjeta_cierre.py`).
 - **Cierre de Turno** (`caja_window.py`, `CierreTurnoWindow`) — cualquiera
@@ -208,10 +215,12 @@ ingreso (el Admin se queda). Si hay un cobro a medias, espera.
   `TarjetaCierreDeTurno`: cabecera con la caja y el turno, A RETIRAR EN EFECTIVO
   en verde y el TOTAL en azul, la tabla de negocios y el Cambio Fijo abajo) y,
   al confirmar, llama a `turnos_repo.cerrar_turno(usuario['id'])`:
-  `monto_a_retirar` = lo vendido en efectivo (el cambio con que arrancó la caja
-  queda en el cajón). Si quien cierra no es la responsable de la caja, queda
-  anotado como cerrada en su ausencia. **Kiosko e Impresiones van en renglones
-  separados** (`resumen["kiosko_solo_*"]` e `["impresiones_*"]`); los dos suman
+  `monto_a_retirar` = lo vendido en efectivo (`dominio.monto_a_retirar`; el
+  cambio con que arrancó la caja queda en el cajón), el mismo que muestran la
+  tarjeta y Caja antes de cerrar (`resumen_turno_actual()["monto_a_retirar"]`).
+  Si quien cierra no es la responsable de la caja (por número de usuario,
+  `cajas_repo.cerrada_en_ausencia`), queda anotado como cerrada en su ausencia.
+  **Kiosko e Impresiones van en renglones separados** (`resumen["kiosko_solo_*"]` e `["impresiones_*"]`); los dos suman
   lo que se graba como Kiosko (`kiosko_efectivo`/`kiosko_digital`). Con el envío
   a la app de gastos prendido, antes del aviso "Turno cerrado" se ve la barra
   "ENVIANDO CIERRE DE TURNO" (`ui/envio_pwa_progreso.py`).
@@ -225,9 +234,12 @@ individual a una empleada; Control de Stock y Usuarios son exclusivos del Admin.
 Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué.
 - **Artículos** (`articulos_window.py`, `ArticulosWindow`) — grilla con
   búsqueda en vivo (`ui/articulos_tabla.py`, compartida con ORDENAR Stock),
-  resalta en rojo filas con `stock < stock_minimo`. `DialogoArticulo` para
+  pinta en rojo el stock de los artículos que quedaron por debajo del mínimo
+  (`dominio.bajo_el_minimo`: `stock < stock_minimo`). `DialogoArticulo` para
   alta/edición (código no editable una vez creado; marca se tipea y se crea al
-  vuelo; **rubro es un combo cerrado**; el stock es solo lectura). Botones
+  vuelo; **rubro es un combo cerrado**; el stock es solo lectura); su
+  calculadora de margen usa `dominio.precio_con_margen` y
+  `dominio.costo_sin_margen`. Botones
   **Gestionar Rubros** (`DialogoGestionRubros`) y, solo para el Admin,
   **Gestionar Marcas** (`DialogoGestionMarcas`: renombrar, juntar, borrar).
   `DialogoMovimientos` muestra el historial de un artículo
@@ -265,7 +277,9 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   Imprimir, venta por venta y por producto con el rubro que tiene HOY cada
   artículo, y por operador), **Por Turno**,
   **Totales** (`reportes_repo.resumen_por_origen`: Kiosko / Impresiones / Total
-  por turno, día, semana o rango; las impresiones NO están sumadas en Kiosko),
+  por turno, día, semana o rango, con una fila TOTAL al pie cuando hay más de un
+  período, que suma `dominio.suma_de_las_filas`; las impresiones NO están
+  sumadas en Kiosko),
   **Ranking de Ventas** (`reportes_repo.ranking_ventas`, por cantidad o monto) y
   **Por Operador** (`ui/reportes_operador.py`: cuánto vendió cada usuario y sus
   ventas con fecha y hora). El día del local va de 06:00 a 06:00 en todas.
@@ -273,7 +287,8 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   `ControlCierresWindow`; se reexporta desde `caja_window.py`) — lista
   `turnos_repo.listar_cierres()`: Turno, Caja, Responsable, Apertura, Cierre ("A
   horario", "Forzoso" o "en ausencia", en rojo), Cambio Fijo, Ventas Ef., Kiosko,
-  A Retirar, Contado, Diferencia. "Cargar monto contado" (solo Admin) guarda
+  A Retirar, Contado, Diferencia (en rojo si no coincide, desde $ 0,01:
+  `dominio.coincide`). "Cargar monto contado" (solo Admin) guarda
   cada conteo en `verificaciones_cierre`. "Ver Detalle" muestra cada cierre con
   la misma tarjeta del Cierre de Turno (también el forzoso), cómo se cerró, la
   caja, los relevos, los conteos del sobre y las ventas. "Mandar a la app de
@@ -357,7 +372,9 @@ negocio `gestionfr`), no a la de CyberBIOS. Las constantes están arriba de
   (`frkiosko-<id>-<fecha>`): un reintento lo pisa, no lo duplica.
 - **A mano:** Control de Cierres > "Mandar a la app de gastos" (solo Admin).
 - **Pantalla:** Configuración ADMIN > "Cierres a la app de gastos": prender o
-  apagar, los últimos envíos, "Probar la conexión" y "Reintentar ahora".
+  apagar, los últimos envíos, "Probar la conexión" y "Reintentar ahora". Estos
+  dos salen a internet desde un hilo aparte (`ui/en_segundo_plano.py`): la
+  ventana no se traba y se puede cerrar mientras esperan.
 - Tests: `tests/test_envio_pwa.py`, con una app de mentira que hace de Google.
 
 ## El Administrador vuelve solo a la empleada (`ui/vuelta_del_admin.py`)
@@ -402,7 +419,11 @@ muestra tal cual (es un rechazo de negocio con su mensaje); cualquier otra
 excepción se loguea completa en `data_fr/errores.log` vía
 `errores.registrar_error()` y se muestra un cartel genérico. `main.py` instala
 además un `sys.excepthook` global. El servidor de red usa el mismo registro sin
-importar Qt ni guardar claves.
+importar Qt ni guardar claves. Lo que una pantalla corre en un hilo aparte
+(`ui/en_segundo_plano.py`) le devuelve el error a la pantalla, y sale por el
+mismo `@manejar_errores`. Si la ventana ya se cerró, un error inesperado igual
+queda en `data_fr/errores.log` (los rechazos del repo, ValueError y
+PermissionError, no).
 
 ## Cómo probarlo en local
 
@@ -443,17 +464,23 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-611 tests al 2026-10-28. Cubren turnos, caja y cajas con número
+701 tests al 2026-10-28. Cubren turnos, caja y cajas con número
 (`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
-ORDENAR Stock, marcas, ventas y anulaciones, el cobro con Enter, impresiones,
-reportes, administrar desde otra PC (`tests/test_admin_remoto.py`, con un
-mostrador de prueba en otro proceso: `tests/mostrador_de_prueba.py`), las copias
-de seguridad, las migraciones de la base (`tests/test_migraciones.py`, con pasos
-de mentira), los cierres que se mandan a la app de gastos
-(`tests/test_envio_pwa.py`, con una app de mentira en vez de Google), la vuelta
-sola del Admin, que siempre quede un Administrador activo, la base de prueba
-(`tests/test_base_de_prueba.py`), el formato de pesos y el aspecto de las
-pantallas (Qt "offscreen").
+ORDENAR Stock, marcas, rubros (`tests/test_rubros.py`), ventas y anulaciones, el
+cobro con Enter, impresiones, reportes, administrar desde otra PC
+(`tests/test_admin_remoto.py`, con un mostrador de prueba en otro proceso:
+`tests/mostrador_de_prueba.py`), las copias de seguridad (también la que se
+guarda a mano en un pendrive), las migraciones de la base
+(`tests/test_migraciones.py`, con pasos de mentira), los cierres que se mandan a
+la app de gastos (`tests/test_envio_pwa.py`, con una app de mentira en vez de
+Google), la vuelta sola del Admin, que siempre quede un Administrador activo, las
+reglas de plata de la caja y del sobre (`tests/test_reglas_de_la_caja.py`), las
+cuentas que salieron de las pantallas (margen, stock bajo el mínimo y la fila
+TOTAL de Reportes, `tests/test_cuentas_de_articulos_y_reportes.py`), la tabla de
+configuración y lo cobrado por medio en cada venta (`tests/test_config_repo.py`),
+la base de prueba (`tests/test_base_de_prueba.py`), el formato de pesos, el
+aspecto de las pantallas (Qt "offscreen") y que los botones que esperan la red no
+congelen el mostrador (`tests/test_en_segundo_plano.py`).
 
 ## Empaquetado (.exe)
 

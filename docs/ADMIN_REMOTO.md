@@ -156,8 +156,8 @@ abre la base de esa carpeta: le habla al programa del mostrador.
   es `SinConexion` a secas; si falla después, esperando o leyendo la respuesta
   (`TimeoutError`, conexión cortada, `http.client.HTTPException`), es
   `SinRespuesta` (una `SinConexion`), con el aviso de que pudo haberse grabado.
-- `admin_remoto/servidor.py` (lo llama `servidor_red.do_POST` para `/admin/`;
-  es lo único que atiende el servidor de red de este programa): token
+- `admin_remoto/servidor.py` (lo llama `servidor_red._ManejadorAdminRemoto.do_POST`
+  para `/admin/`; es lo único que atiende el servidor de red de este programa): token
   `secrets.token_urlsafe(32)` en memoria, atado a la IP del socket, vence a los
   180 min sin uso; bloqueo por IP tras 5 claves mal (5 min), una prueba de clave
   a la vez por IP, un bloqueo nunca se acorta, y tope global de 20 claves mal en
