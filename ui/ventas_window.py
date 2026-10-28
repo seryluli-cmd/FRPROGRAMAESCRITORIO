@@ -246,7 +246,7 @@ class VentasWindow(QDialog):
     def _verificar_stock_minimo(self, articulo, codigo):
         cantidad_en_carrito = sum(l["cantidad"] for l in self.carrito if l["codigo"] == codigo)
         stock_proyectado = articulo["stock"] - cantidad_en_carrito
-        if stock_proyectado < articulo["stock_minimo"]:
+        if dominio.bajo_el_minimo(stock_proyectado, articulo["stock_minimo"]):
             self._avisar_stock(f"{articulo['descripcion']} debajo de Stock Mín. Actualmente hay {stock_proyectado}")
         else:
             self._avisar_stock("")

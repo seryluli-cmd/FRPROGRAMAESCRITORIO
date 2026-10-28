@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
+import dominio
 from repositories import reportes_repo
 # Resumen del Día vive en su propio archivo; se importa también desde acá
 # (ui.reportes_window.PestañaResumenDelDia), como antes de partirlo.
@@ -173,8 +174,9 @@ class PestañaPorTurno(QWidget):
             self.tabla.setItem(fila, 4, QTableWidgetItem(formato_pesos(fila_datos["digital"])))
 
 
-# Las columnas de plata de la pestaña "Totales", en el orden en que se ven: son
-# las claves de cada fila de reportes_repo.resumen_por_origen.
+# Las columnas de plata de la pestaña "Totales", en el orden en que se ven (y las
+# que suma la fila TOTAL): son las claves de cada fila de
+# reportes_repo.resumen_por_origen.
 _COLUMNAS_DE_TOTALES = ("kiosko", "impresiones", "total")
 
 
@@ -248,10 +250,7 @@ class PestañaTotales(QWidget):
         # Fila TOTAL al pie cuando hay más de un período listado -- con
         # "Total del rango" ya sobraría, es la única fila que hay.
         if agrupar_por != "rango" and len(filas) > 1:
-            sumas = {
-                clave: sum(fila[clave] for fila in filas)
-                for clave in _COLUMNAS_DE_TOTALES
-            }
+            sumas = dominio.suma_de_las_filas(filas, _COLUMNAS_DE_TOTALES)
             self._agregar_fila({"etiqueta": "TOTAL", **sumas}, negrita=True)
 
 

@@ -104,3 +104,35 @@ def texto_pesos(monto) -> str:
     else:
         texto = f"{monto:,.2f}"
     return "$ " + texto.replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+
+
+# ---------------------------------------------------------------------
+# Cuentas de Artículos, Ventas y Reportes
+# ---------------------------------------------------------------------
+# Acá y no en un repo: Artículos, ORDENAR Stock y Reportes se abren también
+# desde otra PC, y una función de un repo que usen tendría que entrar en la
+# lista blanca (admin_remoto/lista_blanca.py), cambiando la huella.
+
+def precio_con_margen(costo: float, porcentaje: float) -> float:
+    """Precio de venta con `porcentaje` de margen sobre el costo. Va como
+    costo * (1 + %/100): costo + costo * %/100 da a veces otro centavo."""
+    return round(costo * (1 + porcentaje / 100), 2)
+
+
+def costo_sin_margen(precio_venta: float, porcentaje: float) -> float:
+    """La vuelta de precio_con_margen (estimar el costo si se perdió la
+    factura). La pantalla deja el % entre 0 y 500: nunca divide por cero."""
+    return round(precio_venta / (1 + porcentaje / 100), 2)
+
+
+def bajo_el_minimo(stock: int, stock_minimo: int) -> bool:
+    """Stock en rojo o aviso en Ventas. Justo en el mínimo no avisa; el stock
+    negativo (puede quedar a propósito) sí."""
+    return stock < stock_minimo
+
+
+def suma_de_las_filas(filas, claves) -> dict:
+    """La fila TOTAL de un reporte: suma las filas tal como se ven (ya
+    redondeadas), en su orden y sin redondear de nuevo. Otro SUM en la base
+    podría no dar lo mismo que lo de arriba: Kiosko sale por resta en cada fila."""
+    return {clave: sum(fila[clave] for fila in filas) for clave in claves}
