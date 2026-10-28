@@ -12,6 +12,7 @@ Se ejecutan con:
     python -m unittest discover tests
 """
 
+import sqlite3
 import unittest
 from datetime import date, datetime
 from unittest import mock
@@ -19,7 +20,7 @@ from unittest import mock
 import dominio
 from database import conexion_db
 from repositories import (
-    articulos_repo, compras_repo, relevo_repo, turnos_repo, usuarios_repo,
+    articulos_repo, compras_repo, relevo_repo, turnos_repo, turnos_ventas_repo, usuarios_repo,
     ventas_repo,
 )
 from base import BaseConBaseTemporal
@@ -458,6 +459,64 @@ class TestUnCierreHechoSeVeComoAlCerrarlo(_BaseDeCajas):
 
         self.assertIsNone(resumen["caja_numero"])
         self.assertEqual((resumen["cambio_inicial"], resumen["ventas_efectivo"]), (50000.0, 1500.0))
+
+
+class TestCadaOrigenSumaEnLaCaja(_BaseDeCajas):
+    """
+    Red de seguridad de la trampa "Sumar un origen de venta nuevo toca la caja"
+    (CLAUDE.md): un origen que se agregue a dominio.ORIGENES_VENTA y no a la
+    caja haría "faltar" su plata en cada cierre, sin ningún error a la vista.
+    Hoy hay un solo origen (KIOSKO), pero estas pruebas recorren TODOS los de
+    dominio: el día que se sume uno, fallan hasta que la caja lo cuente.
+    """
+
+    def _vender_una_de_cada_origen(self):
+        # Con las piezas de ventas_repo que reciben el origen (confirmar_venta
+        # graba siempre KIOSKO): así cuenta también un origen nuevo que todavía
+        # no tenga pantalla para venderlo.
+        with conexion_db() as conexion:
+            for origen in dominio.ORIGENES_VENTA:
+                venta_id = ventas_repo._insertar_cabecera_venta(conexion, _a_las(9), self.admin_id, 150.0, origen)
+                ventas_repo._insertar_pagos(conexion, venta_id, [
+                    {"metodo": dominio.PAGO_EFECTIVO, "monto": 100.0},
+                    {"metodo": dominio.PAGO_DIGITAL, "monto": 50.0},
+                ])
+
+    def test_cada_origen_tiene_su_lugar_en_el_desglose_de_la_caja(self):
+        self.assertEqual(set(turnos_ventas_repo._PREFIJO_COLUMNAS_POR_ORIGEN), set(dominio.ORIGENES_VENTA))
+
+    def test_cada_importe_del_desglose_tiene_su_columna_en_el_cierre(self):
+        with conexion_db() as conexion:
+            columnas = {fila["name"] for fila in conexion.execute("PRAGMA table_info(cierres_turno)")}
+        self.assertEqual(set(turnos_repo._CAMPOS_PLATA) - columnas, set())
+
+    def test_la_plata_de_cada_origen_entra_en_el_cajon_y_en_el_cierre_grabado(self):
+        self._vender_una_de_cada_origen()
+        cantidad = len(dominio.ORIGENES_VENTA)
+
+        resumen = turnos_repo.resumen_turno_actual()
+        self.assertEqual((resumen["ventas_efectivo"], resumen["ventas_digital"]), (100.0 * cantidad, 50.0 * cantidad))
+        self.assertEqual(resumen["caja_actual"], resumen["cambio_inicial"] + 100.0 * cantidad)
+
+        cierre_id = turnos_repo.cerrar_turno(self.admin_id)["id"]
+        with conexion_db() as conexion:
+            grabado = conexion.execute("SELECT * FROM cierres_turno WHERE id = ?", (cierre_id,)).fetchone()
+        self.assertEqual((grabado["ventas_efectivo"], grabado["monto_a_retirar"]), (100.0 * cantidad, 100.0 * cantidad))
+        # Cada origen en sus propias columnas: si faltara uno, la suma no llega.
+        self.assertEqual(sum(grabado[campo] for campo in turnos_repo._CAMPOS_PLATA), 150.0 * cantidad)
+        for origen in dominio.ORIGENES_VENTA:
+            prefijo = turnos_ventas_repo._PREFIJO_COLUMNAS_POR_ORIGEN.get(origen)
+            self.assertIsNotNone(prefijo, msg=f"{origen} no tiene columnas en la caja")
+            self.assertEqual((resumen[f"{prefijo}_efectivo"], resumen[f"{prefijo}_digital"]), (100.0, 50.0), msg=origen)
+            self.assertEqual((grabado[f"{prefijo}_efectivo"], grabado[f"{prefijo}_digital"]), (100.0, 50.0), msg=origen)
+
+    def test_el_esquema_de_ventas_admite_cada_origen_y_rechaza_uno_inventado(self):
+        # ventas.origen tiene un CHECK armado con dominio.ORIGENES_VENTA (ver regla 5).
+        with conexion_db() as conexion:
+            for origen in dominio.ORIGENES_VENTA:
+                ventas_repo._insertar_cabecera_venta(conexion, _a_las(9), self.admin_id, 10.0, origen)
+            with self.assertRaises(sqlite3.IntegrityError):
+                ventas_repo._insertar_cabecera_venta(conexion, _a_las(9), self.admin_id, 10.0, "INVENTADO")
 
 
 if __name__ == "__main__":
