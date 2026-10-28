@@ -274,17 +274,18 @@ class DialogoArticulo(QDialog):
         self.spin_precio_compra.setValue(articulo["precio_compra"])
         self.spin_stock_minimo.setValue(articulo["stock_minimo"])
         self.etiqueta_stock.setText(str(articulo["stock"]))
-        self.etiqueta_stock.setStyleSheet("color: red;" if articulo["stock"] < articulo["stock_minimo"] else "")
+        bajo = dominio.bajo_el_minimo(articulo["stock"], articulo["stock_minimo"])
+        self.etiqueta_stock.setStyleSheet("color: red;" if bajo else "")
 
     def _calcular_venta_desde_costo(self):
         costo = self.spin_precio_compra.value()
         porcentaje = self.spin_pct_desde_costo.value()
-        self.spin_precio_venta.setValue(round(costo * (1 + porcentaje / 100), 2))
+        self.spin_precio_venta.setValue(dominio.precio_con_margen(costo, porcentaje))
 
     def _calcular_costo_desde_venta(self):
         venta = self.spin_precio_venta.value()
         porcentaje = self.spin_pct_desde_venta.value()
-        self.spin_precio_compra.setValue(round(venta / (1 + porcentaje / 100), 2))
+        self.spin_precio_compra.setValue(dominio.costo_sin_margen(venta, porcentaje))
 
     def _resolver_marca(self):
         texto = self.combo_marca.currentText().strip()

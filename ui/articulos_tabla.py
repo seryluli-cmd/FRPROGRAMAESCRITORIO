@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QTableWidgetItem
 
+import dominio
 from ui.utils import crear_tabla, formato_pesos, mostrar_columna_entera
 
 TITULOS = ("Código", "Descripción", "Marca", "Rubro", "Precio Venta",
@@ -86,4 +87,4 @@ def poner_stock(item, stock: int, stock_minimo: int):
     usa para volver atrás si lo que se escribió no se pudo guardar."""
     item.setText(str(stock))
     item.setData(Qt.UserRole, stock)
-    item.setData(Qt.ForegroundRole, QBrush(Qt.red) if stock < stock_minimo else None)
+    item.setData(Qt.ForegroundRole, QBrush(Qt.red) if dominio.bajo_el_minimo(stock, stock_minimo) else None)
