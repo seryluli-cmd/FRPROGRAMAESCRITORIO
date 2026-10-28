@@ -1,5 +1,5 @@
 """
-Servidor HTTP del Kiosko independiente para administrar desde otra PC.
+Servidor HTTP de FRKiosko para administrar desde otra PC del local.
 
 Solo atiende POST /admin/... mediante admin_remoto.servidor. El puerto es
 distinto del de CYBERCONTROL para que los dos programas puedan convivir.
@@ -19,8 +19,9 @@ _servidor = None
 _TOPE_CUERPO_DESCARTADO = 64 * 1024
 
 
-class _ManejadorEstado(BaseHTTPRequestHandler):
-    """Recibe los pedidos de administración y delega su autorización."""
+class _ManejadorAdminRemoto(BaseHTTPRequestHandler):
+    """Recibe los pedidos de administración (POST /admin/...) y delega su
+    autorización. Un GET, o un POST a otra ruta, da 404."""
 
     def log_message(self, formato, *args):
         pass
@@ -75,7 +76,7 @@ def iniciar_servidor():
     """Arranca el acceso remoto sin impedir que el Kiosko abra si falla el puerto."""
     global _servidor
     try:
-        _servidor = ThreadingHTTPServer(("0.0.0.0", PUERTO_SERVIDOR), _ManejadorEstado)
+        _servidor = ThreadingHTTPServer(("0.0.0.0", PUERTO_SERVIDOR), _ManejadorAdminRemoto)
     except OSError as error:
         registrar_error(error, "Administración remota: abrir puerto")
         return None

@@ -14,9 +14,9 @@ Punto de entrada del programa. Al ejecutar este archivo:
    (sin tener que reabrir todo el programa).
 
 Si el programa se abrió desde la carpeta compartida del mostrador (otra PC del
-   local, ver admin_remoto/modo.py), es una copia para ADMINISTRAR desde ahí: no
-   toca ninguna base, se conecta al Kiosko
-del mostrador y le pide todo a él (pasos 2 y 3 los hace el mostrador).
+local, ver admin_remoto/modo.py), es una copia para ADMINISTRAR desde ahí: no
+toca ninguna base, se conecta al FRKiosko del mostrador y le pide todo a él
+(pasos 2 y 3 los hace el mostrador).
 
 Para arrancar el sistema, se ejecuta:  python main.py
 """
@@ -135,8 +135,6 @@ def _ya_hay_una_copia_abierta() -> bool:
     return False
 
 
-
-
 def aplicar_estilo(app):
     """
     Deja el aspecto de todo el programa en un solo lugar (lo usan main() y las
@@ -144,9 +142,9 @@ def aplicar_estilo(app):
     de color CLARO y la hoja de estilos (ui/hoja_de_estilos.py).
 
     El esquema claro se fija a propósito: Fusion toma los colores de Windows, y con
-    el modo oscuro puesto los cuadros que la hoja no pinta (el log de "Actividad
-    reciente", la numeración de las filas) salían negros y con la letra oscura de la
-    hoja encima, o sea casi ilegibles. El programa está diseñado en claro.
+    el modo oscuro puesto los cuadros que la hoja no pinta (como la numeración de las
+    filas de una tabla) salían negros y con la letra oscura de la hoja encima, o sea
+    casi ilegibles. El programa está diseñado en claro.
     """
     app.setStyle("Fusion")
     app.styleHints().setColorScheme(Qt.ColorScheme.Light)
@@ -267,7 +265,7 @@ def main():
         )
         sys.exit(0)
     aplicar_estilo(app)
-    # Ícono de la caja registradora: al ponerlo en la aplicación (y no en
+    # Ícono del carrito (assets/icono.ico): al ponerlo en la aplicación (y no en
     # cada ventana por separado), TODAS las ventanas y cuadros de diálogo
     # lo heredan automáticamente en la esquina superior izquierda, en vez
     # del ícono genérico de Qt.

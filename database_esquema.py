@@ -1,4 +1,5 @@
-"""Esquema de una instalación nueva de Kiosko, sin datos de Control de PCs."""
+"""Esquema de la base de FRKiosko: tablas e índices (las de las cajas y la cola de
+envíos, en database_esquema_cajas.py y database_esquema_envios.py)."""
 
 import dominio
 

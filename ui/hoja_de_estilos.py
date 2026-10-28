@@ -365,7 +365,8 @@ HOJA_DE_ESTILOS = """
         font-weight: 600;
     }
 
-    /* Cuadros de texto de solo lectura (el log de "Actividad reciente"). */
+    /* Cuadros de texto de varias líneas: pintados acá para que no salgan oscuros
+       con el modo oscuro de Windows (ver main.aplicar_estilo). */
     QTextEdit, QPlainTextEdit {
         background-color: #FFFFFF;
         border: 1px solid #D3D8E0;
@@ -592,8 +593,8 @@ HOJA_DE_ESTILOS = """
         color: #9AA4B5;
         font-size: 12px;
     }
-    /* La estela: celeste que se aclara hacia la derecha, como la cola del cometa del
-       mosaico (cabeza #EAF4FF, cola #4C8DFF). */
+    /* La estela: celeste que se aclara hacia la derecha (de #4C8DFF a #EAF4FF), parte
+       del diseño de cabecera que eligió el dueño. */
     QFrame#estelaCabecera {
         border: none;
         background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(76, 141, 255, 0),

@@ -65,7 +65,7 @@ class LoginWindow(QWidget):
         paleta.setColor(QPalette.Window, QColor("#EEF1F6"))
         self.setPalette(paleta)
 
-        # El ícono real del programa (la caja registradora). Si el archivo no
+        # El ícono real del programa (el carrito, assets/icono.png). Si el archivo no
         # estuviera, se cae al emoji de siempre en vez de dejar el hueco vacío.
         icono = QLabel()
         imagen = QPixmap(str(RUTA_ICONO_PNG))
