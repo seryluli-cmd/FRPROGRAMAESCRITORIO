@@ -213,7 +213,8 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
     y ver lo mismo que en el programa): el Cambio Fijo, lo que había que retirar,
     cada negocio de dominio.NEGOCIOS_DEL_CIERRE con su efectivo y su digital, y de
     qué hora a qué hora va el turno. Sale de
-    control_cierres_repo._resumen_del_cierre, el mismo que usa Control de Cierres.
+    control_cierres_repo._resumen_del_cierre, el mismo que usa Control de Cierres
+    (el importe es su "ventas_total" y lo que había que retirar, su "monto_a_retirar").
     """
     cierre = conexion.execute(
         """
@@ -228,12 +229,10 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
     caja = control_cierres_repo._datos_de_la_caja(conexion, cierre)
     desde = control_cierres_repo._desde_del_cierre(conexion, cierre_id)
     resumen = control_cierres_repo._resumen_del_cierre(conexion, cierre, desde, caja)
-    efectivo = round(cierre["ventas_efectivo"], 2)
-    digital = round(cierre["ventas_digital"], 2)
     return {
-        "importe": round(efectivo + digital, 2),
-        "efectivo": efectivo,
-        "digital": digital,
+        "importe": resumen["ventas_total"],
+        "efectivo": round(cierre["ventas_efectivo"], 2),
+        "digital": round(cierre["ventas_digital"], 2),
         "turno": turno_para_la_app_de_gastos(cierre["fecha"], cierre["turno"]),
         # La responsable de la caja al cerrarse, no quien apretó el botón: si el
         # Admin cierra en ausencia de Gabriela, allá figura Gabriela (sin caja,
@@ -249,7 +248,7 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
         "cerradoPor": cierre["cerrado_por"],
         "detalle": {
             "cambioFijo": round(resumen["cambio_inicial"], 2),
-            "aRetirar": efectivo,
+            "aRetirar": round(resumen["monto_a_retirar"], 2),
             "negocios": [
                 {
                     "clave": clave, "nombre": nombre,
@@ -571,7 +570,7 @@ def estado() -> dict:
         ultimos = [dict(fila) for fila in conexion.execute(
             """
             SELECT envios_pwa.*, cierres_turno.fecha, cierres_turno.turno,
-                   cierres_turno.ventas_efectivo + cierres_turno.ventas_digital AS total,
+                   cierres_turno.ventas_efectivo, cierres_turno.ventas_digital,
                    COALESCE(responsables.nombre, quien_cerro.nombre) AS responsable
             FROM envios_pwa
             JOIN cierres_turno ON cierres_turno.id = envios_pwa.cierre_id
@@ -585,6 +584,7 @@ def estado() -> dict:
         )]
     for fila in ultimos:
         fila["turno_label"] = etiqueta_turno(fila["fecha"], fila["turno"])
+        fila["total"] = dominio.total_cobrado(fila.pop("ventas_efectivo"), fila.pop("ventas_digital"))
     return {
         "activado": activado,
         "pendientes": cuentas.get(dominio.ENVIO_PENDIENTE, 0),

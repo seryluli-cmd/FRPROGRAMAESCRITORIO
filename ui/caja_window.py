@@ -59,9 +59,9 @@ class CajaWindow(QDialog):
         # Los mismos datos que el Cierre de Turno (pedido del dueño, 2026-10-20), con
         # CAJA ACTUAL en vez de A RETIRAR. Desde el 2026-10-26 la Caja Actual es solo el
         # efectivo cobrado, SIN el cambio (pedido del dueño: "que no esté sumado"; hasta
-        # ese día decía "Incluye el cambio"): es lo mismo que A RETIRAR del cierre. Lo que
-        # tiene que haber en el cajón contando el cambio sigue siendo
-        # resumen["caja_actual"], que usa el relevo de una caja (relevo_repo).
+        # ese día decía "Incluye el cambio"): es lo mismo que A RETIRAR del cierre, y por eso
+        # lee resumen["monto_a_retirar"]. Lo que tiene que haber en el cajón contando el
+        # cambio sigue siendo resumen["caja_actual"], que usa el relevo de una caja (relevo_repo).
         actual = cifra_destacada("CAJA ACTUAL (solo efectivo)", "Sin el cambio: lo cobrado en efectivo", TONO_VERDE)
         total = cifra_destacada("TOTAL (EFECTIVO + DIGITAL)", "Lo cobrado en el turno, sin el cambio", TONO_AZUL)
         self.valor_actual = actual.valor
@@ -102,7 +102,7 @@ class CajaWindow(QDialog):
         resumen = turnos_repo.resumen_turno_actual()
         self.cabecera.detalle.setText(detalle_de_la_cabecera(resumen))
         self.pastilla_hora.setText(f"ACTUALIZADA {datetime.now():%H:%M}")
-        self.valor_actual.setText(formato_pesos(resumen["ventas_efectivo"]))
+        self.valor_actual.setText(formato_pesos(resumen["monto_a_retirar"]))
         self.valor_total.setText(formato_pesos(resumen["ventas_total"]))
         self.tabla.mostrar(resumen)
 
@@ -160,7 +160,7 @@ class CierreTurnoWindow(QDialog):
             DialogoEnviandoCierre(resultado["id"], self).exec()
         caja = f"Caja Nº {resultado['caja_numero']} · " if resultado["caja_numero"] is not None else ""
         ausencia = ""
-        if resultado["responsable"] is not None and resultado["responsable"] != self.usuario["nombre"]:
+        if resultado["cerrada_en_ausencia"]:
             ausencia = f"Queda anotado que la cerraste vos, en ausencia de {resultado['responsable']}.\n\n"
         mostrar_info(
             self, "Turno cerrado",

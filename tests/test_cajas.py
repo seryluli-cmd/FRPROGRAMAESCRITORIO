@@ -368,7 +368,7 @@ class TestSobreLoCargaSoloElAdmin(_BaseDeCajas):
 
 # Lo que muestra la tarjeta del Cierre de Turno (ui/tarjeta_cierre.py).
 _LO_QUE_SE_VE_AL_CERRAR = (
-    "turno_actual_label", "caja_numero", "responsable", "cambio_inicial",
+    "turno_actual_label", "caja_numero", "responsable", "cambio_inicial", "monto_a_retirar",
     "ventas_efectivo", "ventas_digital", "ventas_total",
     "kiosko_solo_efectivo", "kiosko_solo_digital", "impresiones_efectivo", "impresiones_digital",
 )

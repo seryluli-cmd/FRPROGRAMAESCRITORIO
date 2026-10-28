@@ -17,6 +17,7 @@ microsegundos (ver turnos_repo).
 
 from datetime import datetime
 
+import dominio
 from database import conexion_db
 from repositories import cajas_repo, usuarios_repo
 from repositories.turnos_ventas_repo import _aparte_por_metodo, _separar_de_kiosko
@@ -63,12 +64,12 @@ def _datos_de_la_caja(conexion, cierre) -> dict:
     """
     Lo que se sabe de la caja de un cierre, listo para mostrar:
     - "caja_numero": el número de caja, o None si es un cierre sin caja (de
-      antes de las cajas, o de ventas que quedaron sin caja).
+      ventas que quedaron sin caja).
     - "responsable": quién tenía la caja al cerrarla (sin caja, quien cerró).
     - "responsables": todos los que la tuvieron, en orden (quien la abrió y
       quienes la recibieron en un relevo).
     - "cerrada_en_ausencia": la cerró otra persona (la que llegó, o el Admin)
-      porque la responsable se fue sin cerrar.
+      porque la responsable se fue sin cerrar (cajas_repo.cerrada_en_ausencia).
     - "cierre_forzoso": la cerró el programa solo.
     - "abierta_en", "cambio_esperado", "cambio_contado" y "relevos": la
       apertura y los relevos de la caja (vacío si no hay caja).
@@ -100,7 +101,7 @@ def _datos_de_la_caja(conexion, cierre) -> dict:
         "caja_numero": caja["id"],
         "responsable": caja["responsable"],
         "responsables": responsables,
-        "cerrada_en_ausencia": cierre["usuario_id"] != caja["responsable_id"],
+        "cerrada_en_ausencia": cajas_repo.cerrada_en_ausencia(caja, cierre["usuario_id"]),
         "cierre_forzoso": bool(caja["cierre_forzoso"]),
         "abierta_en": caja["abierta_en"],
         "cambio_esperado": caja["cambio_esperado"],
@@ -132,7 +133,7 @@ def _resumen_del_cierre(conexion, cierre, desde: str, caja: dict) -> dict:
         **_separar_de_kiosko(guardado, por_metodo),
         "turno_actual": cierre["turno"],
         "turno_actual_label": etiqueta_turno(cierre["fecha"], cierre["turno"]),
-        "ventas_total": round(cierre["ventas_efectivo"] + cierre["ventas_digital"], 2),
+        "ventas_total": dominio.total_cobrado(cierre["ventas_efectivo"], cierre["ventas_digital"]),
         "cambio_inicial": caja["cambio_inicial"],
         "caja_numero": caja["caja_numero"],
         "responsable": caja["responsable"],
@@ -240,7 +241,7 @@ def verificar_cierre(cierre_id: int, monto_contado: float, usuario_admin_id: int
         cierre = _cierre_o_error(conexion, cierre_id)
 
         monto_contado = round(monto_contado, 2)
-        diferencia = round(monto_contado - cierre["monto_a_retirar"], 2)
+        diferencia = dominio.diferencia_de_plata(monto_contado, cierre["monto_a_retirar"])
         ahora = datetime.now().isoformat(timespec="seconds")
         conexion.execute(
             """

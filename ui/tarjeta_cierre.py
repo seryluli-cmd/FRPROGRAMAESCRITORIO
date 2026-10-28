@@ -234,7 +234,7 @@ class TarjetaCierreDeTurno(QWidget):
         turnos_repo.resumen_turno_actual: el del turno en curso o el de un
         cierre ya hecho (control_cierres_repo.detalle_cierre()["resumen"])."""
         self.cabecera.detalle.setText(detalle_de_la_cabecera(resumen))
-        self.valor_retirar.setText(formato_pesos(resumen["ventas_efectivo"]))
+        self.valor_retirar.setText(formato_pesos(resumen["monto_a_retirar"]))
         self.valor_total.setText(formato_pesos(resumen["ventas_total"]))
         self.tabla.mostrar(resumen)
 

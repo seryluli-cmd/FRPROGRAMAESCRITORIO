@@ -182,6 +182,10 @@ def resumen_turno_actual():
     contó al abrirla); sin caja, el Cambio Fijo. "caja_actual" (lo que tendría
     que haber en el cajón) sale de ahí: es lo que cuenta quien recibe la caja en
     un relevo (relevo_repo.recibir_caja).
+
+    "monto_a_retirar" es lo que iría al sobre si se cerrara ahora
+    (dominio.monto_a_retirar), lo mismo que graba cerrar_turno; "ventas_total",
+    todo lo cobrado (dominio.total_cobrado).
     """
     with conexion_db() as conexion:
         return _resumen_en_curso(conexion)
@@ -209,7 +213,8 @@ def _resumen_en_curso(conexion, ahora_dt=None) -> dict:
         **aparte,
         # Todo lo cobrado en el turno (efectivo + digital de todos los negocios).
         # Las impresiones no se suman: ya están dentro de Kiosko.
-        "ventas_total": round(desglose["ventas_efectivo"] + desglose["ventas_digital"], 2),
+        "ventas_total": dominio.total_cobrado(desglose["ventas_efectivo"], desglose["ventas_digital"]),
+        "monto_a_retirar": dominio.monto_a_retirar(desglose["ventas_efectivo"]),
         "cambio_inicial": cambio_inicial,
         "caja_actual": round(cambio_inicial + desglose["ventas_efectivo"], 2),
         "caja_numero": caja["id"] if caja is not None else None,
@@ -228,7 +233,8 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
 
     Si hay una caja abierta, queda unida a este cierre (deja de estar abierta).
     `usuario_id` es quien cierra: si no es la responsable de la caja, queda
-    como cerrada en su ausencia (ver control_cierres_repo._datos_de_la_caja).
+    como cerrada en su ausencia (cajas_repo.cerrada_en_ausencia), y lo dice
+    "cerrada_en_ausencia" en lo que se devuelve.
     `forzoso` es el cierre que hace el programa solo a los 30 minutos del fin
     del turno (ver MainWindow y relevo_repo). `ahora_dt` es la hora del cierre
     si quien llama ya la tomó (relevo_repo); si no, ahora.
@@ -254,14 +260,15 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
             ).items()
         }
         turno = ventana["turno"]
-        monto_a_retirar = desglose["ventas_efectivo"]
+        monto_a_retirar = dominio.monto_a_retirar(desglose["ventas_efectivo"])
 
         # "fecha" guarda el día en que ARRANCÓ el turno (el mismo criterio
         # que "turno", justo arriba) y no el día en que se lo cerró: para
         # un turno Noche cerrado ya pasada la medianoche, esos dos días son
         # distintos, y turnos_faltantes() necesita que coincida con el día
-        # que arma turnos_del_mes_actual() para poder cruzarlos. Es el día del
-        # local (06:00 a 06:00): una Noche entra entera en el día en que empezó.
+        # que arma turnos_faltantes_repo.turnos_del_mes_actual() para poder
+        # cruzarlos. Es el día del local (06:00 a 06:00): una Noche entra
+        # entera en el día en que empezó.
         fecha_turno = ventana["dia"]
 
         # Los nombres de columna salen de _CAMPOS_PLATA (texto fijo del
@@ -307,6 +314,7 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
         "monto_a_retirar": monto_a_retirar,
         "caja_numero": caja["id"] if caja is not None else None,
         "responsable": caja["responsable"] if caja is not None else None,
+        "cerrada_en_ausencia": cajas_repo.cerrada_en_ausencia(caja, usuario_id),
         "cambio_que_queda": cajas_repo.cambio_inicial(caja) if caja is not None else fondo_cambio,
         "forzoso": forzoso,
         # True = quedó en la cola para la app de gastos (la pantalla muestra la barra).
@@ -392,7 +400,8 @@ def _ventanas_del_dia(conexion, dia, ahora_dt) -> list:
     """
     # "empleada" es quien tenía la caja (cajas_repo), no quien la cerró: la
     # caja que cierra la que llega, en ausencia de la otra, sigue siendo de la
-    # otra. Un cierre sin caja (de antes de las cajas) muestra quién cerró.
+    # otra. Un cierre sin caja (las ventas que quedaron sin caja, cerradas
+    # aparte) muestra quién cerró.
     cierres = conexion.execute(
         """
         SELECT cierres_turno.*, COALESCE(responsables.nombre, usuarios.nombre) AS empleada

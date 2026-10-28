@@ -16,6 +16,7 @@ from datetime import datetime
 
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
+import dominio
 from repositories import relevo_repo
 from turnos import MINUTOS_PARA_CIERRE_FORZOSO
 from ui.utils import (
@@ -30,10 +31,13 @@ def _hora(fecha_iso: str) -> str:
 
 
 def texto_de_la_diferencia(diferencia: float) -> str:
-    """"coincide", "faltan $ 500,00" o "sobran $ 200,00"."""
-    if abs(diferencia) < 0.005:
+    """"coincide", "faltan $ 500" o "sobran $ 200", con dominio.coincide y
+    dominio.falta_plata, como el resto de las pantallas."""
+    if dominio.coincide(diferencia):
         return "coincide"
-    return f"faltan {formato_pesos(-diferencia)}" if diferencia < 0 else f"sobran {formato_pesos(diferencia)}"
+    if dominio.falta_plata(diferencia):
+        return f"faltan {formato_pesos(-diferencia)}"
+    return f"sobran {formato_pesos(diferencia)}"
 
 
 class DialogoContarPlata(QDialog):
@@ -98,14 +102,14 @@ class DialogoContarPlata(QDialog):
 
     def _listo(self):
         contado = self.spin_monto.value()
-        diferencia = relevo_repo.diferencia(contado, self._esperado)
+        diferencia = dominio.diferencia_de_plata(contado, self._esperado)
         detalle = f" ({self._detalle_esperado})" if self._detalle_esperado else ""
         self.resultado.setText(
             f"Tendría que haber {formato_pesos(self._esperado)}{detalle}.\n"
             f"Contaste {formato_pesos(contado)}: {texto_de_la_diferencia(diferencia)}."
         )
         self.resultado.setStyleSheet(
-            "font-weight: 600; color: " + ("#1E7B45;" if abs(diferencia) < 0.005 else "#A6323C;")
+            "font-weight: 600; color: " + ("#1E7B45;" if dominio.coincide(diferencia) else "#A6323C;")
         )
         self.resultado.show()
         self.spin_monto.setEnabled(False)
@@ -212,7 +216,7 @@ def _cerrar_ventas_sin_caja(parent, usuario, situacion) -> bool:
         parent, "Ventas sin cerrar",
         f"Hay {situacion['cantidad']} ventas sin cerrar desde el "
         f"{datetime.fromisoformat(situacion['desde']).strftime('%d/%m %H:%M')}, hechas sin una caja "
-        "abierta (de antes de las cajas, o del Administrador sin nadie en el mostrador).\n\n"
+        "abierta (del Administrador, sin nadie en el mostrador).\n\n"
         "Antes de abrir tu caja hay que cerrarlas en un cierre aparte. ¿Las cerrás ahora?",
     ):
         return False
