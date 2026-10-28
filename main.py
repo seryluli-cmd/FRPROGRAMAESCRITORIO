@@ -30,6 +30,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtGui import QIcon
 
+import database
 import dominio
 from admin_remoto import cliente as cliente_remoto, modo as modo_remoto
 from database import inicializar_base_de_datos
@@ -67,6 +68,57 @@ PUERTO_INSTANCIA_UNICA = 8908
 # valer apenas terminara main(). Mantenerla acá arriba lo mantiene abierto
 # mientras el proceso siga vivo.
 _candado_instancia_unica = None
+
+# python main.py --base data_prueba: abre el programa con otra base (la de prueba
+# de armar_base_de_prueba.py) en vez de data_fr/, para probar sin tocar la real.
+OPCION_BASE = "--base"
+
+
+def _carpeta_de_la_opcion_base(argv):
+    """La carpeta de `--base <carpeta>` o `--base=<carpeta>`, o None si no vino.
+    ValueError si vino --base sin carpeta: seguir de largo abriría data_fr/, la
+    base real, cuando quien lo escribió quería probar."""
+    for posicion, argumento in enumerate(argv):
+        if argumento == OPCION_BASE:
+            carpeta = argv[posicion + 1].strip() if posicion + 1 < len(argv) else ""
+        elif argumento.startswith(OPCION_BASE + "="):
+            carpeta = argumento[len(OPCION_BASE) + 1:].strip()
+        else:
+            continue
+        if not carpeta or carpeta.startswith("-"):
+            raise ValueError("Falta la carpeta de la base: python main.py --base data_prueba")
+        return carpeta
+    return None
+
+
+def _marcar_si_es_de_prueba(ventana):
+    """Que se vea en el título, todo el tiempo, que es la base de prueba (el
+    cartel del arranque se cierra y la ventana es igual a la real)."""
+    if database.es_base_de_prueba():
+        ventana.setWindowTitle(f"{ventana.windowTitle()} - BASE DE PRUEBA")
+
+
+def _usar_otra_base(carpeta: str) -> bool:
+    """Pasa el programa a la base de `carpeta` y avisa cuál es, para que nadie
+    confunda la de prueba con la real. False (después de avisar) si ahí no hay
+    ninguna base: con un nombre mal escrito se armaría una vacía sin que se note."""
+    database.usar_carpeta_de_datos(carpeta)
+    if not Path(database.DB_PATH).exists():
+        QMessageBox.warning(
+            None, "No hay base ahí",
+            f"En {database.DATA_DIR} no hay ninguna base.\n\n"
+            "La de prueba se arma con:  python armar_base_de_prueba.py"
+        )
+        return False
+    if database.es_base_de_prueba():
+        QMessageBox.information(
+            None, "BASE DE PRUEBA",
+            f"Estás usando la BASE DE PRUEBA ({database.DATA_DIR}).\n\n"
+            "Los artículos, las ventas y los cierres son inventados: nada de esto es del kiosko."
+        )
+    else:
+        QMessageBox.information(None, "Otra base", f"Estás usando la base de {database.DATA_DIR}.")
+    return True
 
 
 def _ya_hay_una_copia_abierta() -> bool:
@@ -133,6 +185,7 @@ class Aplicacion:
                 return
         else:
             self.ventana_login = LoginWindow(al_loguearse=self._al_loguearse)
+            _marcar_si_es_de_prueba(self.ventana_login)
         self.ventana_login.show()
 
     def _al_loguearse(self, usuario):
@@ -154,6 +207,8 @@ class Aplicacion:
             usuario, al_cerrar_sesion=self._mostrar_login,
             volver_a=volver_a, al_volver_a=self._abrir_ventana_principal,
         )
+        if self.conexion_remota is None:
+            _marcar_si_es_de_prueba(self.ventana_principal)
         self.ventana_principal.showMaximized()
 
 
@@ -219,6 +274,24 @@ def main():
     app.setWindowIcon(QIcon(str(RUTA_ICONO)))
 
     mostrador = modo_remoto.direccion_del_mostrador()
+    try:
+        otra_base = _carpeta_de_la_opcion_base(sys.argv)
+    except ValueError as error:
+        QMessageBox.warning(None, "Falta la carpeta", str(error))
+        sys.exit(0)
+    if otra_base is not None:
+        if mostrador is not None:
+            # Una copia remota no abre ninguna base: todo lo que hiciera iría a la
+            # base REAL del mostrador, con el cartel diciendo que es de prueba.
+            QMessageBox.warning(
+                None, "Administrar desde otra PC",
+                "Desde otra PC no se elige la base: se trabaja sobre la del mostrador. "
+                "Para usar la base de prueba, abrí el programa sin --mostrador y no desde la red."
+            )
+            sys.exit(0)
+        if not _usar_otra_base(otra_base):
+            sys.exit(0)
+
     if mostrador is not None:
         conexion_remota = _conectar_con_el_mostrador(mostrador)
         if conexion_remota is None:

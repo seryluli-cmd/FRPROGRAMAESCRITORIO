@@ -91,6 +91,11 @@ HORA_DEL_CIERRE_EN_LA_APP = 12
 
 _CLAVE_ACTIVADO = "envio_pwa_activado"
 _CLAVE_RENOVACION = "envio_pwa_renovacion"
+# La base de prueba (armar_base_de_prueba.py) tiene un año de cierres inventados:
+# mandados, quedarían mezclados con los de verdad en la app de FR, que está en uso.
+# Por eso ahí el envío no se prende y el hilo no manda nada aunque lo esté.
+_EN_LA_BASE_DE_PRUEBA = ("Esta es la BASE DE PRUEBA: sus cierres son inventados y no se mandan "
+                         "a la app de gastos.")
 _SEGUNDOS_DE_MARGEN_DEL_TOKEN = 60
 
 _candado = threading.Lock()   # un envío por vez: el hilo y los botones no se pisan
@@ -131,6 +136,8 @@ def activar(usuario_id: int, prendido: bool):
     """Prende o apaga el envío. Solo Admin. Apagarlo no borra lo pendiente: se
     manda cuando se vuelva a prender."""
     usuarios_repo.exigir_admin(usuario_id, "prender o apagar el envío de los cierres a la app de gastos")
+    if prendido and database.es_base_de_prueba():
+        raise ValueError(_EN_LA_BASE_DE_PRUEBA)
     with conexion_db() as conexion:
         conexion.execute(
             "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)",
@@ -483,7 +490,8 @@ def enviar_pendientes(ahora: datetime = None, transporte=None) -> dict:
     resultado = {"enviados": 0, "con_error": 0}
     with _candado:
         with conexion_db() as conexion:
-            pendientes = _filas_pendientes(conexion, ahora) if _activado(conexion) else []
+            se_manda = _activado(conexion) and not database.es_base_de_prueba()
+            pendientes = _filas_pendientes(conexion, ahora) if se_manda else []
         for fila in pendientes:
             contexto = f"Envío del cierre Nº {fila['cierre_id']} a la app de gastos"
             try:

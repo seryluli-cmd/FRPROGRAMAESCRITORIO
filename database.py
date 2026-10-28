@@ -39,6 +39,31 @@ BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) \
 DATA_DIR = os.path.join(BASE_DIR, "data_fr")
 DB_PATH = os.path.join(DATA_DIR, "kiosko.db")
 
+# La base que arma armar_base_de_prueba.py lleva este archivo adentro: así el
+# programa avisa que esos datos son inventados, y el armador nunca pisa una
+# carpeta que no armó él (podría ser la de la base real).
+ARCHIVO_DE_BASE_DE_PRUEBA = "ES_BASE_DE_PRUEBA.txt"
+
+
+def usar_carpeta_de_datos(carpeta: str):
+    """
+    Hace que todo el programa use la base de `carpeta` en vez de data_fr/: la
+    opción `--base` de main.py (python main.py --base data_prueba) y el armador
+    de la base de prueba. Una carpeta sin la letra del disco se busca al lado del
+    programa, como data_fr/. Va antes de abrir la base: todos leen DATA_DIR y
+    DB_PATH de este módulo en el momento (por eso nadie hace
+    `from database import DB_PATH`).
+    """
+    global DATA_DIR, DB_PATH
+    DATA_DIR = os.path.join(BASE_DIR, carpeta)  # si `carpeta` es completa, queda ella sola
+    DB_PATH = os.path.join(DATA_DIR, "kiosko.db")
+
+
+def es_base_de_prueba(carpeta: str = None) -> bool:
+    """Si la carpeta de datos (la que está en uso, si no se dice otra) es una
+    base de prueba de armar_base_de_prueba.py."""
+    return os.path.exists(os.path.join(carpeta or DATA_DIR, ARCHIVO_DE_BASE_DE_PRUEBA))
+
 
 def hash_clave(texto_plano: str, salt: str = None) -> str:
     """

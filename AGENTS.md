@@ -20,7 +20,9 @@ Reglas esenciales:
 - No toques data_fr/ ni la base real para desarrollar o probar. Los tests usan
   bases temporales.
 - Verificá con python -m unittest discover tests y abrí Login y la ventana
-  principal con una base temporal antes de declarar listo un cambio.
+  principal con la base de prueba antes de declarar listo un cambio:
+  python armar_base_de_prueba.py (si no está data_prueba/) y después
+  python main.py --base data_prueba (ver la regla 15 de CLAUDE.md).
 - La UI, los comentarios, los commits y las explicaciones al dueño van en
   español rioplatense.
 - El repo es PÚBLICO: nunca una clave, contraseña o token real en el código,

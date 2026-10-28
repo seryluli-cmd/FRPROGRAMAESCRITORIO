@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 data/
 data_fr/
+# La base de prueba (armar_base_de_prueba.py) se arma en cada PC: no va a git.
+data_prueba*/
 build/
 dist/
 *.spec

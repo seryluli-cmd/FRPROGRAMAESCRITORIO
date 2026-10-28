@@ -54,6 +54,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 | [admin_remoto/](admin_remoto/) · [repositories/admin_remoto_repo.py](repositories/admin_remoto_repo.py) · [ui/admin_remoto_dialogo.py](ui/admin_remoto_dialogo.py) | Administrar desde otra PC del local (ver la sección propia más abajo). |
 | [servidor_red.py](servidor_red.py) · [errores.py](errores.py) | El servidor HTTP del mostrador (puerto 8909, distinto del 8899 de CYBERCONTROL para que los dos programas convivan en una PC): solo atiende `POST /admin/...` de la administración remota; y el registro de fallos compartido con la UI. |
 | [tests/](tests/) | Tests de repositorios, servidor y UI sobre bases SQLite temporales (no tocan `data_fr/kiosko.db`). |
+| [armar_base_de_prueba.py](armar_base_de_prueba.py) | Arma la base de prueba en `data_prueba/` (un año inventado); se abre con `python main.py --base data_prueba`. Ver "Cómo probarlo en local". |
 | [Kiosko.spec](Kiosko.spec) | Config de PyInstaller para generar `dist/FRKiosko.exe`. |
 | [assets/](assets/) | Ícono de la app (`icono.ico`/`.png`). |
 | `data_fr/backups/` | Copias automáticas de la base (después de cada Cierre de Turno y cada 8 horas; todas las de 3 días y una por día hasta 30). |
@@ -403,6 +404,28 @@ python main.py
 Primer arranque: se crea `data_fr/kiosko.db` solo, con el usuario
 `Administrador` / clave `1234` (rol ADMIN).
 
+**Base de prueba** (para mirar las pantallas con contenido, medir los reportes con
+mucho movimiento o probar sin tocar `data_fr/`):
+
+```bash
+python armar_base_de_prueba.py
+python main.py --base data_prueba
+```
+
+[armar_base_de_prueba.py](armar_base_de_prueba.py) arma en `data_prueba/` (en
+`.gitignore`) un año de un kiosko inventado: unos 70 artículos, cuatro empleadas y
+unas 180 ventas por día, con sus cajas, relevos, cierres (en ausencia, forzosos y
+de ventas sin caja), compras de los lunes, subas de precio y sobres contados. No
+escribe filas a mano: pasa por las mismas funciones de los repos que el
+mostrador, con el reloj corrido a cada momento del pasado, así que todo cuadra
+como lo dejaría el programa. Las claves de prueba y las opciones (`--dias`,
+`--escala`, `--semilla`, `--carpeta`) están en el comentario de arriba del
+archivo. Solo arma en una carpeta nueva, vacía o que ya sea de prueba (tiene
+`ES_BASE_DE_PRUEBA.txt`), nunca en `data_fr/`, y pide cerrar FRKiosko antes. Con
+`--base` (o `--base=carpeta`), el programa avisa al abrir qué base usa y, si es
+la de prueba, lo dice en el título de la ventana; ahí el envío a la app de gastos
+no se puede prender.
+
 ## Tests
 
 ```bash
@@ -410,7 +433,7 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-524 tests al 2026-10-27. Cubren turnos, caja y cajas con número
+555 tests al 2026-10-28. Cubren turnos, caja y cajas con número
 (`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
 ORDENAR Stock, marcas, ventas y anulaciones, el cobro con Enter, impresiones,
 reportes, administrar desde otra PC (`tests/test_admin_remoto.py`, con un

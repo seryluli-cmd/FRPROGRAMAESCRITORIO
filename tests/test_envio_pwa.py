@@ -29,6 +29,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402
 
+import database  # noqa: E402
 import dominio  # noqa: E402
 import turnos  # noqa: E402
 from database import conexion_db  # noqa: E402
@@ -319,6 +320,21 @@ class TestLaCola(_BaseDeEnvios):
         envio_pwa_repo.activar(self.admin_id, True)
         self._otro_turno_de_toby(_a_las(14, 1), _a_las(15), _a_las(22, 0))
         self.assertTrue(envio_pwa_repo._hay_novedades.is_set())
+
+    def test_en_la_base_de_prueba_no_se_manda_nada(self):
+        # La base de prueba (armar_base_de_prueba.py) tiene cierres inventados: si
+        # llegaran a la app de FR, quedarían mezclados con los de verdad.
+        envio_pwa_repo.activar(self.admin_id, True)
+        self._turno_de_toby()
+        turnos_repo.cerrar_turno(self.toby_id, ahora_dt=_a_las(14, 0))
+        open(os.path.join(database.DATA_DIR, database.ARCHIVO_DE_BASE_DE_PRUEBA), "w").close()
+        self.assertEqual(envio_pwa_repo.enviar_pendientes(_a_las(14, 1), self.app), {"enviados": 0, "con_error": 0})
+        self.assertEqual(self.app.pedidos, [])
+        envio_pwa_repo.activar(self.admin_id, False)
+        with self.assertRaises(ValueError) as error:
+            envio_pwa_repo.activar(self.admin_id, True)
+        self.assertIn("BASE DE PRUEBA", str(error.exception))
+        self.assertFalse(envio_pwa_repo.esta_activado())
 
     def test_al_cerrar_la_caja_se_manda_en_ese_momento_sin_esperar_la_revision(self):
         envio_pwa_repo.activar(self.admin_id, True)

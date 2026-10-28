@@ -176,11 +176,17 @@ terminado. La UI se prueba a mano; la lógica, no.
 
 ```
 python -m unittest discover tests
-python main.py
+python armar_base_de_prueba.py        (si todavía no está data_prueba/)
+python main.py --base data_prueba
 ```
 
 Que los tests pasen no alcanza si la pantalla no abre. Que la pantalla
-abra no alcanza si los tests no pasan.
+abra no alcanza si los tests no pasan. Se abre con la BASE DE PRUEBA, nunca
+con `python main.py` a secas: eso usa `data_fr/`, y una venta o un cierre de
+prueba no se pueden borrar después (regla 7). La de prueba es un año inventado
+que pasa por los mismos repos que el mostrador (ver `armar_base_de_prueba.py`):
+sirve también para ver cuánto tarda un reporte con mucho movimiento. Si un
+cambio de esquema la deja vieja, se vuelve a armar.
 
 ---
 
@@ -220,7 +226,7 @@ abra no alcanza si los tests no pasan.
 | `dominio.cuenta_del_cobro(total, efectivo, digital, paga_con)` · `.lo_que_falta_para(total, monto)` | se calcula el cobro: la parte en efectivo y la digital, el billete que da el cliente, el vuelto, lo que falta y los pagos que quedan en la caja; y lo que completa el otro medio al escribir en uno |
 | `ui.dialogo_pago.cobrar(parent, monto)` | se cobra algo que no es una venta de kiosko con la ventana de cobro de Ventas (medio, reparto y vuelto). Devuelve los pagos netos de vuelto, o None si se canceló. Hoy no la usa ninguna pantalla; una pantalla nueva que cobre la usa a ella |
 | `database.conexion_db()` | se abre una transacción contra la base |
-| `database.DATA_DIR` / `DB_PATH` | se resuelve dónde viven los datos (código vs `.exe`): `data_fr/` al lado del programa |
+| `database.DATA_DIR` / `DB_PATH` · `.usar_carpeta_de_datos(carpeta)` · `.es_base_de_prueba()` | se resuelve dónde viven los datos (código vs `.exe`): `data_fr/` al lado del programa, u otra carpeta con `python main.py --base <carpeta>` (la base de prueba de `armar_base_de_prueba.py`, marcada con `ARCHIVO_DE_BASE_DE_PRUEBA`). Todos leen `database.DATA_DIR` en el momento: nunca `from database import DB_PATH` |
 | `database.hash_clave()` / `verificar_clave()` | se maneja una contraseña |
 | `database_migraciones.comprobar_base_kiosko(conexion)` · `.migrar_base(conexion)` | se rechaza una base de CYBERCONTROL y se lleva la versión del esquema (`VERSION_ESQUEMA`) |
 | `usuarios_repo.tiene_permiso(usuario, clave)` | se decide si alguien puede entrar a algo |
@@ -438,7 +444,9 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   `frkiosko-<id>-<fecha>`) y el PATCH lo pisa entero: un reintento tras un corte
   no deja dos. Un ENVIADO no se vuelve a mandar solo; a mano sí: Control de
   Cierres > "Mandar a la app de gastos" (solo Admin). Solo se encola con el envío
-  prendido. `registradoPor` es la responsable de la caja, no quien apretó el
+  prendido, y nunca en la base de prueba (`database.es_base_de_prueba()`: ahí
+  `activar` lo rechaza y el hilo no manda nada, porque sus cierres son
+  inventados). `registradoPor` es la responsable de la caja, no quien apretó el
   botón, y tiene que ser el nombre EXACTO que usa la app. La clave de Firebase
   que está acá es la PÚBLICA de la PWA de FR (ya publicada en su código): no es
   un secreto. **Apunta a la app de FR ("Gestión Central", proyecto `frkioskos`),
@@ -545,8 +553,8 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 524 pruebas
-al 2026-10-27 (el día del corte desde CYBERCONTROL). Lo que pasó antes de esa
+La suite se ejecuta con `python -m unittest discover tests` y tiene 555 pruebas
+al 2026-10-28 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
 
