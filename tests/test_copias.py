@@ -33,6 +33,7 @@ import dominio  # noqa: E402
 from repositories import copias_repo, turnos_repo, usuarios_repo  # noqa: E402
 from ui.copias_dialogo import DialogoAgregarCarpeta, DialogoCopiasDeSeguridad  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
+from test_en_segundo_plano import esperar_la_respuesta  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
@@ -406,10 +407,12 @@ class TestPantallaDeCopias(_ConCopias):
         agregar = DialogoAgregarCarpeta(usuarios_repo.obtener_usuario(self.admin_id), dialogo)
         agregar.campo_carpeta.setText(self.disco)
         agregar._guardar()
+        esperar_la_respuesta(agregar)  # la carpeta se prueba en un hilo aparte
         self.assertEqual(agregar.result(), DialogoAgregarCarpeta.Accepted)
         with mock.patch("ui.copias_dialogo.DialogoAgregarCarpeta.exec", return_value=True), \
                 mock.patch("ui.copias_dialogo.mostrar_info") as aviso:
             dialogo._agregar_carpeta()
+            esperar_la_respuesta(dialogo)  # y la copia también
         self.assertIn("en esta PC y en las 1 carpeta(s)", aviso.call_args[0][2])
         self.assertEqual(len(_copias(self.disco)), 1)
         self.assertEqual(dialogo.tabla.item(0, 0).text(), os.path.normpath(self.disco))
@@ -423,6 +426,7 @@ class TestPantallaDeCopias(_ConCopias):
         dialogo = self._dialogo()
         with mock.patch("ui.copias_dialogo.mostrar_error") as aviso:
             dialogo._copiar_ahora()
+            esperar_la_respuesta(dialogo)
         self.assertIn("no en todas las carpetas", aviso.call_args[0][1])
         self.assertIn("y en 1 carpeta(s) más", aviso.call_args[0][2])
         self.assertEqual(dialogo.tabla.item(0, 2).text(), "No anda (ver abajo)")
