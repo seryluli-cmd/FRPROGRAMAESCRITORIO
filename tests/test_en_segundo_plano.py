@@ -6,8 +6,10 @@ Los botones que esperan la red no congelan el mostrador (ui/en_segundo_plano.py)
 copia de seguridad ahora", la copia al pendrive y "Agregar" otra carpeta (Copias
 de Seguridad) corren la función del repo en un hilo aparte. Mientras espera, la
 pantalla sigue andando, las teclas que mandan algo se apagan (Cerrar no) y otro
-clic no arranca otra vez; al terminar sale el mismo cartel de siempre, letra por
-letra, y si la ventana se cerró antes no sale nada ni revienta.
+clic no arranca otra vez; al terminar sale el mismo cartel que con la llamada
+directa, letra por letra, y si la ventana se cerró antes no sale nada ni revienta
+(un error inesperado va igual a errores.log). "Agregar carpeta" no se cierra
+mientras prueba: la lista de carpetas no se pisa.
 
 Las funciones del repo se reemplazan por unas de mentira que esperan un
 threading.Event (o por las de verdad con una red caída de mentira): ninguna
@@ -18,13 +20,16 @@ Se ejecutan con:
     python -m unittest discover tests
 """
 
+import functools
 import gc
 import os
+import tempfile
 import threading
 import time
 import traceback
 import unittest
 import weakref
+from pathlib import Path
 from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -33,10 +38,11 @@ from PySide6.QtCore import QEvent, QObject, Qt, QTimer  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QDialog, QPushButton  # noqa: E402
 
+import database  # noqa: E402
 import dominio  # noqa: E402
 from repositories import copias_repo, envio_pwa_repo, usuarios_repo  # noqa: E402
 from ui.copias_dialogo import DialogoAgregarCarpeta, DialogoCopiasDeSeguridad  # noqa: E402
-from ui.en_segundo_plano import EnSegundoPlano  # noqa: E402
+from ui.en_segundo_plano import EnSegundoPlano, _lleva_un_objeto_de_qt  # noqa: E402
 from ui.envio_pwa_dialogo import DialogoEnvioPwa  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
 
@@ -241,8 +247,8 @@ class TestCierresALaAppDeGastos(_ConVentanas):
                 self.assertEqual(self._teclas_del_envio(ventana), [True, True, True])
                 self.assertEqual(ventana.cursor().shape(), Qt.ArrowCursor)
 
-    def test_sin_internet_sale_el_mismo_cartel_de_siempre(self):
-        with self.assertRaises(ValueError) as hoy:  # lo que mostraba la llamada directa
+    def test_sin_internet_sale_el_mismo_cartel_que_con_la_llamada_directa(self):
+        with self.assertRaises(ValueError) as directo:  # el mensaje del repo llamado directo
             envio_pwa_repo.probar_conexion(transporte=_red_caida)
         ventana = self._envio()
 
@@ -251,11 +257,11 @@ class TestCierresALaAppDeGastos(_ConVentanas):
             ventana.tecla_probar.click()
             esperar_la_respuesta(ventana)
 
-        error.assert_called_once_with(ventana, "No se pudo completar", str(hoy.exception))
-        self.assertIn("Sin internet", str(hoy.exception))
+        error.assert_called_once_with(ventana, "No se pudo completar", str(directo.exception))
+        self.assertIn("Sin internet", str(directo.exception))
         self.assertEqual(self._teclas_del_envio(ventana), [True, True, True])
 
-    def test_un_error_inesperado_va_al_log_con_el_renglon_del_repo_y_al_cartel_de_siempre(self):
+    def test_un_error_inesperado_va_al_log_con_el_renglon_del_repo_y_al_cartel_generico(self):
         repo = self._que_tarda(error=lambda: KeyError("config"))
         ventana = self._envio()
 
@@ -304,7 +310,7 @@ class TestCierresALaAppDeGastos(_ConVentanas):
         error.assert_not_called()
         self.assertIsNone(repo.ultimo_error())
 
-    def test_los_textos_de_resultado_son_los_de_siempre(self):
+    def test_los_textos_de_resultado_letra_por_letra(self):
         envio_pwa_repo.activar(self.admin["id"], True)
         casos = [
             ("probar_conexion", "tecla_probar", {"nombres_app": ["Sergio", "TOBY"], "faltan": ["Gabriela", "MATI"]},
@@ -351,27 +357,73 @@ class TestCopiasDeSeguridad(_ConVentanas):
 
     def _teclas_de_copias(self, dialogo):
         return [dialogo.boton_ahora.isEnabled(), dialogo.boton_pendrive.isEnabled(),
-                dialogo.boton_agregar.isEnabled()]
+                dialogo.boton_agregar.isEnabled(), dialogo.boton_quitar.isEnabled()]
 
-    def test_copia_ahora_no_traba_y_dice_lo_de_siempre(self):
-        repo = self._que_tarda(valor={"local": "copia.db", "extra": []})
-        dialogo = self._copias()
+    def _carpeta_de_disco(self):
+        """Una carpeta de otro disco de verdad: temporal y fuera de data_fr."""
+        carpeta = tempfile.TemporaryDirectory()
+        self.addCleanup(carpeta.cleanup)
+        return copias_repo.agregar_carpeta_extra(self.admin["id"], carpeta.name)
 
-        with mock.patch.object(copias_repo, "hacer_copia_ahora", repo), \
-                mock.patch("ui.copias_dialogo.mostrar_info") as aviso:
-            dialogo.boton_ahora.click()
-            self.assertEqual(self._teclas_de_copias(dialogo), [False, False, False])
-            self.assertTrue(self._tecla(dialogo, "Cerrar").isEnabled())
-            dejar_andar(0.2)
-            aviso.assert_not_called()
-            repo.suelta.set()
-            esperar_la_respuesta(dialogo)
+    def test_copia_ahora_no_traba_y_dice_donde_quedo(self):
+        donde = {"sin carpetas": "en esta PC", "con una carpeta": "en esta PC y en las 1 carpeta(s) de la lista"}
+        for caso, texto in donde.items():
+            with self.subTest(caso):
+                extra = []
+                if caso == "con una carpeta":  # Quitar arranca prendida y se tiene que apagar
+                    disco = self._carpeta_de_disco()
+                    extra = [{"carpeta": disco, "destino": os.path.join(disco, "copia.db"), "error": None}]
+                quitar = bool(extra)  # sin carpetas, Quitar está apagada antes y después
+                repo = self._que_tarda(valor={"local": "copia.db", "extra": extra})
+                dialogo = self._copias()
+                self.assertEqual(self._teclas_de_copias(dialogo), [True, True, True, quitar])
 
-        aviso.assert_called_once_with(dialogo, "Copia hecha", "Listo: la copia quedó guardada en esta PC.")
-        self.assertEqual(self._teclas_de_copias(dialogo), [True, True, True])
-        self.assertFalse(dialogo.boton_quitar.isEnabled())  # sin carpetas sigue apagada, como antes
+                with mock.patch.object(copias_repo, "hacer_copia_ahora", repo), \
+                        mock.patch("ui.copias_dialogo.mostrar_info") as aviso:
+                    dialogo.boton_ahora.click()
+                    self.assertEqual(self._teclas_de_copias(dialogo), [False, False, False, False])
+                    self.assertTrue(self._tecla(dialogo, "Cerrar").isEnabled())
+                    self.assertEqual(dialogo.boton_abrir_extra.isEnabled(), quitar)  # mirar no cambia la lista
+                    dejar_andar(0.2)
+                    aviso.assert_not_called()
+                    repo.suelta.set()
+                    esperar_la_respuesta(dialogo)
 
-    def test_con_una_carpeta_que_no_anduvo_dice_lo_de_siempre(self):
+                aviso.assert_called_once_with(dialogo, "Copia hecha", f"Listo: la copia quedó guardada {texto}.")
+                self.assertEqual(self._teclas_de_copias(dialogo), [True, True, True, quitar])
+
+    def test_cerrada_la_ventana_un_error_inesperado_igual_queda_en_el_log(self):
+        casos = {
+            "un disco lleno": (lambda: OSError(28, "No space left on device"), True),
+            "un rechazo del repo": (lambda: ValueError("Esa carpeta ya está en la lista."), False),
+            "sin permiso": (lambda: PermissionError("No tenés permiso."), False),
+        }
+        log = Path(database.DATA_DIR) / "errores.log"
+        for caso, (error, se_anota) in casos.items():
+            with self.subTest(caso):
+                log.unlink(missing_ok=True)
+                repo = self._que_tarda(error=error)
+                dialogo = self._copias()
+                dialogo.show()
+                with mock.patch.object(copias_repo, "hacer_copia_ahora", repo), \
+                        mock.patch("ui.utils.mostrar_error") as cartel:
+                    dialogo.boton_ahora.click()
+                    self._tecla(dialogo, "Cerrar").click()
+                    repo.suelta.set()
+                    dialogo._espera._hilo.join(5)
+                    dejar_andar(0.3)
+
+                cartel.assert_not_called()
+                self.assertFalse(dialogo._espera._timer.isActive())
+                anotado = log.read_text(encoding="utf-8") if log.exists() else ""
+                if se_anota:
+                    self.assertIn("se cerró antes de que terminara", anotado)
+                    self.assertIn("No space left on device", anotado)
+                    self.assertIn("in __call__", anotado)  # el renglón del repo donde falló
+                else:  # era para el cartel: no es una falla del programa
+                    self.assertEqual(anotado, "")
+
+    def test_con_una_carpeta_que_no_anduvo_avisa_en_cual(self):
         repo = self._que_tarda(valor={"local": "copia.db", "extra": [
             {"carpeta": "D:\\BACKUPS", "destino": "D:\\BACKUPS\\copia.db", "error": None},
             {"carpeta": "\\\\192.168.1.112\\Backups", "destino": None, "error": "La otra PC no contesta."},
@@ -389,7 +441,7 @@ class TestCopiasDeSeguridad(_ConVentanas):
             "La copia quedó en esta PC y en 1 carpeta(s) más, pero no en:\n\nLa otra PC no contesta.",
         )
 
-    def test_si_la_copia_falla_la_lista_se_actualiza_y_sale_el_cartel_de_siempre(self):
+    def test_si_la_copia_falla_la_lista_se_actualiza_antes_del_cartel(self):
         repo = self._que_tarda(error=lambda: OSError(28, "No space left on device"))
         dialogo = self._copias()
         orden = mock.Mock()
@@ -402,7 +454,7 @@ class TestCopiasDeSeguridad(_ConVentanas):
             repo.suelta.set()
             esperar_la_respuesta(dialogo)
 
-        # Como antes: primero la lista al día (lo que pasó con cada carpeta), después el cartel.
+        # Primero la lista al día (lo que pasó con cada carpeta), después el cartel.
         self.assertEqual([llamada[0] for llamada in orden.mock_calls], ["actualizar", "cartel"])
         self.assertIsInstance(orden.cartel.call_args[0][1], OSError)
 
@@ -415,7 +467,7 @@ class TestCopiasDeSeguridad(_ConVentanas):
                 mock.patch.object(copias_repo, "guardar_copia_en", repo), \
                 mock.patch("ui.copias_dialogo.mostrar_info") as aviso:
             dialogo.boton_pendrive.click()
-            self.assertEqual(self._teclas_de_copias(dialogo), [False, False, False])
+            self.assertEqual(self._teclas_de_copias(dialogo), [False, False, False, False])
             repo.suelta.set()
             esperar_la_respuesta(dialogo)
 
@@ -433,7 +485,7 @@ class TestCopiasDeSeguridad(_ConVentanas):
         with mock.patch.object(copias_repo, "agregar_carpeta_extra", repo):
             agregar.boton_agregar.click()
             self.assertFalse(agregar.boton_agregar.isEnabled())
-            self.assertTrue(self._tecla(agregar, "Cancelar").isEnabled())
+            self.assertFalse(agregar.boton_cancelar.isEnabled())  # ver más abajo por qué
             QTest.keyClick(agregar.campo_clave, Qt.Key_Return)  # el Enter del último campo también agrega
             dejar_andar(0.2)
             repo.suelta.set()
@@ -442,42 +494,79 @@ class TestCopiasDeSeguridad(_ConVentanas):
         self.assertEqual(repo.llamadas, [(self.admin["id"], carpeta, "kiosko", "clave-de-prueba-que-no-se-guarda")])
         self.assertEqual(agregar.result(), QDialog.Accepted)
 
-    def test_una_carpeta_mal_escrita_da_el_mismo_aviso_y_la_ventana_sigue_abierta(self):
-        with self.assertRaises(ValueError) as hoy:  # lo que mostraba la llamada directa
+    def test_una_carpeta_mal_escrita_da_el_mismo_aviso_y_despues_cancelar_cierra(self):
+        with self.assertRaises(ValueError) as directo:  # el mensaje del repo llamado directo
             copias_repo.agregar_carpeta_extra(self.admin["id"], "BACKUPS")
         agregar = self._ventana(DialogoAgregarCarpeta, self.admin)
         agregar.campo_carpeta.setText("BACKUPS")
+        agregar.show()
 
         with mock.patch("ui.utils.mostrar_error") as error:
             agregar.boton_agregar.click()
+            QTest.keyClick(agregar, Qt.Key_Escape)  # mientras espera la respuesta, Esc no cierra
+            self.assertTrue(agregar.isVisible())
             esperar_la_respuesta(agregar)
 
-        error.assert_called_once_with(agregar, "No se pudo completar", str(hoy.exception))
-        self.assertNotEqual(agregar.result(), QDialog.Accepted)  # sigue abierta para corregirla
-        self.assertTrue(agregar.boton_agregar.isEnabled())
+        error.assert_called_once_with(agregar, "No se pudo completar", str(directo.exception))
+        self.assertTrue(agregar.isVisible())  # sigue abierta para corregirla
+        self.assertEqual([agregar.boton_agregar.isEnabled(), agregar.boton_cancelar.isEnabled()], [True, True])
+        agregar.boton_cancelar.click()
+        self.assertEqual(agregar.result(), QDialog.Rejected)
 
-    def test_cancelar_mientras_prueba_la_carpeta_no_muestra_nada(self):
-        como_termina = {
-            "la carpeta anduvo": {"valor": "D:\\BACKUPS"},
-            "la carpeta no anduvo": {"error": lambda: ValueError("La otra PC no contesta.")},
-        }
-        for caso, como in como_termina.items():
-            with self.subTest(caso):
-                repo = self._que_tarda(**como)
-                agregar = self._ventana(DialogoAgregarCarpeta, self.admin)
-                agregar.campo_carpeta.setText("D:\\BACKUPS")
-                agregar.show()
-                with mock.patch.object(copias_repo, "agregar_carpeta_extra", repo), \
-                        mock.patch("ui.utils.mostrar_error") as error:
-                    agregar.boton_agregar.click()
-                    self._tecla(agregar, "Cancelar").click()
-                    repo.suelta.set()
-                    agregar._espera._hilo.join(5)
-                    dejar_andar(0.3)
+    def test_mientras_prueba_la_carpeta_no_se_cierra_y_la_lista_no_se_pisa(self):
+        # agregar_carpeta_extra lee la lista antes de probar y la graba después. Si la
+        # ventana se cerrara en el medio, en Copias de Seguridad se podría agregar o
+        # quitar otra carpeta, y al terminar la prueba la pisaría. Abierta, Copias
+        # queda detrás: su exec() no vuelve hasta que termina la prueba.
+        disco = self._carpeta_de_disco()
+        red = "\\\\192.168.1.112\\Backups"
+        prueba = self._que_tarda()  # la otra PC tarda en contestar, y al final contesta
+        copias = self._copias()
+        copias.show()
 
-                error.assert_not_called()
-                self.assertEqual(agregar.result(), QDialog.Rejected)
-                self.assertFalse(agregar._espera.esta_esperando())
+        def ventanas_de_agregar():
+            return [hija for hija in copias.findChildren(QDialog) if isinstance(hija, DialogoAgregarCarpeta)]
+
+        # Si la ventana de agregar no se cerrara nunca, la prueba no queda colgada.
+        seguro = QTimer(copias)
+        seguro.setSingleShot(True)
+        seguro.timeout.connect(lambda: [agregar.done(QDialog.Rejected) for agregar in ventanas_de_agregar()])
+        seguro.start(8000)
+        vista = {}
+
+        def con_la_ventana_de_agregar_abierta():
+            agregar = ventanas_de_agregar()[-1]
+            agregar.campo_carpeta.setText(red)
+            agregar.boton_agregar.click()
+            vista["Cancelar prendido"] = agregar.boton_cancelar.isEnabled()
+            formas_de_cerrar = {
+                "Cancelar": agregar.boton_cancelar.click,
+                "Esc": lambda: QTest.keyClick(agregar, Qt.Key_Escape),
+                "la cruz": agregar.close,
+            }
+            for como, cerrar in formas_de_cerrar.items():
+                cerrar()
+                abierta = agregar.isVisible() and agregar._espera.esta_esperando()
+                vista[como] = "sigue abierta" if abierta else "se cerró"
+            # Y es la modal: Copias de Seguridad, detrás, no recibe clics ni teclas.
+            vista["Copias tapada"] = QApplication.activeModalWidget() is agregar
+            prueba.suelta.set()
+
+        QTimer.singleShot(0, con_la_ventana_de_agregar_abierta)
+        with mock.patch.object(copias_repo, "_probar_que_se_puede_guardar", prueba), \
+                mock.patch.object(copias_repo, "hacer_copia_ahora", return_value={"local": "copia.db", "extra": []}), \
+                mock.patch("ui.copias_dialogo.mostrar_info"), \
+                mock.patch("ui.utils.mostrar_error") as error:
+            copias.boton_agregar.click()  # exec(): vuelve recién cuando se cierra la de agregar
+            esperar_la_respuesta(copias)  # y después la copia que prueba la carpeta nueva
+        seguro.stop()
+
+        self.assertEqual(vista, {"Cancelar prendido": False, "Cancelar": "sigue abierta",
+                                 "Esc": "sigue abierta", "la cruz": "sigue abierta", "Copias tapada": True})
+        error.assert_not_called()
+        self.assertEqual(prueba.llamadas, [(red,)])
+        self.assertEqual(copias_repo.carpetas_extra(), [disco, red])
+        self.assertEqual(copias.tabla.rowCount(), 2)
 
 
 class TestLaPieza(_ConVentanas):
@@ -490,6 +579,9 @@ class TestLaPieza(_ConVentanas):
             "un widget": (len, (tecla,)),
             "el método de una ventana": (dialogo.result, ()),
             "un lambda que nombra la ventana": (lambda: dialogo.result(), ()),
+            "un partial de un método de la ventana": (functools.partial(dialogo.done), (1,)),
+            "un widget dentro de una lista": (len, ([tecla],)),
+            "un widget dentro de un dict": (len, ({"tecla": tecla},)),
         }
         for que, (trabajo, argumentos) in prohibidos.items():
             with self.subTest(que):
@@ -497,6 +589,10 @@ class TestLaPieza(_ConVentanas):
                     espera.arrancar(trabajo, *argumentos, al_terminar=lambda respuesta: None)
                 self.assertFalse(espera.esta_esperando())
                 self.assertTrue(tecla.isEnabled())
+        # Lo que sí va al hilo: la función del repo y datos, también en listas, dicts o un partial.
+        datos = (copias_repo.agregar_carpeta_extra, 1, "D:\\BACKUPS", ["a", 2], {"x": (1, 2)},
+                 functools.partial(len, "abc"))
+        self.assertFalse(any(_lleva_un_objeto_de_qt(cosa) for cosa in datos))
 
     def test_el_hilo_es_daemon_y_lleva_solo_la_funcion_y_datos(self):
         repo = self._que_tarda(valor="D:\\BACKUPS")

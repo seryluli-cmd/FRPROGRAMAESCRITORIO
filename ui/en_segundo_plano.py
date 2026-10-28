@@ -17,24 +17,37 @@ ocupado se ve solo en esa ventana y otro clic no arranca otra vez. Al terminar, 
 ventana recibe lo que devolvió la función, o su error, y lo muestra igual que si la
 hubiera llamado ella. Si la ventana se cerró antes (el mostrador queda libre para
 seguir vendiendo), no se muestra nada: lo que hizo el repo (un cierre mandado, una
-copia hecha, una carpeta agregada) queda hecho igual.
+copia hecha) queda hecho igual, y un error inesperado va igual a data_fr/errores.log.
 
-Dos reglas que no hay que romper:
+Tres reglas que no hay que romper:
 - El hilo recibe SOLO la función del repo, sus argumentos (datos: números y textos)
   y un dict donde deja el valor o el error. Nunca la ventana, un widget ni un método
-  de la ventana: si un hilo suelta la última referencia a un objeto de Qt, Qt lo
-  destruye desde ese hilo y el programa se puede cerrar sin ningún cartel (es la
-  trampa del recolector, ver main.py). `arrancar` lo controla.
+  de la ventana. Un objeto de Qt es del hilo de la pantalla: si el hilo de la espera
+  se queda con la última referencia (la ventana se cerró y se soltó mientras
+  esperaba), al terminar Python lo destruye desde ese otro hilo, y Qt deja el objeto
+  C++ roto (lo mismo que hacía el recolector desde cualquier hilo, ver main.py).
+  `arrancar` rechaza los casos comunes (ver _lleva_un_objeto_de_qt), no todos: la
+  regla es de quien lo llama.
+- El error que vuelve del hilo no deja ciclos de referencias: con el recolector
+  apagado (main.py) un ciclo no se libera nunca. Ver _correr y Respuesta.valor.
 - El hilo es daemon, con threading.Thread y no un ThreadPoolExecutor (Python espera
   a esos hilos al salir): cerrar FRKiosko con un pedido colgado no espera a que
   Google o la otra PC contesten.
 """
 
+import functools
 import threading
 
 from PySide6.QtCore import QObject, Qt, QTimer
 
+from errores import registrar_error
+
 MILISEGUNDOS_ENTRE_VISTAS = 100
+# Los rechazos del repo, con su mensaje listo para el cartel: los mismos que
+# @manejar_errores muestra sin anotarlos en el log.
+_RECHAZOS_DEL_REPO = (ValueError, PermissionError)
+# Hasta dónde se mira adentro de un partial, una lista o un lambda buscando Qt.
+_HONDURA_MAXIMA = 4
 
 
 def _correr(trabajo, argumentos: tuple, resultado: dict):
@@ -50,17 +63,39 @@ def _correr(trabajo, argumentos: tuple, resultado: dict):
         del resultado
 
 
-def _lleva_un_objeto_de_qt(cosa) -> bool:
-    """Un widget, el método de una ventana o una función que nombra a una (un lambda con self)."""
+def _lleva_un_objeto_de_qt(cosa, hondura: int = 0) -> bool:
+    """Los casos comunes de pasarle Qt a un hilo sin querer: un widget, el método de
+    una ventana, una función que nombra a una (un lambda con self), un partial de
+    cualquiera de esos y un widget dentro de una lista, tupla o dict. No ve un widget
+    guardado como atributo de un objeto propio."""
+    if hondura > _HONDURA_MAXIMA:
+        return False
     if isinstance(cosa, QObject) or isinstance(getattr(cosa, "__self__", None), QObject):
         return True
-    for celda in getattr(cosa, "__closure__", None) or ():
-        try:
-            if isinstance(celda.cell_contents, QObject):
-                return True
-        except ValueError:  # una celda todavía vacía
-            pass
-    return False
+    if isinstance(cosa, functools.partial):
+        adentro = [cosa.func, *cosa.args, *cosa.keywords.values()]
+    elif isinstance(cosa, dict):
+        adentro = [*cosa.keys(), *cosa.values()]
+    elif isinstance(cosa, (list, tuple, set, frozenset)):
+        adentro = list(cosa)
+    else:
+        adentro = []
+        for celda in getattr(cosa, "__closure__", None) or ():
+            try:
+                adentro.append(celda.cell_contents)
+            except ValueError:  # una celda todavía vacía
+                pass
+    return any(_lleva_un_objeto_de_qt(otra, hondura + 1) for otra in adentro)
+
+
+def _anotar_si_fallo(resultado: dict):
+    """Terminó la espera de una ventana que ya se cerró: nadie va a mostrar su error.
+    Un rechazo del repo era solo para el cartel; uno inesperado va a errores.log,
+    como lo anota @manejar_errores con la ventana abierta (un disco lleno en una
+    copia no queda anotado en ningún otro lado)."""
+    error = resultado.pop("error", None)
+    if error is not None and not isinstance(error, _RECHAZOS_DEL_REPO):
+        registrar_error(error, "Lo corría una pantalla en un hilo aparte y se cerró antes de que terminara.")
 
 
 class Respuesta:
@@ -96,6 +131,10 @@ class EnSegundoPlano(QObject):
         self._hilo = None
         self._resultado = None
         self._al_terminar = None
+        # [(hilo, resultado)] de las esperas de cuando la ventana se cerró antes de
+        # que contestaran: no se muestran, pero se siguen mirando para anotar un
+        # error inesperado.
+        self._sin_ventana = []
         self._timer = QTimer(self)
         self._timer.setInterval(MILISEGUNDOS_ENTRE_VISTAS)
         self._timer.timeout.connect(self._revisar_si_termino)
@@ -113,7 +152,7 @@ class EnSegundoPlano(QObject):
         `al_terminar(respuesta)` con una Respuesta: `respuesta.valor()` da lo que
         devolvió o levanta su error. Si ya hay una espera en curso no hace nada y
         devuelve False (un Enter o un segundo clic no mandan dos veces). TypeError si
-        algo de lo que se le pasaría al hilo es de Qt.
+        en lo que se le pasaría al hilo se ve algo de Qt.
         """
         if self.esta_esperando():
             return False
@@ -137,22 +176,30 @@ class EnSegundoPlano(QObject):
 
     def _revisar_si_termino(self):
         # is_alive y no el dict: cuando da False, el hilo ya soltó todo lo que tenía.
-        if not self.esta_esperando() or self._hilo.is_alive():
-            return
-        resultado, al_terminar = self._resultado, self._al_terminar
-        self._dejar_de_esperar()
-        al_terminar(Respuesta(resultado))
+        for espera in [espera for espera in self._sin_ventana if not espera[0].is_alive()]:
+            self._sin_ventana.remove(espera)
+            _anotar_si_fallo(espera[1])
+        if self.esta_esperando() and not self._hilo.is_alive():
+            resultado, al_terminar = self._resultado, self._al_terminar
+            self._dejar_de_esperar()
+            al_terminar(Respuesta(resultado))
+        self._parar_si_no_queda_nada()
 
     def _olvidar(self):
         """La ventana se cerró mientras esperaba: lo que conteste el hilo no se muestra."""
         if self.esta_esperando():
+            self._sin_ventana.append((self._hilo, self._resultado))
             self._dejar_de_esperar()
 
     def _dejar_de_esperar(self):
-        self._timer.stop()
         self._resultado = None
         self._al_terminar = None
         for tecla in self._apagadas:
             tecla.setEnabled(True)
         self._apagadas = []
         self.parent().unsetCursor()
+        self._parar_si_no_queda_nada()
+
+    def _parar_si_no_queda_nada(self):
+        if not self.esta_esperando() and not self._sin_ventana:
+            self._timer.stop()

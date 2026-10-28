@@ -241,8 +241,9 @@ class DialogoAgregarCarpeta(QDialog):
         self.setWindowTitle("Agregar carpeta para las copias")
         self.resize(520, 260)
         self._armar_interfaz()
-        # Probar una carpeta de otra PC tarda si no contesta; Cancelar sí anda mientras tanto.
-        self._espera = EnSegundoPlano(self, [self.boton_agregar])
+        # Probar una carpeta de otra PC tarda si no contesta. Mientras tanto Cancelar
+        # también se apaga (y Esc y la cruz no cierran, ver reject).
+        self._espera = EnSegundoPlano(self, [self.boton_agregar, self.boton_cancelar])
 
     def _armar_interfaz(self):
         self.campo_carpeta = QLineEdit()
@@ -276,10 +277,20 @@ class DialogoAgregarCarpeta(QDialog):
         layout.addStretch()
         fila_botones = fila_guardar_cancelar(self, self._guardar, "Agregar")
         self.boton_agregar = fila_botones.itemAt(0).widget()  # el primero es el de guardar
+        self.boton_cancelar = fila_botones.itemAt(1).widget()
         layout.addLayout(fila_botones)
         self.setLayout(layout)
         encadenar_enter(self.campo_carpeta, self.campo_usuario, self.campo_clave, accion_final=self._guardar)
         sin_boton_por_defecto(self)
+
+    def reject(self):
+        # Cancelar, Esc y la cruz pasan por acá, y mientras se prueba la carpeta no
+        # cierran: agregar_carpeta_extra lee la lista de carpetas antes de probar y la
+        # graba después. Con esta ventana cerrada se podría agregar o quitar otra en el
+        # medio, y al terminar la prueba la pisaría sin ningún aviso. La espera sigue en
+        # el hilo: el mostrador no se traba.
+        if not self._espera.esta_esperando():
+            super().reject()
 
     def _buscar(self):
         carpeta = QFileDialog.getExistingDirectory(self, "Elegí la carpeta para las copias")
