@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 
+import dominio
 from repositories import detalle_dia_repo, turnos_repo
 from ui.reportes_detalle_dia import PanelDetalleDelDia
 from ui.utils import (
@@ -254,7 +255,8 @@ class PestañaResumenDelDia(QWidget):
             tiene_plata = turno["estado"] in (turnos_repo.ESTADO_CERRADO, turnos_repo.ESTADO_EN_CURSO)
             if turno["verificado"]:
                 sobre = formato_pesos(turno["diferencia"])
-                color_sobre = "#C62828" if turno["diferencia"] < 0 else None
+                # En rojo solo si falta plata: un sobrante no es una alarma.
+                color_sobre = "#C62828" if dominio.falta_plata(turno["diferencia"]) else None
             elif turno["estado"] == turnos_repo.ESTADO_CERRADO:
                 sobre, color_sobre = "Sin contar", "#7A869A"
             else:

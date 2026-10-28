@@ -77,6 +77,54 @@ def cuenta_del_cobro(total: float, efectivo: float, digital: float, paga_con: fl
     }
 
 
+# ---------------------------------------------------------------------------
+# La plata de la caja y del sobre
+# ---------------------------------------------------------------------------
+# Cada regla en una sola función, para que Caja, el Cierre de Turno, el relevo,
+# Control de Cierres, el Resumen del Día y la app de gastos digan lo mismo.
+
+# Una diferencia de plata menor que esto es cero. Todo se guarda al centavo
+# (regla 9) y las diferencias salen redondeadas de diferencia_de_plata: la más
+# chica que no es cero es un centavo, y el medio centavo solo se come la cola
+# del punto flotante (0.1 + 0.2 - 0.3). No es la misma regla que
+# ventas_repo.DIFERENCIA_MAXIMA_DE_PAGOS ni que el 0.005 de texto_pesos.
+TOLERANCIA_DE_PLATA = 0.005
+
+
+def total_cobrado(efectivo: float, digital: float) -> float:
+    """Todo lo cobrado en un turno: el efectivo más lo digital, sin el Cambio
+    Fijo (que no es cobrado). Es el TOTAL del Cierre de Turno, de Caja y el
+    importe que va a la app de gastos."""
+    return round(efectivo + digital, 2)
+
+
+def monto_a_retirar(efectivo_cobrado: float) -> float:
+    """Lo que va al sobre al cerrar una caja: todo el efectivo cobrado en el
+    turno, de todos los orígenes. El cambio con que arrancó la caja no se toca:
+    queda en el cajón para la siguiente (cajas_repo.cambio_inicial). Es lo que
+    graba el cierre y lo que se espera encontrar al contar el sobre."""
+    return round(efectivo_cobrado, 2)
+
+
+def diferencia_de_plata(contado: float, esperado: float) -> float:
+    """Lo contado menos lo que tendría que haber: negativo = falta plata. Es la
+    cuenta que se muestra al contar y la que se guarda (la apertura y el relevo
+    de una caja, y el sobre de un cierre)."""
+    return round(contado - esperado, 2)
+
+
+def coincide(diferencia: float) -> bool:
+    """Si una diferencia de plata (de diferencia_de_plata) es cero: lo contado
+    es lo que tenía que haber."""
+    return abs(diferencia) < TOLERANCIA_DE_PLATA
+
+
+def falta_plata(diferencia: float) -> bool:
+    """Si una diferencia de plata dice que falta: es negativa y no coincide. Un
+    sobrante no es un faltante."""
+    return diferencia < 0 and not coincide(diferencia)
+
+
 def sin_acentos(texto) -> str:
     """Texto en minúsculas y sin acentos para búsquedas y orden natural."""
     return "".join(

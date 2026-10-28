@@ -53,8 +53,8 @@ def texto_del_cierre(cierre) -> str:
     Cómo se cerró una caja, para Control de Cierres: "Forzoso 14:15", "Gaby, en
     ausencia de Lucía · 14:05", "A horario 14:00" (desde que titila el botón
     hasta el fin del turno), "22:40 (40 min después)" o "10:00 (240 min antes)".
-    Un cierre sin caja (de antes de las cajas, o de ventas que quedaron sin
-    caja) muestra solo la hora. `cierre` es una fila de turnos_repo.listar_cierres.
+    Un cierre sin caja (de ventas que quedaron sin caja) muestra solo la hora.
+    `cierre` es una fila de turnos_repo.listar_cierres.
     """
     hora = _hora(cierre["fecha_cierre"])
     if cierre["cierre_forzoso"]:
@@ -95,7 +95,7 @@ def texto_de_la_apertura(cierre) -> str:
     hora = _hora(cierre["abierta_en"])
     if cierre["cambio_contado"] is None:
         return f"{hora} · sin contar (lo dejó ella)"
-    diferencia = round(cierre["cambio_contado"] - cierre["cambio_esperado"], 2)
+    diferencia = dominio.diferencia_de_plata(cierre["cambio_contado"], cierre["cambio_esperado"])
     return f"{hora} · contó {formato_pesos(cierre['cambio_contado'])} ({texto_de_la_diferencia(diferencia)})"
 
 
@@ -222,7 +222,7 @@ class ControlCierresWindow(QDialog):
             valores.append(QTableWidgetItem(formato_pesos(contado) if contado is not None else "—"))
             diferencia = cierre["diferencia"]
             item_diferencia = QTableWidgetItem(formato_pesos(diferencia) if diferencia is not None else "—")
-            if diferencia is not None and abs(diferencia) > 0.01:
+            if diferencia is not None and not dominio.coincide(diferencia):
                 item_diferencia.setForeground(Qt.red)
             valores.append(item_diferencia)
             for columna, item in enumerate(valores):

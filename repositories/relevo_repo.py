@@ -15,8 +15,8 @@ Qué pasa con la caja cuando alguien entra al programa, y el cierre forzoso
 - Si la caja abierta es de otra persona y su turno ya terminó (desde 5 minutos
   antes del fin, cuando titila el botón), la cierra la que llega: queda "cerrada
   por Gaby en ausencia de Lucía". Después abre la suya.
-- Si quedaron ventas sin caja (de antes de las cajas, o del Admin vendiendo sin
-  nadie en el mostrador), se cierran primero, en un cierre aparte.
+- Si quedaron ventas sin caja (del Admin vendiendo sin nadie en el mostrador),
+  se cierran primero, en un cierre aparte.
 - El Admin (el dueño, que entra a cargar mercadería o cambiar precios) no abre
   caja: entra directo. Lo que cobre va a nombre de la responsable de la caja
   abierta (cajas_repo._quien_vende).
@@ -26,7 +26,8 @@ Qué pasa con la caja cuando alguien entra al programa, y el cierre forzoso
   ingreso de la propia responsable si el programa estuvo cerrado.
 
 La plata del cierre sigue saliendo de turnos_repo (la ventana entre cierres):
-acá solo se decide quién hace qué y se deja anotado.
+acá solo se decide quién hace qué y se deja anotado. Las diferencias al contar
+salen de dominio.diferencia_de_plata, como el sobre en Control de Cierres.
 """
 
 from datetime import datetime
@@ -53,12 +54,6 @@ SITUACION_VENTAS_SIN_CAJA = "VENTAS_SIN_CAJA"      # quedaron ventas sin caja: s
 
 # Las que se resuelven con un Cierre de Turno antes de poder entrar.
 _SITUACIONES_QUE_CIERRAN = (SITUACION_SU_CAJA_VENCIDA, SITUACION_CERRAR_LA_DE_OTRA, SITUACION_VENTAS_SIN_CAJA)
-
-
-def diferencia(contado: float, esperado: float) -> float:
-    """Lo contado menos lo que tendría que haber: negativo = falta plata. Es la
-    cuenta que muestra la pantalla al contar y la que se guarda."""
-    return round(contado - esperado, 2)
 
 
 def _datos_de_caja(caja) -> dict:
@@ -105,7 +100,7 @@ def _situacion(conexion, usuario, ahora: datetime) -> dict:
         if ahora >= inicio_del_aviso_de_cierre(caja["fecha"], caja["turno"]):
             return {
                 "situacion": SITUACION_CERRAR_LA_DE_OTRA, **datos,
-                "a_retirar": resumen["ventas_efectivo"], "cambio_que_queda": resumen["cambio_inicial"],
+                "a_retirar": resumen["monto_a_retirar"], "cambio_que_queda": resumen["cambio_inicial"],
             }
         return {"situacion": SITUACION_RECIBIR, **datos, "esperado": resumen["caja_actual"],
                 "cambio_inicial": resumen["cambio_inicial"], "ventas_efectivo": resumen["ventas_efectivo"]}
@@ -120,7 +115,7 @@ def _situacion(conexion, usuario, ahora: datetime) -> dict:
         ).fetchone()["fecha"]
         return {
             "situacion": SITUACION_VENTAS_SIN_CAJA, "cantidad": confirmadas, "desde": primera,
-            "a_retirar": resumen["ventas_efectivo"], "cambio_que_queda": resumen["cambio_inicial"],
+            "a_retirar": resumen["monto_a_retirar"], "cambio_que_queda": resumen["cambio_inicial"],
         }
 
     return {
@@ -139,7 +134,8 @@ def situacion_al_entrar(usuario_id: int, ahora: datetime = None) -> dict:
     - RECIBIR: "esperado" (lo que tiene que haber en el cajón), "cambio_inicial"
       y "ventas_efectivo" (de dónde sale);
     - CERRAR_LA_DE_OTRA y VENTAS_SIN_CAJA: "a_retirar" y "cambio_que_queda"
-      (lo que va al sobre y lo que se deja); VENTAS_SIN_CAJA, además,
+      (lo que va al sobre, el mismo "monto_a_retirar" que graba el cierre, y lo
+      que se deja); VENTAS_SIN_CAJA, además,
       "cantidad" y "desde" (la primera de esas ventas);
     - ABRIR: "cambio_esperado", "cuenta_cambio" y "turno_label" de la caja nueva.
     La pantalla de ingreso resuelve la situación (abrir_caja, recibir_caja o
@@ -193,7 +189,8 @@ def abrir_caja(usuario_id: int, cambio_contado=None, ahora: datetime = None) -> 
         "turno_label": etiqueta_turno(dia, turno),
         "cambio_esperado": situacion["cambio_esperado"],
         "cambio_contado": cambio_contado,
-        "diferencia": diferencia(cambio_contado, situacion["cambio_esperado"]) if cambio_contado is not None else 0.0,
+        "diferencia": (dominio.diferencia_de_plata(cambio_contado, situacion["cambio_esperado"])
+                       if cambio_contado is not None else 0.0),
     }
 
 
@@ -213,6 +210,7 @@ def recibir_caja(usuario_id: int, caja_id: int, monto_contado: float, ahora: dat
         if situacion["caja_id"] != caja_id:
             raise ValueError("La caja cambió mientras tanto. Volvé a entrar para ver cómo está ahora.")
         esperado = situacion["esperado"]
+        diferencia = dominio.diferencia_de_plata(monto_contado, esperado)
         conexion.execute(
             """
             INSERT INTO relevos_caja
@@ -220,11 +218,11 @@ def recibir_caja(usuario_id: int, caja_id: int, monto_contado: float, ahora: dat
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (caja_id, ahora.isoformat(timespec="microseconds"), situacion["responsable_id"], usuario_id,
-             esperado, monto_contado, diferencia(monto_contado, esperado)),
+             esperado, monto_contado, diferencia),
         )
         conexion.execute("UPDATE cajas SET responsable_id = ? WHERE id = ?", (usuario_id, caja_id))
     return {
-        "esperado": esperado, "contado": monto_contado, "diferencia": diferencia(monto_contado, esperado),
+        "esperado": esperado, "contado": monto_contado, "diferencia": diferencia,
         "de": situacion["responsable"], "caja_numero": caja_id,
     }
 

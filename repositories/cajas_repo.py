@@ -10,9 +10,9 @@ otra persona): eso es relevo_repo, que usa a este y a turnos_repo. Acá solo hay
 lo que necesitan ventas_repo y turnos_repo, para que ninguno de los dos tenga
 que importar al otro.
 
-Una base de antes de las cajas no tiene ninguna: todo sigue funcionando igual
-que antes (las ventas quedan sin caja y el cierre sale de la ventana entre
-cierres, ver turnos_repo).
+Sin caja abierta (el Admin vendiendo sin nadie en el mostrador) las ventas
+quedan sin caja y el cierre sale igual de la ventana entre cierres (ver
+turnos_repo); relevo_repo las cierra aparte antes de abrir la próxima caja.
 """
 
 import dominio
@@ -51,13 +51,22 @@ def cambio_inicial(caja) -> float:
     return caja["cambio_esperado"]
 
 
+def cerrada_en_ausencia(caja, quien_cierra_id) -> bool:
+    """Si la caja `caja` (o None, un cierre sin caja) la cierra otra persona que
+    su responsable: la que llega o el Admin, porque la responsable se fue sin
+    cerrar. Se compara por número de usuario, no por nombre: el nombre se puede
+    cambiar en Usuarios con la sesión abierta, y una usuaria dada de baja puede
+    llamarse igual que una activa."""
+    return caja is not None and quien_cierra_id != caja["responsable_id"]
+
+
 def _quien_vende(conexion, usuario_id: int) -> tuple:
     """
     A nombre de quién queda una venta que cobra `usuario_id` y en qué caja:
     (usuario_id de la venta, caja_id o None, cargada_por o None).
 
-    - Sin caja abierta (base de antes de las cajas, o el Admin vendiendo sin
-      nadie en el mostrador): a su nombre y sin caja, como siempre.
+    - Sin caja abierta (el Admin vendiendo sin nadie en el mostrador): a su
+      nombre y sin caja.
     - El Admin con la caja de una empleada abierta: a nombre de ELLA, dentro de
       su caja, y queda anotado que la cargó el Admin (pedido del dueño,
       2026-10-18: "que lo asiente como la empleada que estaba antes de que yo
@@ -98,8 +107,8 @@ def _marcar_cerrada(conexion, caja_id: int, cierre_id: int, forzoso: bool):
 
 def _caja_del_cierre(conexion, cierre_id: int):
     """La caja que se cerró con el cierre `cierre_id` (con los nombres de quien
-    la abrió y de su responsable), o None si es un cierre sin caja (de antes de
-    las cajas, o de ventas que quedaron sin caja)."""
+    la abrió y de su responsable), o None si es un cierre sin caja (de ventas
+    que quedaron sin caja)."""
     return conexion.execute(
         """
         SELECT cajas.*, responsables.nombre AS responsable, abridores.nombre AS abierta_por_nombre
