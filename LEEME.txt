@@ -88,6 +88,16 @@ stock, y también usuarios nuevos y claves cambiadas: vuelve la clave vieja).
    Si el error dice que la base es de CYBERCONTROL, la sacaste de la carpeta
    equivocada: tiene que ser una copia de FRKiosko.
 
+TURNOS DEL KIOSKO (todos los días, también el domingo)
+-----------------------------------------------------
+- Mañana: de 06:00 a 14:00.
+- Tarde: de 14:00 a 22:00.
+- Noche: de 22:00 a 06:00 del día siguiente.
+
+El domingo funciona igual que cualquier otro día: hay Mañana, Tarde y
+Noche. La madrugada del lunes hasta las 06:00 pertenece a la Noche del
+domingo. Esta regla es propia de FRKiosko.
+
 LA CAJA (cada persona con su caja)
 ----------------------------------
 - Al entrar, si no hay ninguna caja abierta, el programa pide contar el
@@ -97,8 +107,8 @@ LA CAJA (cada persona con su caja)
 - 5 minutos antes del fin del turno (13:55, 21:55 y 05:55, todos los
   días, incluidos los domingos) el botón Cierre de Turno titila en rojo:
   cerrá la caja, armá el sobre con lo que dice el programa y guardalo en la caja fuerte.
-- Si a la hora del fin del turno la caja sigue abierta, el programa
-  la cierra solo (cierre forzoso). Si estás en medio de un cobro, espera a
+- Si pasó una hora desde el fin del turno y la caja sigue abierta, el
+  programa la cierra solo: a las 15:00, 23:00 o 07:00, según el turno. Si estás en medio de un cobro, espera a
   que termines.
 - Si tu reemplazo llega un poco tarde (menos de una hora), seguí con tu caja
   y cerrala vos cuando llegue, ANTES de que entre con su usuario: todo lo que
