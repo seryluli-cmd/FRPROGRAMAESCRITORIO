@@ -53,15 +53,15 @@ class TestCalcularTurno(unittest.TestCase):
 
     # El 2026-01-04 es domingo, el 2026-01-03 es sábado (usados también en
     # TestEtiquetaTurno / TestTurnoVencimiento / TestTurnosFaltantes).
-    def test_domingo_manana_dura_hasta_las_18(self):
-        self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 4, 17, 59)), "MAÑANA")
+    def test_domingo_manana_dura_hasta_las_14(self):
+        self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 4, 13, 59)), "MAÑANA")
 
-    def test_domingo_no_existe_el_turno_tarde(self):
-        # A las 14:00, un día de semana normal ya sería Tarde.
-        self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 4, 14, 0)), "MAÑANA")
+    def test_domingo_tarde_empieza_a_las_14(self):
+        # El domingo tiene la misma Tarde que cualquier otro día.
+        self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 4, 14, 0)), "TARDE")
 
-    def test_domingo_noche_empieza_a_las_18(self):
-        self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 4, 18, 0)), "NOCHE")
+    def test_domingo_noche_empieza_a_las_22(self):
+        self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 4, 22, 0)), "NOCHE")
 
     def test_sabado_a_la_noche_sigue_siendo_el_turno_normal(self):
         self.assertEqual(turnos.calcular_turno(datetime(2026, 1, 3, 22, 0)), "NOCHE")
@@ -74,10 +74,10 @@ class TestEtiquetaTurno(unittest.TestCase):
         self.assertEqual(turnos.etiqueta_turno(lunes, "TARDE"), "Tarde")
         self.assertEqual(turnos.etiqueta_turno(lunes, "NOCHE"), "Noche")
 
-    def test_domingo_usa_las_etiquetas_de_2_turnos(self):
+    def test_domingo_usa_las_etiquetas_de_tres_turnos(self):
         domingo = date(2026, 1, 4)
-        self.assertEqual(turnos.etiqueta_turno(domingo, "MAÑANA"), "Domingo T1")
-        self.assertEqual(turnos.etiqueta_turno(domingo, "NOCHE"), "Domingo T2")
+        self.assertEqual(turnos.etiqueta_turno(domingo, "MAÑANA"), "Mañana")
+        self.assertEqual(turnos.etiqueta_turno(domingo, "NOCHE"), "Noche")
 
 
 class TestTurnosDelDia(unittest.TestCase):
@@ -92,14 +92,14 @@ class TestTurnosDelDia(unittest.TestCase):
             (dominio.TURNO_MANANA, dominio.TURNO_TARDE, dominio.TURNO_NOCHE),
         )
 
-    def test_domingo_tiene_solo_dos_turnos_y_sin_tarde(self):
+    def test_domingo_tiene_tres_turnos_con_tarde(self):
         domingo = date(2026, 1, 4)
         turnos_domingo = turnos.turnos_del_dia(domingo)
-        self.assertEqual(turnos_domingo, (dominio.TURNO_MANANA, dominio.TURNO_NOCHE))
-        self.assertNotIn(dominio.TURNO_TARDE, turnos_domingo)
+        self.assertEqual(turnos_domingo, (dominio.TURNO_MANANA, dominio.TURNO_TARDE, dominio.TURNO_NOCHE))
+        self.assertIn(dominio.TURNO_TARDE, turnos_domingo)
 
     def test_acepta_string_igual_que_es_domingo(self):
-        self.assertEqual(turnos.turnos_del_dia("2026-01-04"), dominio.TURNOS_DOMINGO)
+        self.assertEqual(turnos.turnos_del_dia("2026-01-04"), dominio.TURNOS)
 
 
 class TestSubtotalDeLinea(unittest.TestCase):
@@ -144,9 +144,9 @@ class TestTurnoVencimiento(unittest.TestCase):
         lunes = date(2026, 1, 5)
         self.assertEqual(turnos.turno_vencimiento(lunes, "MAÑANA"), datetime(2026, 1, 5, 15, 0))
 
-    def test_manana_vence_a_las_19_el_domingo(self):
+    def test_manana_vence_a_las_15_el_domingo(self):
         domingo = date(2026, 1, 4)
-        self.assertEqual(turnos.turno_vencimiento(domingo, "MAÑANA"), datetime(2026, 1, 4, 19, 0))
+        self.assertEqual(turnos.turno_vencimiento(domingo, "MAÑANA"), datetime(2026, 1, 4, 15, 0))
 
     def test_noche_vence_a_la_madrugada_del_dia_siguiente(self):
         lunes = date(2026, 1, 5)
@@ -163,8 +163,8 @@ class TestAvisoDeCierre(unittest.TestCase):
     def test_la_manana_avisa_desde_las_13_55(self):
         self.assertEqual(turnos.inicio_del_aviso_de_cierre(date(2026, 1, 5), "MAÑANA"), datetime(2026, 1, 5, 13, 55))
 
-    def test_el_domingo_la_manana_avisa_desde_las_17_55(self):
-        self.assertEqual(turnos.inicio_del_aviso_de_cierre(date(2026, 1, 4), "MAÑANA"), datetime(2026, 1, 4, 17, 55))
+    def test_el_domingo_la_manana_avisa_desde_las_13_55(self):
+        self.assertEqual(turnos.inicio_del_aviso_de_cierre(date(2026, 1, 4), "MAÑANA"), datetime(2026, 1, 4, 13, 55))
 
     def test_la_noche_avisa_a_las_05_55_del_dia_siguiente(self):
         self.assertEqual(turnos.inicio_del_aviso_de_cierre(date(2026, 1, 4), "NOCHE"), datetime(2026, 1, 5, 5, 55))
@@ -174,7 +174,7 @@ class TestAvisoDeCierre(unittest.TestCase):
         self.assertEqual(turnos.fin_del_turno(lunes, "MAÑANA"), datetime(2026, 1, 5, 14, 0))
         self.assertEqual(turnos.fin_del_turno(lunes, "TARDE"), datetime(2026, 1, 5, 22, 0))
         self.assertEqual(turnos.fin_del_turno(lunes, "NOCHE"), datetime(2026, 1, 6, 6, 0))
-        self.assertEqual(turnos.fin_del_turno("2026-01-04", "MAÑANA"), datetime(2026, 1, 4, 18, 0))
+        self.assertEqual(turnos.fin_del_turno("2026-01-04", "MAÑANA"), datetime(2026, 1, 4, 14, 0))
 
 
 class TestTurnoQueArrancaTrasUnCierre(unittest.TestCase):
@@ -205,14 +205,15 @@ class TestTurnoQueArrancaTrasUnCierre(unittest.TestCase):
         self.assertEqual(turnos.turno_que_arranca_tras_un_cierre(justo_antes_de_la_gracia), "MAÑANA")
         self.assertEqual(turnos.turno_que_arranca_tras_un_cierre(justo_en_la_gracia), "TARDE")
 
-    def test_los_domingos_el_cambio_es_a_las_18_y_a_las_6_del_lunes(self):
+    def test_los_domingos_tienen_los_mismos_tres_cambios(self):
         casos = [
             (datetime(2026, 1, 3, 21, 55), "NOCHE"),    # sábado: la Tarde normal, cerrada 5 min antes de las 22
             (datetime(2026, 1, 3, 23, 50), "NOCHE"),    # sábado a la noche, ya cruzando a domingo
-            (datetime(2026, 1, 4, 5, 55), "MAÑANA"),    # la Noche del sábado, cerrada 5 min antes: Domingo T1
-            (datetime(2026, 1, 4, 14, 5), "MAÑANA"),    # el domingo no existe la Tarde
-            (datetime(2026, 1, 4, 17, 55), "NOCHE"),    # Domingo T1 cerrado 5 min antes: arranca Domingo T2
-            (datetime(2026, 1, 5, 5, 55), "MAÑANA"),    # Domingo T2 cerrado 5 min antes de las 6 del lunes
+            (datetime(2026, 1, 4, 5, 55), "MAÑANA"),    # la Noche del sábado, cerrada 5 min antes: Mañana
+            (datetime(2026, 1, 4, 14, 5), "TARDE"),
+            (datetime(2026, 1, 4, 17, 55), "TARDE"),
+            (datetime(2026, 1, 4, 21, 55), "NOCHE"),
+            (datetime(2026, 1, 5, 5, 55), "MAÑANA"),    # Noche cerrada 5 min antes de las 6 del lunes
         ]
         for cuando, esperado in casos:
             with self.subTest(cuando=cuando):
@@ -1157,9 +1158,9 @@ class TestResumenDelDia(BaseConBaseTemporal):
         self.assertEqual(resumen["total"]["total"], 65.0)
         self.assertEqual(resumen["total"]["cantidad_ventas"], 4)
 
-    def test_el_domingo_tiene_dos_turnos_y_un_dia_pasado_sin_cierres_queda_sin_cerrar(self):
+    def test_el_domingo_tiene_tres_turnos_y_un_dia_pasado_sin_cierres_queda_sin_cerrar(self):
         resumen = self._resumen(date(2026, 1, 4), datetime(2026, 1, 7, 10, 0))
-        self.assertEqual([t["etiqueta"] for t in resumen["turnos"]], ["Domingo T1", "Domingo T2"])
+        self.assertEqual([t["etiqueta"] for t in resumen["turnos"]], ["Mañana", "Tarde", "Noche"])
         self.assertTrue(all(t["estado"] == turnos_repo.ESTADO_SIN_CERRAR for t in resumen["turnos"]))
         self.assertEqual(resumen["total"]["total"], 0.0)
 
@@ -1407,9 +1408,9 @@ class TestTurnosFaltantes(BaseConBaseTemporal):
         self.assertNotIn((date(2026, 1, 5), "MAÑANA"), claves)
         # ...pero un turno vencido de un día anterior que nunca se cerró, sí.
         self.assertIn((date(2026, 1, 1), "TARDE"), claves)
-        # El domingo 4 de enero no tiene turno Tarde (2 turnos de 12hs).
+        # El domingo 4 de enero también tiene turno Tarde.
         self.assertIn((date(2026, 1, 4), "MAÑANA"), claves)
-        self.assertNotIn((date(2026, 1, 4), "TARDE"), claves)
+        self.assertIn((date(2026, 1, 4), "TARDE"), claves)
         # La Tarde de hoy (día 5) todavía no venció (recién son las 20:00,
         # vence a las 22:40): no debería figurar todavía.
         self.assertNotIn((date(2026, 1, 5), "TARDE"), claves)

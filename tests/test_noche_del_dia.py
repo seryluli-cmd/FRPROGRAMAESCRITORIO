@@ -128,15 +128,15 @@ class TestLaNocheEntraEnteraEnElDiaEnQueEmpezo(_ConTurnos):
         self.assertEqual(lunes["Noche"]["total"], 7.0)
 
     def test_caja_nombra_bien_la_noche_del_domingo_pasada_la_medianoche(self):
-        # Domingo 4 de enero: la Noche es "Domingo T2" (18 a 06 del lunes). Cerrada
-        # una vez a las 02:00 del lunes, lo que sigue sigue siendo "Domingo T2".
-        self._cerrar(datetime(2026, 1, 4, 18, 5))
+        # Domingo 4 de enero: la Noche es "Noche" (22 a 06 del lunes). Cerrada
+        # una vez a las 02:00 del lunes, lo que sigue sigue siendo "Noche".
+        self._cerrar(datetime(2026, 1, 4, 22, 5))
         self._cerrar(datetime(2026, 1, 5, 2, 0))
         self._con_reloj(datetime(2026, 1, 5, 3, 0))
 
         caja = turnos_repo.resumen_turno_actual()
 
-        self.assertEqual(caja["turno_actual_label"], "Domingo T2")
+        self.assertEqual(caja["turno_actual_label"], "Noche")
 
 
 class TestHoyDeLosReportes(_ConTurnos):

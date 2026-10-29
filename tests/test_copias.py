@@ -327,7 +327,9 @@ class TestOtrasCarpetas(_ConCopias):
             copias_repo.agregar_carpeta_extra(self.admin_id, copias_repo.carpeta_local())
         copias_repo.agregar_carpeta_extra(self.admin_id, self.disco + "\\")
         with self.assertRaises(ValueError):
-            copias_repo.agregar_carpeta_extra(self.admin_id, self.disco.upper())
+            # Windows ignora mayúsculas; en Linux esa sería otra carpeta.
+            repetida = self.disco.upper() if os.name == "nt" else os.path.join(self.disco, ".")
+            copias_repo.agregar_carpeta_extra(self.admin_id, repetida)
         self.assertEqual(copias_repo.carpetas_extra(), [os.path.normpath(self.disco)])
         self.assertEqual(os.listdir(self.disco), [])  # la prueba de escritura no deja nada
 

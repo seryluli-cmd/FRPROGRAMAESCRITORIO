@@ -427,9 +427,8 @@ def _ventanas_del_dia(conexion, dia, ahora_dt) -> list:
 
 def resumen_del_dia(dia):
     """
-    El reporte de UN día del local, abierto por turno (Mañana/Tarde/Noche,
-    o Domingo T1/T2): qué se vendió en cada uno, quién lo cerró y cuánto
-    faltó o sobró al contar el sobre.
+    El reporte de UN día del local, abierto por turno (Mañana/Tarde/Noche):
+    qué se vendió en cada uno, quién lo cerró y cuánto faltó o sobró al contar el sobre.
 
     Un turno pertenece al día en que ARRANCÓ (mismo criterio que
     `cierres_turno.fecha`, ver cerrar_turno): la Noche del lunes incluye lo

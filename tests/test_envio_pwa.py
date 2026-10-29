@@ -165,9 +165,10 @@ class TestElTurnoConElNombreDeAlla(unittest.TestCase):
             self.assertEqual(turnos.turno_para_la_app_de_gastos(LUNES, turno), alla)
             self.assertEqual(turnos.turno_para_la_app_de_gastos("2026-01-10", turno), alla)  # sábado
 
-    def test_el_domingo_son_t1_y_t2(self):
-        self.assertEqual(turnos.turno_para_la_app_de_gastos(DOMINGO, dominio.TURNO_MANANA), "t1")
-        self.assertEqual(turnos.turno_para_la_app_de_gastos("2026-01-04", dominio.TURNO_NOCHE), "t2")
+    def test_el_domingo_son_manana_tarde_y_noche(self):
+        self.assertEqual(turnos.turno_para_la_app_de_gastos(DOMINGO, dominio.TURNO_MANANA), "mañana")
+        self.assertEqual(turnos.turno_para_la_app_de_gastos(DOMINGO, dominio.TURNO_TARDE), "tarde")
+        self.assertEqual(turnos.turno_para_la_app_de_gastos("2026-01-04", dominio.TURNO_NOCHE), "noche")
 
 
 class TestLoQueViaja(_BaseDeEnvios):
@@ -240,11 +241,11 @@ class TestLoQueViaja(_BaseDeEnvios):
 
         self.assertEqual((datos["registradoPor"], datos["caja"], datos["importe"]), ("Dueño", None, 700.0))
 
-    def test_el_domingo_va_como_t1(self):
+    def test_el_domingo_va_como_manana(self):
         self._turno_de_toby(DOMINGO)
-        cierre = turnos_repo.cerrar_turno(self.toby_id, ahora_dt=_a_las(18, 0, DOMINGO))
+        cierre = turnos_repo.cerrar_turno(self.toby_id, ahora_dt=_a_las(14, 0, DOMINGO))
 
-        self.assertEqual((self._datos(cierre["id"])["turno"], cierre["turno_label"]), ("t1", "Domingo T1"))
+        self.assertEqual((self._datos(cierre["id"])["turno"], cierre["turno_label"]), ("mañana", "Mañana"))
 
     def test_los_campos_llevan_los_tipos_de_firestore(self):
         self._turno_de_toby()

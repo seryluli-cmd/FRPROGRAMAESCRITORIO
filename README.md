@@ -119,11 +119,10 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
   fondo de cambio, `database.CLAVE_FONDO_CAMBIO`), y todos la leen y graban con
   `config_repo.leer` / `config_repo.guardar`.
 - **`calcular_turno(fecha_hora)`** (`turnos.py`) — Mañana 06-14, Tarde
-  14-22, Noche 22-06 (cruza medianoche). ⚠️ **Los domingos son distintos**: 2
-  turnos de 12 hs (Mañana 06-18 y Noche 18-06 del lunes), que se muestran como
-  **"Domingo T1"/"Domingo T2"** (`turnos.etiqueta_turno`). ⚠️ Para el **cierre de
-  turno**, la etiqueta y la **`fecha`** usan el momento en que **empezó** el
-  turno (el `fecha_cierre` del cierre anterior, con la tolerancia de
+  14-22, Noche 22-06 (cruza medianoche), **todos los días, incluidos los
+  domingos**. Se muestran como Mañana, Tarde y Noche (`turnos.etiqueta_turno`).
+  ⚠️ Para el **cierre de turno**, la etiqueta y la **`fecha`** usan el momento
+  en que **empezó** el turno (el `fecha_cierre` del cierre anterior, con la tolerancia de
   `TURNO_GRACIA_MIN`, 60 min: `turnos.turno_que_arranca_tras_un_cierre`), no el
   clic de cerrar. ⚠️ **Con una caja abierta, el turno y el día del cierre son los
   de la caja** (decididos al abrirla).
@@ -357,7 +356,7 @@ negocio `gestionfr`), no a la de CyberBIOS. Las constantes están arriba de
   en la app de CyberBIOS); "Probar la conexión" lo verifica sin escribir nada.
 - **Qué viaja** (`datos_del_cierre`): `importe`, `efectivo`, `digital`, `turno`
   con el nombre de allá (`turnos.turno_para_la_app_de_gastos`: "mañana",
-  "tarde", "noche"; los domingos "t1"/"t2"), `fecha` (el día en que ARRANCÓ el
+  "tarde", "noche", también los domingos), `fecha` (el día en que ARRANCÓ el
   turno), `registradoPor` = el NOMBRE de la **responsable de la caja**,
   `creadoEn`, `origen: "frkiosko"`, `cierreId`, `caja`, `forzoso`, `enAusencia`,
   `cerradoPor` y **`detalle`** (la tarjeta del cierre: Cambio Fijo, a retirar,

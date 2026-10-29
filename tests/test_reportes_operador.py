@@ -5,8 +5,8 @@ Reportes > "Por Operador" (pedido del dueño, 2026-10-17): cuánto vendió cada
 usuario en un rango de fechas y sus ventas una por una con fecha y hora
 (reportes_repo.resumen_por_operador / ventas_de_operador y la pestaña de
 ui/reportes_operador.py), más el día en que empezó el turno de una venta de
-madrugada (turnos.dia_en_que_empezo_el_turno), que decide si se ve como
-"Noche" o "Domingo T2". La pantalla se prueba con Qt "offscreen".
+madrugada (turnos.dia_en_que_empezo_el_turno), que mantiene la Noche
+en el día en que empezó. La pantalla se prueba con Qt "offscreen".
 
 Se ejecutan con:
 
@@ -155,7 +155,7 @@ class TestDiaEnQueEmpezoElTurno(unittest.TestCase):
         domingo_3am = datetime(2026, 10, 18, 3, 0)    # el sábado 17 a la noche
 
         self.assertEqual(dia_en_que_empezo_el_turno(lunes_1am), date(2026, 10, 18))
-        self.assertEqual(etiqueta_turno(dia_en_que_empezo_el_turno(lunes_1am), dominio.TURNO_NOCHE), "Domingo T2")
+        self.assertEqual(etiqueta_turno(dia_en_que_empezo_el_turno(lunes_1am), dominio.TURNO_NOCHE), "Noche")
         self.assertEqual(etiqueta_turno(dia_en_que_empezo_el_turno(domingo_3am), dominio.TURNO_NOCHE), "Noche")
 
     def test_desde_las_6_es_el_mismo_dia(self):

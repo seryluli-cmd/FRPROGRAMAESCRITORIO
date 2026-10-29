@@ -9,11 +9,10 @@ from turnos import calcular_turno, turno_vencimiento, turnos_del_dia
 
 def turnos_del_mes_actual(hoy):
     """
-    Los turnos esperados del mes en curso, de día 1 a hoy — domingo
-    tiene solo 2 (Mañana, Noche); el resto de los días tiene los 3 de
-    siempre (ver turnos.calcular_turno). Todavía no dice cuáles ya
-    tienen cierre cargado ni cuáles vencieron — eso lo hace
-    turnos_faltantes().
+    Los turnos esperados del mes en curso, de día 1 a hoy: Mañana,
+    Tarde y Noche todos los días (ver turnos.calcular_turno).
+    Todavía no dice cuáles ya tienen cierre cargado ni cuáles vencieron:
+    eso lo hace turnos_faltantes().
     """
     dia = date(hoy.year, hoy.month, 1)
     slots = []
@@ -36,9 +35,9 @@ def _responsables_del_mes(conexion, inicio_mes):
     todavía no facturó nada, o que atendió sin cobrar nada por sistema).
 
     NOCHE cruza la medianoche: un evento de esas horas puede tener
-    fecha del día en que arrancó el turno (22-23:59, o 18-23:59 el
-    domingo) o del día siguiente (00-05:59) — se le atribuye al día en
-    que arrancó, mismo criterio que turno_vencimiento().
+    fecha del día en que arrancó el turno (22-23:59) o del día siguiente
+    (00-05:59): se le atribuye al día en que arrancó, mismo criterio que
+    turno_vencimiento().
     """
     responsables = {}
 
@@ -62,9 +61,9 @@ def _responsables_del_mes(conexion, inicio_mes):
 
     # Las sesiones no tienen "turno" guardado (a diferencia de las
     # ventas): se calcula al vuelo con la misma calcular_turno() que usa
-    # todo el resto del sistema, para que quede consistente incluso con
-    # la excepción de los domingos. Los ingresos desde otra PC (desde_ip, el
-    # Administrador administrando desde otra PC del local) no cuentan: no dicen
+    # todo el resto del sistema, para que quede consistente todos los días.
+    # Los ingresos desde otra PC (desde_ip, el Administrador administrando
+    # desde otra PC del local) no cuentan: no dicen
     # nada de quién estaba en el mostrador.
     filas_sesiones = conexion.execute(
         """

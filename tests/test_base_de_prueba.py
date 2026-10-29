@@ -32,7 +32,9 @@ from turnos import turno_vencimiento, turnos_del_dia  # noqa: E402
 
 _HASTA = date(2026, 10, 20)  # martes: entran dos lunes (12 y 19)
 _DIAS = 10
-_SEMILLAS = (2, 3, 4)  # con estas, antes del arreglo una caja vieja vendía el turno siguiente
+# Con tres turnos también los domingos cambian los sorteos de la simulación.
+# Estas semillas incluyen la caja vieja de quien sigue atendiendo y la reposición del lunes.
+_SEMILLAS = (1, 4, 5)
 # Que en pocos días pase de todo: olvidos, cierres forzosos, relevos, reemplazos,
 # ventas sin caja y el cambio siempre mal contado.
 _SEGUIDO = {"olvido": 0.3, "forzoso": 0.3, "relevo": 0.4, "reemplazo": 0.2, "anulada": 0.05,

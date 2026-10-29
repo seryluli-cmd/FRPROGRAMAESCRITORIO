@@ -24,7 +24,7 @@ import dominio
 # es Mañana (06-14), Tarde (14-22) y Noche (22 a 06 del día 2). La Noche se
 # factura desde el día 1 a las 22, así que cuenta ENTERA en el día 1: un día va
 # de las 06:00 a las 06:00 del día siguiente, no de medianoche a medianoche. Los
-# domingos también, aunque tengan 2 turnos de 12 hs (ver calcular_turno).
+# domingos tienen los mismos tres turnos que cualquier otro día.
 HORA_CAMBIO_DE_DIA = 6
 
 
@@ -39,19 +39,12 @@ def calcular_turno(fecha_hora: datetime) -> str:
     una empleada llegue tarde, cada venta se clasifica sola por su hora
     real.
 
-    EXCEPCIÓN: los domingos son distintos — solo hay 2 turnos de 12hs en
-    vez de 3. "MAÑANA" pasa a durar 06:00-17:59 (absorbe lo que sería
-    "TARDE", que no existe ese día) y "NOCHE" pasa a ser 18:00-05:59 del
-    lunes. El sábado a la noche sigue siendo el turno normal 22-06
-    (termina el domingo a la mañana), eso no cambia — por eso se mira el
-    día de `fecha_hora` tal cual, sin correcciones.
+    Estos horarios rigen todos los días, incluidos los domingos.
     """
-    domingo = fecha_hora.weekday() == 6  # Monday=0 ... Sunday=6
     hora = fecha_hora.hour
-    fin_manana = 18 if domingo else 14
-    if HORA_CAMBIO_DE_DIA <= hora < fin_manana:
+    if HORA_CAMBIO_DE_DIA <= hora < 14:
         return dominio.TURNO_MANANA
-    elif not domingo and 14 <= hora < 22:
+    elif 14 <= hora < 22:
         return dominio.TURNO_TARDE
     else:
         return dominio.TURNO_NOCHE
@@ -69,26 +62,25 @@ def es_domingo(fecha) -> bool:
 
 def turnos_del_dia(fecha) -> tuple:
     """
-    Qué turnos existen en un día calendario dado: los tres de siempre, o
-    los dos de 12hs si es domingo (ver calcular_turno). `fecha` acepta lo
-    mismo que es_domingo().
+    Los tres turnos del kiosko, todos los días incluidos los domingos.
+    Se conserva `fecha` para que pantallas y reportes consulten el calendario
+    por la misma interfaz.
 
     Único lugar donde se decide esto. Cualquier pantalla o reporte que
     recorra "los turnos de un día" tiene que preguntar acá, si no el día
     que cambien los horarios habría que acordarse de todos los lugares
     donde está escrita la lista a mano.
     """
-    return dominio.TURNOS_DOMINGO if es_domingo(fecha) else dominio.TURNOS
+    return dominio.TURNOS
 
 
 def dia_en_que_empezo_el_turno(fecha_hora: datetime) -> date:
     """
     El día calendario en que EMPEZÓ el turno al que pertenece un momento (ver
     calcular_turno). Es el mismo día, salvo de madrugada (antes de las 06:00):
-    eso es el turno Noche que arrancó el día anterior. Sin esto, una venta del
-    lunes a la 01:00 (Noche del domingo, "Domingo T2") se mostraría como
-    "Noche", y una del domingo a las 03:00 (Noche del sábado) como "Domingo T2".
-    Se usa para pasarle el día correcto a etiqueta_turno.
+    eso es el turno Noche que arrancó el día anterior. Una venta del lunes
+    a la 01:00 pertenece al domingo, y una del domingo a las 03:00 al sábado.
+    Así los reportes mantienen cada noche entera en el día en que empezó.
 
     Es también "a qué día del local pertenece este momento" (ver
     HORA_CAMBIO_DE_DIA): el día del turno y el día del local son lo mismo.
@@ -142,30 +134,18 @@ def turno_para_la_app_de_gastos(fecha, turno: str) -> str:
     """
     El nombre con que la app de gastos del dueño (la PWA "Gestión Central",
     repo FRWEB; campo `turno` de su colección `facturacion`) llama a un
-    turno de acá: "mañana", "tarde" o "noche" y, los domingos, "t1" (MAÑANA,
-    06-18) o "t2" (NOCHE, 18-06): allá tampoco existe la Tarde ese día. Las dos
-    apps tienen el mismo calendario, así que solo cambia el nombre; lo usa
-    envio_pwa_repo para asentar allá cada Cierre de Turno. `fecha` acepta lo
-    mismo que es_domingo().
+    turno de acá: "mañana", "tarde" o "noche", también los domingos.
+    Lo usa envio_pwa_repo para asentar allá cada Cierre de Turno. Se conserva
+    `fecha` en la interfaz, aunque el nombre ya no depende del día.
     """
-    if es_domingo(fecha):
-        return "t1" if turno == dominio.TURNO_MANANA else "t2"
     return {dominio.TURNO_MANANA: "mañana", dominio.TURNO_TARDE: "tarde", dominio.TURNO_NOCHE: "noche"}[turno]
 
 
 def etiqueta_turno(fecha, turno: str) -> str:
     """
-    Nombre legible de un turno según el día calendario al que
-    pertenece: los domingos "MAÑANA"/"NOCHE" se muestran como "Domingo
-    T1"/"Domingo T2" en vez de "Mañana"/"Noche", porque ese día no
-    existe el turno Tarde — son 2 turnos de 12hs en vez de 3 (ver
-    calcular_turno). `fecha` acepta lo mismo que es_domingo().
+    Nombre legible del turno, igual todos los días. Se conserva `fecha`
+    para las pantallas y reportes que ya pasan el día del turno.
     """
-    if es_domingo(fecha):
-        if turno == dominio.TURNO_MANANA:
-            return "Domingo T1"
-        if turno == dominio.TURNO_NOCHE:
-            return "Domingo T2"
     return turno.capitalize()
 
 
@@ -229,20 +209,17 @@ def dia_del_turno_que_arranca_tras_un_cierre(momento_del_cierre: datetime) -> da
 def fin_del_turno(dia_base, turno: str) -> datetime:
     """
     A qué hora termina, según el horario del local, el turno `turno` del día
-    `dia_base` (acepta lo mismo que es_domingo()): Mañana a las 14:00 (el
-    domingo, a las 18:00), Tarde a las 22:00 y Noche a las 06:00.
+    `dia_base` (date, datetime o string ISO): Mañana a las 14:00,
+    Tarde a las 22:00 y Noche a las 06:00, incluidos los domingos.
 
     NOCHE cruza la medianoche, por eso termina a la madrugada del día
-    SIGUIENTE al que arrancó — esto no cambia los domingos: tanto la
-    noche normal como "Domingo T2" terminan igual a las 06:00 del día
-    siguiente, lo único que cambia es a qué hora arrancan.
+    SIGUIENTE al que arrancó.
     """
     dia_base = _como_date(dia_base)
-    domingo = dia_base.weekday() == 6
     inicio_dia = datetime(dia_base.year, dia_base.month, dia_base.day)
 
     if turno == dominio.TURNO_MANANA:
-        return inicio_dia.replace(hour=18 if domingo else 14)
+        return inicio_dia.replace(hour=14)
     if turno == dominio.TURNO_TARDE:
         return inicio_dia.replace(hour=22)
     return (inicio_dia + timedelta(days=1)).replace(hour=HORA_CAMBIO_DE_DIA)

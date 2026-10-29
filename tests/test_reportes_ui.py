@@ -32,7 +32,7 @@ _app = QApplication.instance() or QApplication([])
 
 _COLUMNA_ESTADO = 1
 _COLUMNA_CERRO = 2
-_FILA_NOCHE = 2     # los lunes (y cualquier día que no sea domingo): Mañana, Tarde, Noche
+_FILA_NOCHE = 2     # todos los días, incluidos los domingos: Mañana, Tarde, Noche
 
 
 class TestResumenDelDiaEnPantalla(BaseConBaseTemporal):

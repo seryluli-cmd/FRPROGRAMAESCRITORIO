@@ -94,9 +94,9 @@ LA CAJA (cada persona con su caja)
   Cambio Fijo del cajón y escribirlo. Primero se escribe lo que se contó y
   recién después el programa dice cuánto tenía que haber y si falta o sobra.
   Esa caja queda con un número y a tu nombre.
-- 5 minutos antes del fin del turno (13:55, 21:55 y 05:55; los domingos
-  17:55 y 05:55) el botón Cierre de Turno titila en rojo: cerrá la caja,
-  armá el sobre con lo que dice el programa y guardalo en la caja fuerte.
+- 5 minutos antes del fin del turno (13:55, 21:55 y 05:55, todos los
+  días, incluidos los domingos) el botón Cierre de Turno titila en rojo:
+  cerrá la caja, armá el sobre con lo que dice el programa y guardalo en la caja fuerte.
 - Si a la hora del fin del turno la caja sigue abierta, el programa
   la cierra solo (cierre forzoso). Si estás en medio de un cobro, espera a
   que termines.
