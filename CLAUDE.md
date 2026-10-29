@@ -11,8 +11,10 @@ cierres a la app de gastos. Hereda las reglas de trabajo de CYBERCONTROL, que
 son **el contrato para que el código siga ordenado** cuando crezca.
 
 Es otro negocio, otro repo (`seryluli-cmd/FRPROGRAMAESCRITORIO`, público) y
-otra base (`data_fr/`, arranca de cero). Los arreglos a la lógica común (cajas,
-turnos, cierres) hay que hacerlos en los dos repos; nada de PCs vuelve acá.
+otra base (`data_fr/`, arranca de cero). Desde el 2026-10-29 es un proyecto
+aparte (pedido del dueño: "olvidate de cybercontrol, ya es otro proyecto"):
+los arreglos de acá no se llevan a CYBERCONTROL ni al revés, salvo que él lo
+pida; nada de PCs vuelve acá.
 
 ---
 
@@ -616,9 +618,9 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   con el Python instalado en la PC (no el que trae un agente como Codex),
   genera `dist/FRKiosko.exe`. Ojo: `dist/data_fr/` sería la base *real* de la
   copia empaquetada si se abre desde ahí.
-- **Dos repos hermanos:** un arreglo a cajas, turnos, cierres, ventas o stock
-  que vale para los dos negocios se hace también en CYBERCONTROL (y al revés),
-  sin asumir que el código sigue siendo idéntico: diffear antes.
+- **Proyecto aparte:** desde el 2026-10-29 no se pasan arreglos a CYBERCONTROL
+  ni se traen de allá, salvo pedido del dueño (ver arriba, "Por qué existe
+  este archivo").
 
 ---
 

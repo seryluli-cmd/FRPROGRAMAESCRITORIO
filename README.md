@@ -10,9 +10,8 @@ Admin y las empleadas desde la PC del mostrador.
 sacando todo lo de PCs, Miembros, Bonos, Trámites, PlayStation 5 y Cliente PC.
 Quedó la misma lógica de turnos, cajas, cierres, usuarios y permisos. Es otro
 negocio, otro repo (`seryluli-cmd/FRPROGRAMAESCRITORIO`) y otra base: arranca
-de cero en `data_fr/` y no abre ni importa la base de CYBERCONTROL. Los
-arreglos a la lógica común (cajas, turnos, cierres) hay que hacerlos en los dos
-repos.
+de cero en `data_fr/` y no abre ni importa la base de CYBERCONTROL. Desde el
+2026-10-29 es un proyecto aparte: los arreglos no se pasan de un repo al otro.
 
 Para la guía de uso pensada para quien opera el kiosko (no técnica), ver
 [LEEME.txt](LEEME.txt). Este README es la referencia técnica: para cualquier
