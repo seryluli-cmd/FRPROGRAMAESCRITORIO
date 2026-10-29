@@ -19,6 +19,38 @@ tarea de código, leer esto primero en vez de explorar archivo por archivo.
 Recién si hace falta el detalle exacto de una función, ir a buscarla
 puntualmente (está indexada acá por nombre y archivo).
 
+## Calendario del kiosko — corrección del 29/10/2026
+
+Por indicación del dueño, FRKiosko usa **tres turnos todos los días, de lunes
+a domingo**. Se eliminó la excepción dominical de dos turnos heredada de
+CyberBIOS.
+
+| Turno | Horario | Aviso de cierre | Cierre forzoso si sigue abierta |
+|---|---|---|---|
+| Mañana | 06:00–14:00 | 13:55 | 15:00 |
+| Tarde | 14:00–22:00 | 21:55 | 23:00 |
+| Noche | 22:00–06:00 del día siguiente | 05:55 del día siguiente | 07:00 del día siguiente |
+
+El día comercial sigue siendo de 06:00 a 06:00: por ejemplo, una venta del
+lunes a las 02:00 pertenece a la Noche del domingo. La asignación al turno
+de la caja y la tolerancia de apertura se conservan; los horarios de la
+tabla no reemplazan esas reglas. El cierre forzoso espera si hay un cobro
+o formulario abierto.
+
+La corrección alcanza el calendario de `turnos.py`, las etiquetas de las
+pantallas, los reportes y turnos faltantes, los cierres y los datos preparados
+para Gestión Central: `mañana`, `tarde` y `noche`, también el domingo.
+No requiere una migración del esquema ni reescribe las ventas o los cierres
+ya guardados. Tampoco modifica el proyecto FRWEB ni genera un nuevo ejecutable.
+
+**Validación previa a la integración:** 714 pruebas ejecutadas, 712 aprobadas
+y 2 omitidas por ser exclusivas de Windows. Se verificaron el Login, la
+ventana principal y el reporte dominical con Qt offscreen y una base de
+prueba de 365 días. `tests/test_domingo.py` cubre cada minuto de la semana,
+los límites de los turnos, avisos y cierres forzosos, y la conciliación de
+los tres cierres del domingo con reportes y datos para la app, incluida
+la madrugada del lunes.
+
 ## Stack
 
 - **Python 3.10+**, sin build ni empaquetado en desarrollo (se corre
@@ -466,7 +498,7 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-701 tests al 2026-10-28. Cubren turnos, caja y cajas con número
+714 tests al 2026-10-29. Cubren turnos, caja y cajas con número
 (`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
 ORDENAR Stock, marcas, rubros (`tests/test_rubros.py`), ventas y anulaciones, el
 cobro con Enter, impresiones, reportes, administrar desde otra PC
