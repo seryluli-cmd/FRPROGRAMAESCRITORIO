@@ -19,6 +19,38 @@ tarea de código, leer esto primero en vez de explorar archivo por archivo.
 Recién si hace falta el detalle exacto de una función, ir a buscarla
 puntualmente (está indexada acá por nombre y archivo).
 
+## Calendario del kiosko — corrección del 29/10/2026
+
+Por indicación del dueño, FRKiosko usa **tres turnos todos los días, de lunes
+a domingo**. Se eliminó la excepción dominical de dos turnos heredada de
+CyberBIOS.
+
+| Turno | Horario | Aviso de cierre | Cierre forzoso si sigue abierta |
+|---|---|---|---|
+| Mañana | 06:00–14:00 | 13:55 | 15:00 |
+| Tarde | 14:00–22:00 | 21:55 | 23:00 |
+| Noche | 22:00–06:00 del día siguiente | 05:55 del día siguiente | 07:00 del día siguiente |
+
+El día comercial sigue siendo de 06:00 a 06:00: por ejemplo, una venta del
+lunes a las 02:00 pertenece a la Noche del domingo. La asignación al turno
+de la caja y la tolerancia de apertura se conservan; los horarios de la
+tabla no reemplazan esas reglas. El cierre forzoso espera si hay un cobro
+o formulario abierto.
+
+La corrección alcanza el calendario de `turnos.py`, las etiquetas de las
+pantallas, los reportes y turnos faltantes, los cierres y los datos preparados
+para Gestión Central: `mañana`, `tarde` y `noche`, también el domingo.
+No requiere una migración del esquema ni reescribe las ventas o los cierres
+ya guardados. Tampoco modifica el proyecto FRWEB ni genera un nuevo ejecutable.
+
+**Validación previa a la integración:** 714 pruebas ejecutadas, 712 aprobadas
+y 2 omitidas por ser exclusivas de Windows. Se verificaron el Login, la
+ventana principal y el reporte dominical con Qt offscreen y una base de
+prueba de 365 días. `tests/test_domingo.py` cubre cada minuto de la semana,
+los límites de los turnos, avisos y cierres forzosos, y la conciliación de
+los tres cierres del domingo con reportes y datos para la app, incluida
+la madrugada del lunes.
+
 ## Stack
 
 - **Python 3.10+**, sin build ni empaquetado en desarrollo (se corre
@@ -119,11 +151,10 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
   fondo de cambio, `database.CLAVE_FONDO_CAMBIO`), y todos la leen y graban con
   `config_repo.leer` / `config_repo.guardar`.
 - **`calcular_turno(fecha_hora)`** (`turnos.py`) — Mañana 06-14, Tarde
-  14-22, Noche 22-06 (cruza medianoche). ⚠️ **Los domingos son distintos**: 2
-  turnos de 12 hs (Mañana 06-18 y Noche 18-06 del lunes), que se muestran como
-  **"Domingo T1"/"Domingo T2"** (`turnos.etiqueta_turno`). ⚠️ Para el **cierre de
-  turno**, la etiqueta y la **`fecha`** usan el momento en que **empezó** el
-  turno (el `fecha_cierre` del cierre anterior, con la tolerancia de
+  14-22, Noche 22-06 (cruza medianoche), **todos los días, incluidos los
+  domingos**. Se muestran como Mañana, Tarde y Noche (`turnos.etiqueta_turno`).
+  ⚠️ Para el **cierre de turno**, la etiqueta y la **`fecha`** usan el momento
+  en que **empezó** el turno (el `fecha_cierre` del cierre anterior, con la tolerancia de
   `TURNO_GRACIA_MIN`, 60 min: `turnos.turno_que_arranca_tras_un_cierre`), no el
   clic de cerrar. ⚠️ **Con una caja abierta, el turno y el día del cierre son los
   de la caja** (decididos al abrirla).
@@ -357,7 +388,7 @@ negocio `gestionfr`), no a la de CyberBIOS. Las constantes están arriba de
   en la app de CyberBIOS); "Probar la conexión" lo verifica sin escribir nada.
 - **Qué viaja** (`datos_del_cierre`): `importe`, `efectivo`, `digital`, `turno`
   con el nombre de allá (`turnos.turno_para_la_app_de_gastos`: "mañana",
-  "tarde", "noche"; los domingos "t1"/"t2"), `fecha` (el día en que ARRANCÓ el
+  "tarde", "noche", también los domingos), `fecha` (el día en que ARRANCÓ el
   turno), `registradoPor` = el NOMBRE de la **responsable de la caja**,
   `creadoEn`, `origen: "frkiosko"`, `cierreId`, `caja`, `forzoso`, `enAusencia`,
   `cerradoPor` y **`detalle`** (la tarjeta del cierre: Cambio Fijo, a retirar,
@@ -467,7 +498,7 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-701 tests al 2026-10-28. Cubren turnos, caja y cajas con número
+714 tests al 2026-10-29. Cubren turnos, caja y cajas con número
 (`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
 ORDENAR Stock, marcas, rubros (`tests/test_rubros.py`), ventas y anulaciones, el
 cobro con Enter, impresiones, reportes, administrar desde otra PC

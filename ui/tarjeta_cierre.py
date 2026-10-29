@@ -53,7 +53,7 @@ def titulo_de_la_caja(resumen) -> str:
 
 def detalle_de_la_cabecera(resumen) -> str:
     """La línea de abajo del título en Caja y en Cierre de Turno: "Caja Nº 22 de MATI ·
-    Turno Domingo T2" (sin caja, solo el turno)."""
+    Turno Noche" (sin caja, solo el turno)."""
     return f"{titulo_de_la_caja(resumen)}Turno {resumen['turno_actual_label']}"
 
 

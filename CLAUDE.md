@@ -86,7 +86,7 @@ desde ahí, nunca escritos a mano:
 | Rol | `ROL_ADMIN`, `ROL_EMPLEADA`, `ROLES` — y `dominio.es_admin(usuario)` |
 | Estado de venta | `VENTA_CONFIRMADA`, `VENTA_ANULADA`, `ESTADOS_VENTA` |
 | Método de pago | `PAGO_EFECTIVO`, `PAGO_DIGITAL`, `METODOS_PAGO` (no hay "mixto": ver más abajo) |
-| Turno | `TURNO_MANANA`, `TURNO_TARDE`, `TURNO_NOCHE`, `TURNOS`, `TURNOS_DOMINGO` |
+| Turno | `TURNO_MANANA`, `TURNO_TARDE`, `TURNO_NOCHE`, `TURNOS` |
 | Origen de una venta | `ORIGEN_KIOSKO`, `ORIGENES_VENTA` (hoy uno solo; sumar otro toca la caja, ver "Trampas") |
 | Negocios del cierre | `NEGOCIOS_DEL_CIERRE` (los renglones de Caja, Cierre de Turno y lo que viaja a la app de gastos) |
 | Envío a la app de gastos | `ENVIO_PENDIENTE`, `ENVIO_ENVIADO`, `ENVIO_ERROR`, `ESTADOS_ENVIO_PWA` |
@@ -229,7 +229,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 |---|---|
 | `turnos.calcular_turno(fecha_hora)` | se decide a qué turno pertenece una hora |
 | `turnos.es_domingo(fecha)` | se pregunta si un día es domingo (acepta date, datetime o string) |
-| `turnos.turnos_del_dia(fecha)` | se decide qué turnos existen en un día (3, o 2 el domingo) |
+| `turnos.turnos_del_dia(fecha)` | se decide qué turnos existen en un día (siempre 3, también el domingo) |
 | `turnos.etiqueta_turno(fecha, turno)` | se arma el nombre legible de un turno |
 | `turnos.dia_en_que_empezo_el_turno(fecha_hora)` | se decide a qué día pertenece el turno de un momento (antes de las 06:00 es la Noche del día anterior): pasarle eso a `etiqueta_turno`, nunca el día calendario de una venta de madrugada |
 | `turnos.limites_de_los_dias(desde, hasta)` · `turnos.sql_dia_del_local(columna)` | se filtra y se agrupa por día en un reporte de ventas: días de 06:00 a 06:00, con la Noche entera en el día en que empezó |
@@ -237,9 +237,9 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `turnos.dia_del_turno_que_arranca_tras_un_cierre(momento)` | se decide con qué DÍA queda anotado lo que sigue a un cierre (misma tolerancia que el turno) |
 | `ui.utils.hoy_del_local()` | se decide qué es "hoy" en los reportes de ventas (hasta las 06:00, el día anterior) |
 | `turnos.turno_vencimiento(dia, turno)` | se decide si un turno ya debería estar cerrado: su fin + `MINUTOS_PARA_CIERRE_FORZOSO` (60 min). Es también la hora del cierre forzoso de la caja. Los carteles que nombran esos minutos leen la constante |
-| `turnos.fin_del_turno(dia, turno)` · `.inicio_del_aviso_de_cierre(dia, turno)` | se decide a qué hora termina un turno (Mañana 14, Tarde 22, Noche 06; domingo 18 y 06) y desde cuándo titila el botón Cierre de Turno (`MINUTOS_AVISO_ANTES_DEL_FIN`, 5 min antes) |
+| `turnos.fin_del_turno(dia, turno)` · `.inicio_del_aviso_de_cierre(dia, turno)` | se decide a qué hora termina un turno (Mañana 14, Tarde 22, Noche 06, todos los días) y desde cuándo titila el botón Cierre de Turno (`MINUTOS_AVISO_ANTES_DEL_FIN`, 5 min antes) |
 | `turnos.turno_que_arranca_tras_un_cierre(momento)` | se decide con qué turno queda anotado lo que sigue a un cierre (la hora del cierre + `TURNO_GRACIA_MIN`); la usa `turnos_repo._desde_y_turno_en_curso`, que es lo que ven Caja y Cierre de Turno y lo que graba `cerrar_turno`. Con la misma regla `relevo_repo.abrir_caja` decide el turno de una caja que se abre |
-| `turnos.turno_para_la_app_de_gastos(fecha, turno)` | se traduce un turno al nombre que usa la app de gastos ("mañana", "tarde", "noche"; los domingos "t1"/"t2") |
+| `turnos.turno_para_la_app_de_gastos(fecha, turno)` | se traduce un turno al nombre que usa la app de gastos ("mañana", "tarde", "noche", también los domingos) |
 | `relevo_repo.situacion_al_entrar(usuario_id)` · `.abrir_caja` · `.recibir_caja` · `.cerrar_para_entrar` | se decide qué pasa con la caja cuando alguien entra (abrirla contando, recibirla contando todo el cajón, cerrar la de quien se fue, pasar a la caja que se abre lo que el Admin cobró sin caja; el Admin entra sin caja). La pantalla es `ui/ingreso_caja.py` |
 | `relevo_repo.estado_de_la_caja()` · `.cierre_forzoso_si_corresponde()` | se decide si el botón Cierre de Turno titila y si toca el cierre forzoso (lo dispara `MainWindow._revisar_la_caja`, que espera si hay un cobro a medias) |
 | `cajas_repo._quien_vende(conexion, usuario_id)` | se decide a nombre de quién y en qué caja queda una venta (lo que cobra el Admin va a nombre de la responsable de la caja abierta, con `ventas_caja.cargada_por`); lo usa `ventas_repo._insertar_cabecera_venta` |
@@ -330,9 +330,10 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   pruebas pasa lo mismo: el "hoy" de una prueba de reportes es
   `turnos.dia_en_que_empezo_el_turno(datetime.now())` o `hoy_del_local()`, nunca
   `date.today()` ni `QDate.currentDate()`.
-- **Los domingos tienen 2 turnos de 12hs, no 3.** `MAÑANA` dura hasta las
-  18:00 y no existe `TARDE`. El sábado a la noche sigue siendo el turno
-  normal 22–06. Nunca asumas tres turnos por día.
+- **Todos los días tienen tres turnos, incluidos los domingos.** `MAÑANA`
+  va de 06 a 14, `TARDE` de 14 a 22 y `NOCHE` de 22 a 06 del día siguiente.
+  FRKiosko tiene su propio calendario: no hereda la excepción de CyberBIOS.
+  Las etiquetas y los envíos usan Mañana/Tarde/Noche todos los días.
 - **El `.exe` empaquetado resuelve las rutas distinto.** Con PyInstaller
   `__file__` apunta a una carpeta temporal que se borra en cada arranque;
   por eso `BASE_DIR` usa `sys.executable` si está `frozen`. Si guardás un
@@ -641,7 +642,7 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 709 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 714 pruebas
 al 2026-10-29 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.

@@ -320,12 +320,12 @@ class TestCierreForzoso(_BaseDeCajas):
                 estado = relevo_repo.estado_de_la_caja(momento)
                 self.assertEqual((estado["titilar"], estado["vencida"]), (titilar, vencida))
 
-    def test_el_domingo_la_manana_titila_a_las_17_55(self):
+    def test_el_domingo_la_manana_titila_a_las_13_55(self):
         relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(6, 0, DOMINGO))
 
-        self.assertFalse(relevo_repo.estado_de_la_caja(_a_las(17, 54, DOMINGO))["titilar"])
-        self.assertTrue(relevo_repo.estado_de_la_caja(_a_las(17, 55, DOMINGO))["titilar"])
-        self.assertEqual(relevo_repo.estado_de_la_caja(_a_las(17, 55, DOMINGO))["turno_label"], "Domingo T1")
+        self.assertFalse(relevo_repo.estado_de_la_caja(_a_las(13, 54, DOMINGO))["titilar"])
+        self.assertTrue(relevo_repo.estado_de_la_caja(_a_las(13, 55, DOMINGO))["titilar"])
+        self.assertEqual(relevo_repo.estado_de_la_caja(_a_las(13, 55, DOMINGO))["turno_label"], "Mañana")
 
     def test_a_la_hora_la_caja_se_cierra_sola(self):
         relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))

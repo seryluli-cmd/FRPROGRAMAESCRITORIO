@@ -46,7 +46,7 @@ from repositories import (
     articulos_repo, compras_repo, config_repo, control_cierres_repo, envio_pwa_repo, impresiones_repo,
     relevo_repo, turnos_repo, usuarios_repo, ventas_repo,
 )
-from turnos import dia_en_que_empezo_el_turno, es_domingo, fin_del_turno, turno_vencimiento, turnos_del_dia
+from turnos import dia_en_que_empezo_el_turno, fin_del_turno, turno_vencimiento, turnos_del_dia
 
 CARPETA_POR_DEFECTO = "data_prueba"
 # El candado de instancia única de main.py (PUERTO_INSTANCIA_UNICA; no se importa
@@ -76,8 +76,7 @@ PROBABILIDADES = {
 
 # Ventas de un turno común; los fines de semana se venden más.
 _VENTAS_POR_TURNO = {dominio.TURNO_MANANA: 55, dominio.TURNO_TARDE: 80, dominio.TURNO_NOCHE: 35}
-_VENTAS_DEL_DOMINGO = {dominio.TURNO_MANANA: 100, dominio.TURNO_NOCHE: 60}
-_FIN_DE_SEMANA = {dominio.TURNO_TARDE: 1.2, dominio.TURNO_NOCHE: 1.6}  # viernes y sábado
+_FIN_DE_SEMANA = {dominio.TURNO_TARDE: 1.2, dominio.TURNO_NOCHE: 1.6}  # viernes, sábado y domingo
 
 _MOTIVOS_DE_ANULACION = (
     "Se cobró dos veces", "El cliente se arrepintió", "Se cargó mal el producto",
@@ -305,10 +304,7 @@ class _Simulacion:
     # --- un turno ---
 
     def _ventas_esperadas(self, dia: date, turno: str) -> float:
-        if es_domingo(dia):
-            base = _VENTAS_DEL_DOMINGO[turno]
-        else:
-            base = _VENTAS_POR_TURNO[turno] * (_FIN_DE_SEMANA.get(turno, 1) if dia.weekday() >= 4 else 1)
+        base = _VENTAS_POR_TURNO[turno] * (_FIN_DE_SEMANA.get(turno, 1) if dia.weekday() >= 4 else 1)
         return base * self.escala
 
     def _de_turno(self, dia: date, turno: str) -> str:

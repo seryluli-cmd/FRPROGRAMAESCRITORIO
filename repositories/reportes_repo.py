@@ -97,10 +97,8 @@ def resumen_por_turno(desde: str, hasta: str):
     Tarde/Noche) en vez de un único total — para responder "¿cuánto
     trabajó la Tarde esta semana?" sin tener que sumar a mano los
     cierres cargados en Control de Cierres de Turno. Devuelve siempre
-    los 3 turnos, en orden, aunque alguno no tenga ventas en el rango
-    (por ejemplo, si el rango son puros domingos, Tarde da $0 — ver
-    turnos.calcular_turno, que ese día no genera ventas con turno
-    "TARDE"). La Noche de cada día entra entera (días de 06:00 a 06:00).
+    los 3 turnos, en orden, aunque alguno no tenga ventas en el rango.
+    La Noche de cada día entra entera (días de 06:00 a 06:00).
     El turno y el día de cada venta son los de su caja (ver _CON_SU_CAJA):
     lo de cada turno es lo que suman sus cierres.
     """

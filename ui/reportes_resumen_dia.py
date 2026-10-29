@@ -28,9 +28,8 @@ from ui.utils import (
 
 
 class PestañaResumenDelDia(QWidget):
-    """El reporte de UN día abierto por turno (Mañana/Tarde/Noche, o
-    Domingo T1/T2): qué se vendió en cada uno, quién lo cerró y si el
-    sobre cuadró. A diferencia de "Por Turno" (que suma un rango entero),
+    """El reporte de UN día abierto por turno (Mañana/Tarde/Noche):
+    qué se vendió en cada uno, quién lo cerró y si el sobre cuadró. A diferencia de "Por Turno" (que suma un rango entero),
     acá cada fila es un turno real con su cierre -- ver
     turnos_repo.resumen_del_dia."""
 
