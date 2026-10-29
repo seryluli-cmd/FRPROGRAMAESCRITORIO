@@ -109,9 +109,9 @@ def _ventana_en_curso(conexion, ahora_dt=None) -> dict:
     Con una caja abierta (cajas_repo), el turno y el día son los de la caja,
     decididos al abrirla: quien abre a las 05:55 abre la Mañana, aunque el
     cierre anterior haya sido de madrugada o de hace horas. "desde" sigue siendo
-    el último cierre: entre ese cierre y la apertura no se puede vender sin caja
-    (relevo_repo pide cerrar antes lo que haya quedado). "caja" es la fila de la
-    caja abierta, o None.
+    el último cierre: lo que el Admin vendió sin caja entre ese cierre y la
+    apertura pasa a esta caja al abrirla (relevo_repo.abrir_caja) y se cierra con
+    ella. "caja" es la fila de la caja abierta, o None.
 
     `ahora_dt` solo se pasa si quien llama ya tomó la hora antes (como
     resumen_del_dia, que la necesita también para otras cosas); si no, se
@@ -400,8 +400,8 @@ def _ventanas_del_dia(conexion, dia, ahora_dt) -> list:
     """
     # "empleada" es quien tenía la caja (cajas_repo), no quien la cerró: la
     # caja que cierra la que llega, en ausencia de la otra, sigue siendo de la
-    # otra. Un cierre sin caja (las ventas que quedaron sin caja, cerradas
-    # aparte) muestra quién cerró.
+    # otra. Un cierre sin caja (el Admin cerró sin ninguna caja abierta)
+    # muestra quién cerró.
     cierres = conexion.execute(
         """
         SELECT cierres_turno.*, COALESCE(responsables.nombre, usuarios.nombre) AS empleada

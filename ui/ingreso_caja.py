@@ -133,14 +133,25 @@ class DialogoContarPlata(QDialog):
 
 
 def _abrir(parent, usuario, situacion) -> bool:
-    """Abre la caja de `usuario`, contando el cambio si hace falta."""
+    """Abre la caja de `usuario`, contando el cambio si hace falta. Si el Admin
+    cobró algo sin caja, pasa a esta: se cuenta todo el cajón."""
     contado = None
     if situacion["cuenta_cambio"]:
+        abre = f"No hay ninguna caja abierta: vas a abrir una para el turno {situacion['turno_label']}.\n\n"
+        if situacion["ventas_sin_caja"]:
+            explicacion = (
+                f"{abre}El Administrador cobró {situacion['ventas_sin_caja']} ventas sin caja desde el "
+                f"{datetime.fromisoformat(situacion['desde']).strftime('%d/%m %H:%M')}: pasan a tu caja y "
+                "esa plata va en tu sobre. Contá TODA la plata del cajón (el Cambio Fijo y lo que cobró "
+                "el Administrador) y escribila:"
+            )
+            detalle = (f"{formato_pesos(situacion['cambio_esperado'])} de Cambio Fijo + "
+                       f"{formato_pesos(situacion['efectivo_sin_caja'])} que cobró el Administrador en efectivo")
+        else:
+            explicacion = f"{abre}Contá el Cambio Fijo que hay en el cajón y escribilo:"
+            detalle = "lo que dejó la caja anterior"
         dialogo = DialogoContarPlata(
-            parent, "Abrir caja",
-            f"No hay ninguna caja abierta: vas a abrir una para el turno {situacion['turno_label']}.\n\n"
-            "Contá el Cambio Fijo que hay en el cajón y escribilo:",
-            situacion["cambio_esperado"], "lo que dejó la caja anterior", texto_confirmar="Abrir caja",
+            parent, "Abrir caja", explicacion, situacion["esperado"], detalle, texto_confirmar="Abrir caja",
         )
         if dialogo.exec() != QDialog.Accepted:
             return False
@@ -210,30 +221,11 @@ def _cerrar_la_propia_vencida(parent, usuario, situacion) -> bool:
     return True
 
 
-def _cerrar_ventas_sin_caja(parent, usuario, situacion) -> bool:
-    """Cierra aparte las ventas que quedaron sin caja."""
-    if not confirmar(
-        parent, "Ventas sin cerrar",
-        f"Hay {situacion['cantidad']} ventas sin cerrar desde el "
-        f"{datetime.fromisoformat(situacion['desde']).strftime('%d/%m %H:%M')}, hechas sin una caja "
-        "abierta (del Administrador, sin nadie en el mostrador).\n\n"
-        "Antes de abrir tu caja hay que cerrarlas en un cierre aparte. ¿Las cerrás ahora?",
-    ):
-        return False
-    resultado = relevo_repo.cerrar_para_entrar(usuario["id"], relevo_repo.SITUACION_VENTAS_SIN_CAJA)
-    mostrar_info(
-        parent, "Ventas cerradas",
-        f"Listo. Armá un sobre aparte para esas ventas. {mensaje_del_sobre(resultado)}\n\nAhora abrís tu caja.",
-    )
-    return True
-
-
 _QUE_HACER = {
     relevo_repo.SITUACION_ABRIR: _abrir,
     relevo_repo.SITUACION_RECIBIR: _recibir,
     relevo_repo.SITUACION_CERRAR_LA_DE_OTRA: _cerrar_la_de_otra,
     relevo_repo.SITUACION_SU_CAJA_VENCIDA: _cerrar_la_propia_vencida,
-    relevo_repo.SITUACION_VENTAS_SIN_CAJA: _cerrar_ventas_sin_caja,
 }
 
 # Más vueltas que esto sería un error (cada paso deja la caja en otra situación):

@@ -63,8 +63,8 @@ def _minutos_despues_del_fin(cierre) -> int:
 def _datos_de_la_caja(conexion, cierre) -> dict:
     """
     Lo que se sabe de la caja de un cierre, listo para mostrar:
-    - "caja_numero": el número de caja, o None si es un cierre sin caja (de
-      ventas que quedaron sin caja).
+    - "caja_numero": el número de caja, o None si es un cierre sin caja (el
+      Admin cerró sin ninguna caja abierta).
     - "responsable": quién tenía la caja al cerrarla (sin caja, quien cerró).
     - "responsables": todos los que la tuvieron, en orden (quien la abrió y
       quienes la recibieron en un relevo).

@@ -172,7 +172,9 @@ sin caja: si no hay ninguna abierta, abre una contando el Cambio Fijo (si la
 abre la misma persona que acaba de cerrar la anterior, no cuenta); si la caja
 abierta es de otra y su turno sigue, la **recibe** contando todo el cajón; si el
 turno de esa caja ya terminó, la **cierra en ausencia** de la otra y después
-abre la suya; si quedaron ventas sin caja, las cierra aparte primero. El conteo
+abre la suya. Si el Admin cobró algo sin ninguna caja abierta, pasa a la caja que
+se abre: quien la abre cuenta todo el cajón (el cambio y esa plata) y va en su
+sobre (pedido del dueño, 2026-10-29; antes se cerraba aparte). El conteo
 es **a ciegas** (`DialogoContarPlata`). El Admin entra directo, sin caja: lo que
 cobra queda a nombre de la responsable de la caja abierta, con
 `ventas_caja.cargada_por`.
@@ -444,8 +446,8 @@ python main.py --base data_prueba
 
 [armar_base_de_prueba.py](armar_base_de_prueba.py) arma en `data_prueba/` (en
 `.gitignore`) un año de un kiosko inventado: unos 70 artículos, cuatro empleadas y
-unas 180 ventas por día, con sus cajas, relevos, cierres (en ausencia, forzosos y
-de ventas sin caja), compras de los lunes, subas de precio y sobres contados. No
+unas 180 ventas por día, con sus cajas, relevos, cierres (en ausencia y
+forzosos), ventas del Admin sin caja que pasan a la caja siguiente, compras de los lunes, subas de precio y sobres contados. No
 escribe filas a mano: pasa por las mismas funciones de los repos que el
 mostrador, con el reloj corrido a cada momento del pasado, así que todo cuadra
 como lo dejaría el programa. Las claves de prueba y las opciones (`--dias`,

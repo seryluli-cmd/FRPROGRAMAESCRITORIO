@@ -100,7 +100,16 @@ class TestLaBaseCuadra(unittest.TestCase):
                     "SELECT COUNT(*) FROM ventas JOIN ventas_caja ON ventas_caja.venta_id = ventas.id "
                     "JOIN cajas ON cajas.id = ventas_caja.caja_id "
                     "JOIN cierres_turno ON cierres_turno.id = cajas.cierre_id "
-                    "WHERE ventas.fecha < cajas.abierta_en OR ventas.fecha > cierres_turno.fecha_cierre"
+                    "WHERE (ventas.fecha < cajas.abierta_en AND ventas_caja.cargada_por IS NULL) "
+                    "OR ventas.fecha > cierres_turno.fecha_cierre"
+                ), 0)
+                # lo que el Admin cobró sin caja (y pasó a la caja que se abrió después)
+                # es de después del cierre anterior: no se coló de otro turno
+                self.assertEqual(uno(
+                    "SELECT COUNT(*) FROM ventas JOIN ventas_caja ON ventas_caja.venta_id = ventas.id "
+                    "JOIN cajas ON cajas.id = ventas_caja.caja_id "
+                    "WHERE ventas.fecha < cajas.abierta_en AND ventas.fecha <= "
+                    "(SELECT MAX(fecha_cierre) FROM cierres_turno WHERE fecha_cierre < cajas.abierta_en)"
                 ), 0)
                 # tampoco la de quien recibe la caja antes de recibirla
                 self.assertEqual(uno(
@@ -151,7 +160,7 @@ class TestLaBaseCuadra(unittest.TestCase):
                 self.assertGreater(resumen["forzosos"], 0)
                 self.assertGreater(resumen["relevos"], 0)
                 self.assertGreater(resumen["anuladas"], 0)
-                self.assertGreater(resumen["sin_caja"], 0)  # ventas del Admin sin nadie en el mostrador
+                self.assertGreater(resumen["sin_caja"], 0)  # del Admin sin nadie, pasadas a la caja siguiente
                 self.assertGreater(uno(  # cerradas "en ausencia" de la responsable
                     "SELECT COUNT(*) FROM cierres_turno JOIN cajas ON cajas.cierre_id = cierres_turno.id "
                     "WHERE cajas.responsable_id <> cierres_turno.usuario_id AND cajas.cierre_forzoso = 0"

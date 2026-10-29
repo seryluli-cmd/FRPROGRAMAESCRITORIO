@@ -12,7 +12,7 @@ que importar al otro.
 
 Sin caja abierta (el Admin vendiendo sin nadie en el mostrador) las ventas
 quedan sin caja y el cierre sale igual de la ventana entre cierres (ver
-turnos_repo); relevo_repo las cierra aparte antes de abrir la próxima caja.
+turnos_repo); relevo_repo las pasa a la próxima caja que se abre.
 """
 
 import dominio
@@ -66,7 +66,8 @@ def _quien_vende(conexion, usuario_id: int) -> tuple:
     (usuario_id de la venta, caja_id o None, cargada_por o None).
 
     - Sin caja abierta (el Admin vendiendo sin nadie en el mostrador): a su
-      nombre y sin caja.
+      nombre y sin caja, hasta que alguien abra una y pase a la suya
+      (relevo_repo._pasar_las_ventas_sin_caja).
     - El Admin con la caja de una empleada abierta: a nombre de ELLA, dentro de
       su caja, y queda anotado que la cargó el Admin (pedido del dueño,
       2026-10-18: "que lo asiente como la empleada que estaba antes de que yo
@@ -107,8 +108,8 @@ def _marcar_cerrada(conexion, caja_id: int, cierre_id: int, forzoso: bool):
 
 def _caja_del_cierre(conexion, cierre_id: int):
     """La caja que se cerró con el cierre `cierre_id` (con los nombres de quien
-    la abrió y de su responsable), o None si es un cierre sin caja (de ventas
-    que quedaron sin caja)."""
+    la abrió y de su responsable), o None si es un cierre sin caja (el Admin
+    cerró sin ninguna caja abierta)."""
     return conexion.execute(
         """
         SELECT cajas.*, responsables.nombre AS responsable, abridores.nombre AS abierta_por_nombre

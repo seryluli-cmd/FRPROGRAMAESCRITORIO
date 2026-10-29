@@ -3,9 +3,10 @@ tests/test_cajas.py
 ====================
 Las cajas con número (pedido del dueño, 2026-10-18; reglas en
 repositories/relevo_repo.py): abrir contando el Cambio Fijo, recibir la caja de
-quien cubrió el turno, cerrar la de quien se fue, el cierre forzoso a los 30
-minutos, las ventas del Admin a nombre de la responsable y el sobre que carga
-solo el Admin.
+quien cubrió el turno, cerrar la de quien se fue, el cierre forzoso a la hora
+del fin del turno, las ventas del Admin a nombre de la responsable (también las
+que cobró sin caja, que pasan a la caja siguiente) y el sobre que carga solo el
+Admin.
 
 Se ejecutan con:
 
@@ -354,25 +355,65 @@ class TestCierreForzoso(_BaseDeCajas):
 
 
 class TestVentasSinCaja(_BaseDeCajas):
-    def test_las_ventas_sin_caja_se_cierran_aparte_antes_de_abrir(self):
-        self._vender(self.admin_id, _a_las(2, 36), 1500.0)   # el Admin, sin nadie en el mostrador
-        self._vender(self.admin_id, _a_las(4, 50), 500.0)
+    """Lo que cobra el Admin sin ninguna caja abierta pasa a la caja de la que
+    llega (pedido del dueño, 2026-10-29: "lo que yo facture queda a cargo de la
+    operadora que viene"; hasta ese día se cerraba aparte)."""
+
+    def _el_admin_vende_sin_caja(self):
+        primera = self._vender(self.admin_id, _a_las(2, 36), 1500.0)   # sin nadie en el mostrador
+        segunda = self._vender(self.admin_id, _a_las(4, 50), 500.0)
+        return primera, segunda
+
+    def test_la_que_llega_abre_su_caja_contando_el_cambio_y_lo_que_cobro_el_admin(self):
+        self._el_admin_vende_sin_caja()
 
         situacion = self._situacion(self.lucia_id, _a_las(5, 55))
-        self.assertEqual(situacion["situacion"], relevo_repo.SITUACION_VENTAS_SIN_CAJA)
-        self.assertEqual((situacion["cantidad"], situacion["a_retirar"]), (2, 2000.0))
+
+        self.assertEqual(situacion["situacion"], relevo_repo.SITUACION_ABRIR)
+        self.assertTrue(situacion["cuenta_cambio"])
+        self.assertEqual((situacion["ventas_sin_caja"], situacion["efectivo_sin_caja"]), (2, 2000.0))
+        self.assertEqual((situacion["cambio_esperado"], situacion["esperado"]), (50000.0, 52000.0))
         self.assertTrue(situacion["desde"].startswith("2026-01-05T02:36"))
         with self.assertRaises(ValueError):
-            relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
+            relevo_repo.abrir_caja(self.lucia_id, None, _a_las(5, 55))
 
-        cierre = relevo_repo.cerrar_para_entrar(self.lucia_id, relevo_repo.SITUACION_VENTAS_SIN_CAJA, _a_las(5, 55))
+    def test_las_ventas_del_admin_quedan_en_su_caja_a_su_nombre_y_van_en_su_sobre(self):
+        primera, segunda = self._el_admin_vende_sin_caja()
 
-        self.assertIsNone(cierre["caja_numero"])
-        self.assertEqual(cierre["monto_a_retirar"], 2000.0)
-        self.assertIsNone(turnos_repo.listar_cierres()[0]["caja_numero"])
-        apertura = self._situacion(self.lucia_id, _a_las(5, 56))
-        self.assertEqual(apertura["situacion"], relevo_repo.SITUACION_ABRIR)
-        self.assertTrue(apertura["cuenta_cambio"])
+        apertura = relevo_repo.abrir_caja(self.lucia_id, 52000.0, _a_las(5, 55))
+        self._vender(self.lucia_id, _a_las(9), 1000.0)
+
+        self.assertEqual((apertura["ventas_sin_caja"], apertura["diferencia"]), (2, 0.0))
+        self.assertEqual(apertura["cambio_contado"], 50000.0)   # el cambio solo: lo del Admin va al sobre
+        for venta in (primera, segunda):
+            fila = self._caja_de_la_venta(venta)
+            self.assertEqual((fila["usuario_id"], fila["caja_id"], fila["cargada_por"]),
+                             (self.lucia_id, apertura["caja_numero"], self.admin_id))
+        cierre = turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(13, 59))
+        self.assertEqual((cierre["caja_numero"], cierre["turno_label"]), (apertura["caja_numero"], "Mañana"))
+        self.assertEqual((cierre["monto_a_retirar"], cierre["cambio_que_queda"]), (3000.0, 50000.0))
+        self.assertEqual(len(turnos_repo.listar_cierres()), 1)   # ningún cierre aparte
+
+    def test_si_falta_plata_de_lo_del_admin_se_ve_al_abrir_y_una_sola_vez(self):
+        self._el_admin_vende_sin_caja()
+
+        apertura = relevo_repo.abrir_caja(self.lucia_id, 51500.0, _a_las(5, 55))
+
+        self.assertEqual((apertura["diferencia"], apertura["cambio_contado"]), (-500.0, 49500.0))
+        cierre = turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(13, 59))
+        self.assertEqual((cierre["monto_a_retirar"], cierre["cambio_que_queda"]), (2000.0, 49500.0))
+        self.assertEqual(self._situacion(self.gaby_id, _a_las(13, 59))["esperado"], 49500.0)
+
+    def test_aunque_haya_cerrado_ella_la_anterior_cuenta_si_el_admin_cobro_en_el_medio(self):
+        relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
+        turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(13, 59))
+        self.assertFalse(self._situacion(self.lucia_id, _a_las(14, 0))["cuenta_cambio"])
+
+        self._vender(self.admin_id, _a_las(14, 10), 700.0)
+        situacion = self._situacion(self.lucia_id, _a_las(14, 20))
+
+        self.assertTrue(situacion["cuenta_cambio"])
+        self.assertEqual(situacion["esperado"], 50700.0)
 
 
 class TestSobreLoCargaSoloElAdmin(_BaseDeCajas):
@@ -486,7 +527,7 @@ class TestUnCierreHechoSeVeComoAlCerrarlo(_BaseDeCajas):
 
     def test_un_cierre_sin_caja_muestra_el_cambio_fijo(self):
         self._vender(self.admin_id, _a_las(2, 36), 1500.0)   # el Admin, sin nadie en el mostrador
-        cierre = relevo_repo.cerrar_para_entrar(self.lucia_id, relevo_repo.SITUACION_VENTAS_SIN_CAJA, _a_las(5, 55))
+        cierre = turnos_repo.cerrar_turno(self.admin_id, ahora_dt=_a_las(5, 55))   # y lo cierra él
 
         resumen = turnos_repo.detalle_cierre(cierre["id"])["resumen"]
 

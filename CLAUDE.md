@@ -239,7 +239,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `turnos.fin_del_turno(dia, turno)` · `.inicio_del_aviso_de_cierre(dia, turno)` | se decide a qué hora termina un turno (Mañana 14, Tarde 22, Noche 06; domingo 18 y 06) y desde cuándo titila el botón Cierre de Turno (`MINUTOS_AVISO_ANTES_DEL_FIN`, 5 min antes) |
 | `turnos.turno_que_arranca_tras_un_cierre(momento)` | se decide con qué turno queda anotado lo que sigue a un cierre (la hora del cierre + `TURNO_GRACIA_MIN`); la usa `turnos_repo._desde_y_turno_en_curso`, que es lo que ven Caja y Cierre de Turno y lo que graba `cerrar_turno`. Con la misma regla `relevo_repo.abrir_caja` decide el turno de una caja que se abre |
 | `turnos.turno_para_la_app_de_gastos(fecha, turno)` | se traduce un turno al nombre que usa la app de gastos ("mañana", "tarde", "noche"; los domingos "t1"/"t2") |
-| `relevo_repo.situacion_al_entrar(usuario_id)` · `.abrir_caja` · `.recibir_caja` · `.cerrar_para_entrar` | se decide qué pasa con la caja cuando alguien entra (abrirla contando, recibirla contando todo el cajón, cerrar la de quien se fue, cerrar aparte las ventas sin caja; el Admin entra sin caja). La pantalla es `ui/ingreso_caja.py` |
+| `relevo_repo.situacion_al_entrar(usuario_id)` · `.abrir_caja` · `.recibir_caja` · `.cerrar_para_entrar` | se decide qué pasa con la caja cuando alguien entra (abrirla contando, recibirla contando todo el cajón, cerrar la de quien se fue, pasar a la caja que se abre lo que el Admin cobró sin caja; el Admin entra sin caja). La pantalla es `ui/ingreso_caja.py` |
 | `relevo_repo.estado_de_la_caja()` · `.cierre_forzoso_si_corresponde()` | se decide si el botón Cierre de Turno titila y si toca el cierre forzoso (lo dispara `MainWindow._revisar_la_caja`, que espera si hay un cobro a medias) |
 | `cajas_repo._quien_vende(conexion, usuario_id)` | se decide a nombre de quién y en qué caja queda una venta (lo que cobra el Admin va a nombre de la responsable de la caja abierta, con `ventas_caja.cargada_por`); lo usa `ventas_repo._insertar_cabecera_venta` |
 | `cajas_repo.cambio_inicial(caja)` | se decide con cuánto cambio arrancó una caja (lo contado, o lo esperado si no se contó): es lo que queda en el cajón al cerrarla y lo que se espera en la siguiente |
@@ -421,9 +421,14 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   abierta ya terminó, quien llega la cierra "en ausencia" de la otra. El Admin
   (el dueño) no abre caja: lo que cobra va a nombre de la responsable
   (`cajas_repo._quien_vende`). Las ventas sin caja (del Admin sin nadie en el
-  mostrador) se cierran aparte antes de abrir la próxima caja
-  (`SITUACION_VENTAS_SIN_CAJA`): si se sumaran a la caja nueva, la empleada
-  respondería por plata que no vendió. Lo que queda en el cajón al cerrar es el
+  mostrador) pasan a la próxima caja que se abre, a nombre de quien la abre y con
+  `cargada_por` (pedido del dueño, 2026-10-29: "lo que yo facture queda a cargo
+  de la operadora que viene"; antes se cerraban aparte): quien abre cuenta TODO el
+  cajón, el cambio más ese efectivo, aunque haya cerrado ella la anterior. En
+  `cajas.cambio_contado` queda solo el cambio (lo contado menos lo del Admin),
+  porque es lo que se deja en el cajón al cerrar; lo del Admin va en el sobre. Así
+  un faltante de esa plata se ve al abrir, una sola vez
+  (`relevo_repo._pasar_las_ventas_sin_caja`). Lo que queda en el cajón al cerrar es el
   cambio con que arrancó la caja (`cajas_repo.cambio_inicial`), no el Cambio
   Fijo: así un faltante del cambio se ve una sola vez. `ventas_caja` es una
   tabla aparte (no columnas de `ventas`) para no tocar la reconstrucción de la
@@ -635,8 +640,8 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 701 pruebas
-al 2026-10-28 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
+La suite se ejecuta con `python -m unittest discover tests` y tiene 706 pruebas
+al 2026-10-29 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
 

@@ -118,6 +118,10 @@ LA CAJA (cada persona con su caja)
   abierta, la venta queda a nombre de ella, en su caja, y se anota que la
   cargó el Administrador. Si entra para algo rápido y se olvida de salir, a
   los 10 minutos el programa vuelve solo a la empleada que estaba antes.
+- Si el Administrador cobra algo cuando no hay ninguna caja abierta, esa
+  plata pasa a la caja de la próxima que entra: al abrir, el programa le pide
+  contar TODA la plata del cajón (el cambio más lo que cobró él) y esas
+  ventas van en su sobre.
 - Lo contado en cada sobre lo carga solo el Administrador, desde Control de
   Cierres. Cada conteo queda guardado.
 

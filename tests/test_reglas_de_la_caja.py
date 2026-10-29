@@ -249,25 +249,31 @@ class TestElRelevoAnunciaElMismoSobre(_BaseDeLaCaja):
         self.assertEqual(situacion["a_retirar"], cierre["monto_a_retirar"])
         self.assertEqual(situacion["a_retirar"], self._grabado(cierre["id"])["monto_a_retirar"])
 
-    def test_las_ventas_sin_caja_anuncian_el_sobre_que_graba_su_cierre(self):
+    def test_lo_que_cobro_el_admin_sin_caja_se_cuenta_al_abrir_y_va_en_el_sobre(self):
         self._turno_con_centavos(self.admin_id, desde_hora=2)   # el Admin, sin nadie en el mostrador
 
         situacion = relevo_repo.situacion_al_entrar(self.lucia_id, _a_las(5, 55))
-        cierre = relevo_repo.cerrar_para_entrar(self.lucia_id, relevo_repo.SITUACION_VENTAS_SIN_CAJA, _a_las(5, 55))
+        relevo_repo.abrir_caja(self.lucia_id, situacion["esperado"], _a_las(5, 55))
+        cierre = turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(13, 59))
 
-        self.assertEqual((situacion["a_retirar"], cierre["monto_a_retirar"]), (1000.3, 1000.3))
+        self.assertEqual(situacion["efectivo_sin_caja"], 1000.3)
+        self.assertEqual(situacion["esperado"], round(situacion["cambio_esperado"] + 1000.3, 2))
+        self.assertEqual(cierre["monto_a_retirar"], 1000.3)
+        self.assertEqual(cierre["cambio_que_queda"], situacion["cambio_esperado"])
 
-    def test_el_cartel_de_las_ventas_sin_caja_dice_de_quien_son(self):
+    def test_el_cartel_de_abrir_dice_que_lo_del_admin_pasa_a_su_caja(self):
         self._vender(self.admin_id, _a_las(2, 36), 1500.0)
         self._vender(self.admin_id, _a_las(4, 50), 500.0)
 
-        with mock.patch.object(ingreso_caja, "confirmar", return_value=False) as pregunta:
+        with mock.patch.object(ingreso_caja, "DialogoContarPlata") as dialogo:
+            dialogo.return_value.exec.return_value = 0   # Cancelar
             self.assertFalse(resolver_caja_al_entrar(None, usuarios_repo.obtener_usuario(self.lucia_id)))
 
-        texto = pregunta.call_args[0][2]
-        self.assertIn("Hay 2 ventas sin cerrar desde el 05/01 02:36, hechas sin una caja abierta "
-                      "(del Administrador, sin nadie en el mostrador).", texto)
-        self.assertNotIn("antes de las cajas", texto)
+        _, _, texto, esperado, detalle = dialogo.call_args[0]
+        self.assertIn("El Administrador cobró 2 ventas sin caja desde el 05/01 02:36: pasan a tu caja", texto)
+        self.assertIn("Contá TODA la plata del cajón", texto)
+        self.assertEqual(esperado, 52000.0)
+        self.assertEqual(detalle, "$ 50.000 de Cambio Fijo + $ 2.000 que cobró el Administrador en efectivo")
 
 
 class TestCoincideConLaMismaReglaEnCadaPantalla(_BaseDeLaCaja):
@@ -364,9 +370,7 @@ class TestEnAusenciaPorNumeroDeUsuario(_BaseDeLaCaja):
         self._dice_lo_mismo_que_control_de_cierres(forzoso, False)
 
         self._vender(self.admin_id, _a_las(7, 10, MARTES), 500.0)
-        sin_caja = relevo_repo.cerrar_para_entrar(
-            self.lucia_id, relevo_repo.SITUACION_VENTAS_SIN_CAJA, _a_las(7, 15, MARTES)
-        )
+        sin_caja = turnos_repo.cerrar_turno(self.admin_id, ahora_dt=_a_las(7, 15, MARTES))   # el Admin, sin caja
         self._dice_lo_mismo_que_control_de_cierres(sin_caja, False)
 
     def test_si_le_cambiaron_el_nombre_con_la_sesion_abierta_no_dice_en_ausencia(self):

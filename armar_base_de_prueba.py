@@ -361,13 +361,14 @@ class _Simulacion:
             if que == relevo_repo.SITUACION_ABRIR:
                 contado = None
                 if situacion["cuenta_cambio"]:
-                    contado = self.fondo if repone_el_cambio else self._contar(situacion["cambio_esperado"])
+                    # Lo que cobró el Admin sin caja está en el cajón: se cuenta junto con el cambio.
+                    contado = (self.fondo + situacion["efectivo_sin_caja"] if repone_el_cambio
+                               else self._contar(situacion["esperado"]))
                 relevo_repo.abrir_caja(usuario_id, contado, momento)
             elif que == relevo_repo.SITUACION_RECIBIR:
                 relevo_repo.recibir_caja(usuario_id, situacion["caja_id"], self._contar(situacion["esperado"]),
                                          momento)
-            elif que in (relevo_repo.SITUACION_CERRAR_LA_DE_OTRA, relevo_repo.SITUACION_VENTAS_SIN_CAJA,
-                         relevo_repo.SITUACION_SU_CAJA_VENCIDA):
+            elif que in (relevo_repo.SITUACION_CERRAR_LA_DE_OTRA, relevo_repo.SITUACION_SU_CAJA_VENCIDA):
                 self._anotar_cierre(relevo_repo.cerrar_para_entrar(usuario_id, que, momento), momento)
             else:
                 raise RuntimeError(f"{nombre} no tendría que encontrarse con {que} al entrar.")
@@ -441,8 +442,8 @@ class _Simulacion:
             self._anotar_cierre(turnos_repo.cerrar_turno(self.ids[atiende], ahora_dt=se_va), se_va)
             llega = se_va + self._minutos(1, 6)
             if not es_el_ultimo and self.rng.random() < PROBABILIDADES["venta_sin_caja"]:
-                # El Admin cobra algo con el mostrador sin nadie: la que llega
-                # primero cierra esas ventas aparte (SITUACION_VENTAS_SIN_CAJA).
+                # El Admin cobra algo con el mostrador sin nadie: pasa a la caja
+                # de la que llega (relevo_repo.abrir_caja), que lo cuenta al abrir.
                 self._a_las(se_va + timedelta(seconds=20))
                 usuarios_repo.autenticar_por_nombre(ADMIN, CLAVE_DE_PRUEBA)
                 self._vender(ADMIN, se_va + timedelta(seconds=30))
@@ -677,8 +678,8 @@ def _resumen() -> dict:
             "ventas": contar("SELECT COUNT(*) FROM ventas WHERE estado = ?", dominio.VENTA_CONFIRMADA),
             "anuladas": contar("SELECT COUNT(*) FROM ventas WHERE estado = ?", dominio.VENTA_ANULADA),
             "cierres": contar("SELECT COUNT(*) FROM cierres_turno"),
-            "sin_caja": contar("SELECT COUNT(*) FROM cierres_turno WHERE id NOT IN "
-                               "(SELECT cierre_id FROM cajas WHERE cierre_id IS NOT NULL)"),
+            "sin_caja": contar("SELECT COUNT(*) FROM ventas_caja JOIN ventas ON ventas.id = ventas_caja.venta_id "
+                               "JOIN cajas ON cajas.id = ventas_caja.caja_id WHERE ventas.fecha < cajas.abierta_en"),
             "relevos": contar("SELECT COUNT(*) FROM relevos_caja"),
             "forzosos": contar("SELECT COUNT(*) FROM cajas WHERE cierre_forzoso = 1"),
             "compras": contar("SELECT COUNT(*) FROM compras"),
@@ -724,8 +725,8 @@ def main():
         sys.exit(1)
     print(
         f"Listo en {resumen['segundos']} s: {resumen['ventas']} ventas ({resumen['anuladas']} anuladas), "
-        f"{resumen['cierres']} cierres ({resumen['forzosos']} forzosos, {resumen['sin_caja']} de ventas "
-        f"sin caja, {resumen['relevos']} relevos), "
+        f"{resumen['cierres']} cierres ({resumen['forzosos']} forzosos, {resumen['relevos']} relevos), "
+        f"{resumen['sin_caja']} ventas del Admin sin caja pasadas a la caja siguiente, "
         f"{resumen['compras']} compras, {resumen['articulos']} artículos, {resumen['megas']} MB.\n"
         f"Para abrirla: python main.py --base {argumentos.carpeta}"
     )

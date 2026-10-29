@@ -7,7 +7,7 @@ Qué pasa con la caja cuando alguien entra al programa, y el cierre forzoso
 - Una empleada no trabaja sin caja. Si no hay ninguna abierta, abre una
   contando el cambio del cajón. Si la abre la misma persona que acaba de cerrar
   la anterior (su reemplazo no llegó), no cuenta: arranca con el cambio que ella
-  misma dejó.
+  misma dejó (salvo que en el medio el Admin haya cobrado algo sin caja).
 - Si la caja abierta es de otra persona y su turno todavía no terminó (el
   reemplazo llegó tarde y la caja la tiene quien lo cubrió), la recibe contando
   TODO el cajón: el cambio más el efectivo vendido. Desde ahí la responsable es
@@ -16,7 +16,11 @@ Qué pasa con la caja cuando alguien entra al programa, y el cierre forzoso
   antes del fin, cuando titila el botón), la cierra la que llega: queda "cerrada
   por Gaby en ausencia de Lucía". Después abre la suya.
 - Si quedaron ventas sin caja (del Admin vendiendo sin nadie en el mostrador),
-  se cierran primero, en un cierre aparte.
+  pasan a la caja que se abre (pedido del dueño, 2026-10-29: "lo que yo
+  facture queda a cargo de la operadora que viene"; hasta ese día se cerraban
+  aparte). Quien abre cuenta TODO el cajón, el cambio más lo que cobró el
+  Admin, y esa plata va en su sobre: si algo no está, se ve al abrir y no
+  recién al cerrar.
 - El Admin (el dueño, que entra a cargar mercadería o cambiar precios) no abre
   caja: entra directo. Lo que cobre va a nombre de la responsable de la caja
   abierta (cajas_repo._quien_vende).
@@ -50,10 +54,9 @@ SITUACION_SU_CAJA_VENCIDA = "SU_CAJA_VENCIDA"      # es suya pero pasó el cierr
 SITUACION_ABRIR = "ABRIR"                          # no hay caja: abre una
 SITUACION_RECIBIR = "RECIBIR"                      # caja de otra, turno en curso: la recibe contando
 SITUACION_CERRAR_LA_DE_OTRA = "CERRAR_LA_DE_OTRA"  # caja de otra, turno terminado: la cierra
-SITUACION_VENTAS_SIN_CAJA = "VENTAS_SIN_CAJA"      # quedaron ventas sin caja: se cierran primero
 
 # Las que se resuelven con un Cierre de Turno antes de poder entrar.
-_SITUACIONES_QUE_CIERRAN = (SITUACION_SU_CAJA_VENCIDA, SITUACION_CERRAR_LA_DE_OTRA, SITUACION_VENTAS_SIN_CAJA)
+_SITUACIONES_QUE_CIERRAN = (SITUACION_SU_CAJA_VENCIDA, SITUACION_CERRAR_LA_DE_OTRA)
 
 
 def _datos_de_caja(caja) -> dict:
@@ -105,24 +108,30 @@ def _situacion(conexion, usuario, ahora: datetime) -> dict:
         return {"situacion": SITUACION_RECIBIR, **datos, "esperado": resumen["caja_actual"],
                 "cambio_inicial": resumen["cambio_inicial"], "ventas_efectivo": resumen["ventas_efectivo"]}
 
+    apertura = _apertura(conexion, usuario["id"])
+    situacion = {
+        "situacion": SITUACION_ABRIR, **apertura,
+        "turno_label": etiqueta_turno(dia_del_turno_que_arranca_tras_un_cierre(ahora),
+                                      turno_que_arranca_tras_un_cierre(ahora)),
+        "ventas_sin_caja": 0, "efectivo_sin_caja": 0.0, "desde": None,
+        "esperado": apertura["cambio_esperado"],
+    }
     ventana = turnos_repo._ventana_en_curso(conexion, ahora)
     confirmadas, _ = _contar_ventas_entre(conexion, ventana["desde"], ventana["hasta"])
     if confirmadas:
-        resumen = turnos_repo._resumen_en_curso(conexion, ahora)
+        # Lo que cobró el Admin sin caja pasa a la caja que se abre (ver
+        # abrir_caja): su efectivo está en el cajón junto con el cambio, y se
+        # cuenta todo junto aunque quien abre haya cerrado ella la anterior.
+        efectivo = round(turnos_repo._resumen_en_curso(conexion, ahora)["ventas_efectivo"], 2)
         primera = conexion.execute(
             "SELECT MIN(fecha) AS fecha FROM ventas WHERE fecha > ? AND fecha <= ? AND estado = ?",
             (ventana["desde"], ventana["hasta"], dominio.VENTA_CONFIRMADA),
         ).fetchone()["fecha"]
-        return {
-            "situacion": SITUACION_VENTAS_SIN_CAJA, "cantidad": confirmadas, "desde": primera,
-            "a_retirar": resumen["monto_a_retirar"], "cambio_que_queda": resumen["cambio_inicial"],
-        }
-
-    return {
-        "situacion": SITUACION_ABRIR, **_apertura(conexion, usuario["id"]),
-        "turno_label": etiqueta_turno(dia_del_turno_que_arranca_tras_un_cierre(ahora),
-                                      turno_que_arranca_tras_un_cierre(ahora)),
-    }
+        situacion.update({
+            "cuenta_cambio": True, "ventas_sin_caja": confirmadas, "efectivo_sin_caja": efectivo,
+            "desde": primera, "esperado": round(apertura["cambio_esperado"] + efectivo, 2),
+        })
+    return situacion
 
 
 def situacion_al_entrar(usuario_id: int, ahora: datetime = None) -> dict:
@@ -133,11 +142,12 @@ def situacion_al_entrar(usuario_id: int, ahora: datetime = None) -> dict:
     - con caja abierta: "caja_numero", "responsable", "turno_label", "abierta_en";
     - RECIBIR: "esperado" (lo que tiene que haber en el cajón), "cambio_inicial"
       y "ventas_efectivo" (de dónde sale);
-    - CERRAR_LA_DE_OTRA y VENTAS_SIN_CAJA: "a_retirar" y "cambio_que_queda"
-      (lo que va al sobre, el mismo "monto_a_retirar" que graba el cierre, y lo
-      que se deja); VENTAS_SIN_CAJA, además,
-      "cantidad" y "desde" (la primera de esas ventas);
-    - ABRIR: "cambio_esperado", "cuenta_cambio" y "turno_label" de la caja nueva.
+    - CERRAR_LA_DE_OTRA: "a_retirar" y "cambio_que_queda" (lo que va al sobre,
+      el mismo "monto_a_retirar" que graba el cierre, y lo que se deja);
+    - ABRIR: "cambio_esperado", "cuenta_cambio" y "turno_label" de la caja nueva;
+      "ventas_sin_caja" (cuántas cobró el Admin sin caja, que pasan a esta),
+      "efectivo_sin_caja" y "desde" (la primera de esas ventas, o None), y
+      "esperado": lo que tiene que haber en el cajón (el cambio más ese efectivo).
     La pantalla de ingreso resuelve la situación (abrir_caja, recibir_caja o
     cerrar_para_entrar) y vuelve a preguntar hasta que da SU_CAJA o ADMIN.
     PermissionError si el usuario ya no está habilitado.
@@ -161,19 +171,27 @@ def abrir_caja(usuario_id: int, cambio_contado=None, ahora: datetime = None) -> 
     """
     Abre una caja nueva a cargo de `usuario_id`, con el turno que corresponde a
     esta hora (con la tolerancia de turnos.turno_que_arranca_tras_un_cierre:
-    quien abre a las 05:55 abre la Mañana). `cambio_contado` es lo que contó;
-    None solo si no hace falta contar (ver _apertura): si hace falta y no viene,
-    ValueError. Devuelve {"caja_numero", "turno_label", "cambio_esperado",
-    "cambio_contado", "diferencia"}.
+    quien abre a las 05:55 abre la Mañana). `cambio_contado` es lo que contó en
+    el cajón (con lo que cobró el Admin sin caja, si hubo: ver
+    situacion_al_entrar); None solo si no hace falta contar (ver _apertura): si
+    hace falta y no viene, ValueError. Las ventas sin caja pasan a esta caja
+    (_pasar_las_ventas_sin_caja). Devuelve {"caja_numero", "turno_label",
+    "cambio_esperado", "cambio_contado", "diferencia", "ventas_sin_caja"}: el
+    cambio esperado y el contado son los de la caja, sin la plata del Admin.
     """
     usuario = usuarios_repo.usuario_habilitado(usuario_id)
     ahora = ahora or datetime.now()
     with conexion_db() as conexion:
         situacion = _exigir_situacion(conexion, usuario, ahora, (SITUACION_ABRIR,))
         if situacion["cuenta_cambio"] and cambio_contado is None:
-            raise ValueError("Contá el cambio del cajón antes de abrir la caja.")
+            raise ValueError("Contá la plata del cajón antes de abrir la caja.")
+        # En la caja queda anotado solo el cambio, que es lo que tiene que quedar
+        # en el cajón al cerrarla (cajas_repo.cambio_inicial): el efectivo del
+        # Admin se va en el sobre con el resto de lo cobrado. La diferencia es
+        # la misma que la de todo lo contado contra todo lo esperado.
         if cambio_contado is not None:
-            cambio_contado = round(cambio_contado, 2)
+            cambio_contado = round(cambio_contado - situacion["efectivo_sin_caja"], 2)
+        ventana = turnos_repo._ventana_en_curso(conexion, ahora)
         turno = turno_que_arranca_tras_un_cierre(ahora)
         dia = dia_del_turno_que_arranca_tras_un_cierre(ahora)
         cursor = conexion.execute(
@@ -184,6 +202,7 @@ def abrir_caja(usuario_id: int, cambio_contado=None, ahora: datetime = None) -> 
             (dia.isoformat(), turno, usuario_id, ahora.isoformat(timespec="microseconds"),
              situacion["cambio_esperado"], cambio_contado, usuario_id),
         )
+        _pasar_las_ventas_sin_caja(conexion, cursor.lastrowid, usuario_id, ventana["desde"], ventana["hasta"])
     return {
         "caja_numero": cursor.lastrowid,
         "turno_label": etiqueta_turno(dia, turno),
@@ -191,7 +210,31 @@ def abrir_caja(usuario_id: int, cambio_contado=None, ahora: datetime = None) -> 
         "cambio_contado": cambio_contado,
         "diferencia": (dominio.diferencia_de_plata(cambio_contado, situacion["cambio_esperado"])
                        if cambio_contado is not None else 0.0),
+        "ventas_sin_caja": situacion["ventas_sin_caja"],
     }
+
+
+def _pasar_las_ventas_sin_caja(conexion, caja_id: int, usuario_id: int, desde: str, hasta: str):
+    """
+    Las ventas de la ventana en curso que no tienen caja (las del Admin, sin
+    nadie en el mostrador) pasan a la caja `caja_id` que acaba de abrir
+    `usuario_id`: quedan a su nombre, y en `cargada_por` queda quién las cobró,
+    igual que si el Admin las hubiera cobrado con su caja abierta
+    (cajas_repo._quien_vende). Su plata ya entra en el cierre de esta caja,
+    porque el cierre suma la ventana desde el cierre anterior (turnos_repo).
+    """
+    conexion.execute(
+        """
+        INSERT INTO ventas_caja (venta_id, caja_id, cargada_por)
+        SELECT id, ?, NULLIF(usuario_id, ?) FROM ventas
+        WHERE fecha > ? AND fecha <= ? AND id NOT IN (SELECT venta_id FROM ventas_caja)
+        """,
+        (caja_id, usuario_id, desde, hasta),
+    )
+    conexion.execute(
+        "UPDATE ventas SET usuario_id = ? WHERE id IN (SELECT venta_id FROM ventas_caja WHERE caja_id = ?)",
+        (usuario_id, caja_id),
+    )
 
 
 def recibir_caja(usuario_id: int, caja_id: int, monto_contado: float, ahora: datetime = None) -> dict:
@@ -230,8 +273,8 @@ def recibir_caja(usuario_id: int, caja_id: int, monto_contado: float, ahora: dat
 def cerrar_para_entrar(usuario_id: int, situacion_esperada: str, ahora: datetime = None) -> dict:
     """
     El Cierre de Turno que hace falta antes de entrar: la caja de otra persona
-    cuyo turno ya terminó (queda cerrada en su ausencia), la propia que pasó el
-    cierre forzoso (queda como forzoso) o las ventas que quedaron sin caja.
+    cuyo turno ya terminó (queda cerrada en su ausencia) o la propia que pasó el
+    cierre forzoso (queda como forzoso).
     `situacion_esperada` es la que vio la pantalla: si ya no es esa, ValueError
     y no se cierra nada. Devuelve lo mismo que turnos_repo.cerrar_turno.
     """
