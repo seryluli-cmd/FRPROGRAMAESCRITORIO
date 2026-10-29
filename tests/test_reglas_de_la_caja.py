@@ -360,12 +360,12 @@ class TestEnAusenciaPorNumeroDeUsuario(_BaseDeLaCaja):
         self._dice_lo_mismo_que_control_de_cierres(la_cierra_el_admin, True)
 
         relevo_repo.abrir_caja(self.gaby_id, 50000.0, _a_las(22, 1))
-        forzoso = relevo_repo.cierre_forzoso_si_corresponde(_a_las(6, 30, MARTES))
+        forzoso = relevo_repo.cierre_forzoso_si_corresponde(_a_las(7, 0, MARTES))
         self._dice_lo_mismo_que_control_de_cierres(forzoso, False)
 
-        self._vender(self.admin_id, _a_las(7, 0, MARTES), 500.0)
+        self._vender(self.admin_id, _a_las(7, 10, MARTES), 500.0)
         sin_caja = relevo_repo.cerrar_para_entrar(
-            self.lucia_id, relevo_repo.SITUACION_VENTAS_SIN_CAJA, _a_las(7, 5, MARTES)
+            self.lucia_id, relevo_repo.SITUACION_VENTAS_SIN_CAJA, _a_las(7, 15, MARTES)
         )
         self._dice_lo_mismo_que_control_de_cierres(sin_caja, False)
 

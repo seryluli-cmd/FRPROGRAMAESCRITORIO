@@ -106,11 +106,11 @@ class TestAQuienVuelve(_ConEmpleadas):
         self.assertEqual(vuelta_admin_repo.volver(self.gaby_id, _a_las(10, 5))["nombre"], "GABRIELA")
 
     def test_si_su_turno_ya_vencio_va_al_ingreso(self):
-        # La Mañana termina a las 14 y la caja se cierra sola a los 30 minutos: a
-        # las 15 entra por el ingreso, que cierra su caja como corresponde.
+        # La Mañana termina a las 14 y la caja se cierra sola a la hora: a las
+        # 15:30 entra por el ingreso, que cierra su caja como corresponde.
         relevo_repo.abrir_caja(self.toby_id, 50000.0, _a_las(5, 55))
 
-        self.assertIsNone(vuelta_admin_repo.volver(self.toby_id, _a_las(15)))
+        self.assertIsNone(vuelta_admin_repo.volver(self.toby_id, _a_las(15, 30)))
 
 
 class TestElReloj(BaseConBaseTemporal):

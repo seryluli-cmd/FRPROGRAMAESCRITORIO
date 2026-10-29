@@ -114,7 +114,7 @@ class ControlCierresWindow(QDialog):
         self._cargar()
 
     def _armar_interfaz(self):
-        # Aviso de turnos ya vencidos (ventana + turnos.TURNO_GRACIA_MIN) del
+        # Aviso de turnos ya vencidos (ventana + turnos.MINUTOS_PARA_CIERRE_FORZOSO) del
         # mes en curso que todavía no tienen cierre cargado — ver
         # turnos_repo.turnos_faltantes(). Es una QListWidget (no un QLabel)
         # con alto máximo y scroll propio: puede haber más de un centenar de

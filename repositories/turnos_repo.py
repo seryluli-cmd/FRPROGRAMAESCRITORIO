@@ -235,7 +235,7 @@ def cerrar_turno(usuario_id: int, forzoso: bool = False, ahora_dt=None):
     `usuario_id` es quien cierra: si no es la responsable de la caja, queda
     como cerrada en su ausencia (cajas_repo.cerrada_en_ausencia), y lo dice
     "cerrada_en_ausencia" en lo que se devuelve.
-    `forzoso` es el cierre que hace el programa solo a los 30 minutos del fin
+    `forzoso` es el cierre que hace el programa solo a la hora del fin
     del turno (ver MainWindow y relevo_repo). `ahora_dt` es la hora del cierre
     si quien llama ya la tomó (relevo_repo); si no, ahora.
 

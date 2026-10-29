@@ -122,7 +122,7 @@ class TestLaBaseCuadra(unittest.TestCase):
                 self.assertEqual(en_cierres, cobrado)
 
     def test_ninguna_caja_pasa_su_cierre_forzoso(self):
-        # El mostrador cierra solo la caja a los 30 minutos del fin de su turno:
+        # El mostrador cierra solo la caja a la hora del fin de su turno:
         # ninguna puede cerrarse después (ni seguir vendiendo el turno siguiente).
         for semilla, (carpeta, resumen, conexion) in self.bases.items():
             with self.subTest(semilla=semilla):
@@ -136,7 +136,7 @@ class TestLaBaseCuadra(unittest.TestCase):
 
     def test_se_cierra_sola_la_caja_vieja_de_quien_sigue_atendiendo(self):
         # La que se olvidó de cerrar atiende también el turno siguiente: el
-        # mostrador cierra su caja a los 30 minutos y ella abre otra sin contar.
+        # mostrador cierra su caja a la hora y ella abre otra sin contar.
         for semilla, (_, _, uno) in self._bases():
             with self.subTest(semilla=semilla):
                 self.assertGreater(uno(

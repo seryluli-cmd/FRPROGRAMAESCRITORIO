@@ -129,7 +129,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
   clic de cerrar. ⚠️ **Con una caja abierta, el turno y el día del cierre son los
   de la caja** (decididos al abrirla).
 - **`turnos.turno_vencimiento(dia, turno)`** — su fin (`turnos.fin_del_turno`)
-  + `MINUTOS_PARA_CIERRE_FORZOSO` (30): a esa hora la caja se cierra sola y el
+  + `MINUTOS_PARA_CIERRE_FORZOSO` (60): a esa hora la caja se cierra sola y el
   turno pasa a contar como sin cerrar. El botón Cierre de Turno titila desde
   `turnos.inicio_del_aviso_de_cierre` (5 min antes del fin).
   **`turnos_repo.turnos_faltantes()`** cruza los turnos esperados del mes en
@@ -181,7 +181,7 @@ cobra queda a nombre de la responsable de la caja abierta, con
 **En la ventana principal**, al lado del nombre se ve la caja ("Caja Nº 12 ·
 Mañana"). Cada 10 s `MainWindow._revisar_la_caja` mira
 `relevo_repo.estado_de_la_caja`: desde 5 minutos antes del fin del turno el
-botón **Cierre de Turno titila en rojo** y a los 30 minutos del fin hace el
+botón **Cierre de Turno titila en rojo** y a la hora del fin hace el
 **cierre forzoso** (`relevo_repo.cierre_forzoso_si_corresponde`) y vuelve al
 ingreso (el Admin se queda). Si hay un cobro a medias, espera.
 

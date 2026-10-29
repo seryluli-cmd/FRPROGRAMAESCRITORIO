@@ -61,7 +61,7 @@ ADMIN = "Administrador"  # el que crea database._cargar_datos_iniciales
 # pruebas las suben para que aparezcan todas en pocos días.
 PROBABILIDADES = {
     "olvido": 0.04,      # quien se va no cierra: la que llega la cierra "en ausencia"
-    "forzoso": 0.015,    # nadie la cierra: se cierra sola a los 30 minutos
+    "forzoso": 0.015,    # nadie la cierra: se cierra sola a la hora del fin del turno
     "venta_sin_caja": 0.01,  # el Admin vende entre un cierre y la llegada de la siguiente
     "relevo": 0.03,      # a mitad de turno llega otra y RECIBE la caja contando
     "reemplazo": 0.03,   # el turno lo cubre otra empleada que la de siempre

@@ -85,7 +85,7 @@ def _responsables_del_mes(conexion, inicio_mes):
 def turnos_faltantes(ahora):
     """
     De los turnos esperados del mes en curso (turnos_del_mes_actual), los
-    que YA vencieron (ventana nominal + turnos.TURNO_GRACIA_MIN de gracia, ver
+    que YA vencieron (ventana nominal + turnos.MINUTOS_PARA_CIERRE_FORZOSO, ver
     turnos.turno_vencimiento) y todavía no tienen un cierre cargado en
     cierres_turno. Se usa en "Control de Cierres de Turno" para que el
     Admin se entere de un turno sin cerrar antes de que se pierda en el

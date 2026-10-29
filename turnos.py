@@ -182,9 +182,12 @@ MINUTOS_AVISO_ANTES_DEL_FIN = 5
 # Cuántos minutos después del fin del turno la caja se cierra sola (cierre
 # forzoso) y el turno pasa a contar como "sin cerrar" (pedido del dueño,
 # 2026-10-18: "el programa aprieta solo Cierre de Turno"; eran 15 minutos de
-# gracia y el 2026-10-20 pidió 30). Ver turno_vencimiento. Los carteles que lo
-# nombran leen esta constante: cambiarla acá alcanza.
-MINUTOS_PARA_CIERRE_FORZOSO = 30
+# gracia, el 2026-10-20 pidió 30 y el 2026-10-29 una hora: el reemplazo suele
+# llegar hasta media hora tarde, y la que se queda esperándolo tiene que poder
+# cerrar SU caja; si se cerraba sola antes, lo que cobraba hasta que llegaba la
+# otra terminaba en el sobre de la otra). Ver turno_vencimiento. Los carteles
+# que lo nombran leen esta constante: cambiarla acá alcanza.
+MINUTOS_PARA_CIERRE_FORZOSO = 60
 
 
 def turno_que_arranca_tras_un_cierre(momento_del_cierre: datetime) -> str:

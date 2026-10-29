@@ -233,7 +233,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `turnos.limites_de_los_dias(desde, hasta)` · `turnos.sql_dia_del_local(columna)` | se filtra y se agrupa por día en un reporte de ventas: días de 06:00 a 06:00, con la Noche entera en el día en que empezó |
 | `turnos.dia_del_turno_que_arranca_tras_un_cierre(momento)` | se decide con qué DÍA queda anotado lo que sigue a un cierre (misma tolerancia que el turno) |
 | `ui.utils.hoy_del_local()` | se decide qué es "hoy" en los reportes de ventas (hasta las 06:00, el día anterior) |
-| `turnos.turno_vencimiento(dia, turno)` | se decide si un turno ya debería estar cerrado: su fin + `MINUTOS_PARA_CIERRE_FORZOSO` (30 min). Es también la hora del cierre forzoso de la caja. Los carteles que nombran esos minutos leen la constante |
+| `turnos.turno_vencimiento(dia, turno)` | se decide si un turno ya debería estar cerrado: su fin + `MINUTOS_PARA_CIERRE_FORZOSO` (60 min). Es también la hora del cierre forzoso de la caja. Los carteles que nombran esos minutos leen la constante |
 | `turnos.fin_del_turno(dia, turno)` · `.inicio_del_aviso_de_cierre(dia, turno)` | se decide a qué hora termina un turno (Mañana 14, Tarde 22, Noche 06; domingo 18 y 06) y desde cuándo titila el botón Cierre de Turno (`MINUTOS_AVISO_ANTES_DEL_FIN`, 5 min antes) |
 | `turnos.turno_que_arranca_tras_un_cierre(momento)` | se decide con qué turno queda anotado lo que sigue a un cierre (la hora del cierre + `TURNO_GRACIA_MIN`); la usa `turnos_repo._desde_y_turno_en_curso`, que es lo que ven Caja y Cierre de Turno y lo que graba `cerrar_turno`. Con la misma regla `relevo_repo.abrir_caja` decide el turno de una caja que se abre |
 | `turnos.turno_para_la_app_de_gastos(fecha, turno)` | se traduce un turno al nombre que usa la app de gastos ("mañana", "tarde", "noche"; los domingos "t1"/"t2") |
@@ -408,11 +408,13 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   sale de `turnos_repo._desde_y_turno_en_curso`. **Con una caja abierta, el
   turno y el día son los de la caja** (decididos al abrirla con la misma
   tolerancia). `TURNO_GRACIA_MIN` (40) es SOLO esa tolerancia: lo que tarda en
-  cerrarse sola una caja es `MINUTOS_PARA_CIERRE_FORZOSO` (30), no los mezcles.
+  cerrarse sola una caja es `MINUTOS_PARA_CIERRE_FORZOSO` (60), no los mezcles.
 - **Cajas con número (reglas en `relevo_repo`).** Una empleada no entra sin
-  caja y nunca hay dos abiertas. La caja es de UNA persona por vez: si el
-  reemplazo llega tarde, quien cubrió cierra a horario y vuelve a entrar con una
-  caja nueva (sin contar); el que llega la RECIBE contando todo el cajón
+  caja y nunca hay dos abiertas. La caja es de UNA persona por vez. Si el
+  reemplazo llega poco tarde (el caso de todos los días), la que espera sigue
+  con su caja y la cierra ella cuando llega la otra: para eso el forzoso es
+  recién a la hora. Si tarda más, quien cubrió cierra a horario y vuelve a
+  entrar con una caja nueva (sin contar); el que llega la RECIBE contando todo el cajón
   (`relevos_caja`) y lo vendido antes va en su sobre. Si el turno de la caja
   abierta ya terminó, quien llega la cierra "en ausencia" de la otra. El Admin
   (el dueño) no abre caja: lo que cobra va a nombre de la responsable
@@ -586,7 +588,7 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   descartable ni lo edites por fuera de una migración.
 - **El envío de cierres va a la app de FR ("Gestión Central"),** no a la de
   CyberBIOS. Viene apagado; prenderlo es decisión del dueño.
-- **El modelo de caja** (cajas con número, cierre forzoso a los 30 minutos,
+- **El modelo de caja** (cajas con número, cierre forzoso a la hora del fin del turno,
   el Admin que no abre caja, el conteo a ciegas) y **el cobro con un solo Enter**
   son decisiones del dueño tomadas en CYBERCONTROL y heredadas acá tal cual.
 

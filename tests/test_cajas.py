@@ -228,6 +228,26 @@ class TestReemplazoQueLlegaTarde(_BaseDeCajas):
         self.assertEqual(guardado["relevos"][0]["monto_contado"], 56000.0)
         self.assertFalse(guardado["cerrada_en_ausencia"])
 
+    def test_si_gaby_llega_14_45_lucia_todavia_cierra_su_propia_caja(self):
+        # El caso de todos los días (pedido del dueño, 2026-10-29): la caja se
+        # cierra sola recién a las 15, así que Lucía cierra la suya cuando llega
+        # Gaby. Todo lo que cobró va a su sobre; en el cajón queda el cambio con
+        # que arrancó su caja, y con eso abre Gaby la Tarde.
+        relevo_repo.abrir_caja(self.lucia_id, 49500.0, _a_las(5, 55))   # faltaban $ 500
+        self._vender(self.lucia_id, _a_las(9), 1000.0)
+        self._vender(self.lucia_id, _a_las(14, 30), 2000.0)
+
+        self.assertEqual(self._situacion(self.lucia_id, _a_las(14, 45))["situacion"], relevo_repo.SITUACION_SU_CAJA)
+        manana = turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(14, 45))
+        self.assertEqual((manana["turno"], manana["monto_a_retirar"]), (dominio.TURNO_MANANA, 3000.0))
+
+        situacion = self._situacion(self.gaby_id, _a_las(14, 45))
+        self.assertEqual(situacion["situacion"], relevo_repo.SITUACION_ABRIR)
+        self.assertEqual((situacion["cambio_esperado"], situacion["cuenta_cambio"], situacion["turno_label"]),
+                         (49500.0, True, "Tarde"))
+        tarde = relevo_repo.abrir_caja(self.gaby_id, 49500.0, _a_las(14, 45))
+        self.assertEqual((tarde["turno_label"], tarde["diferencia"]), ("Tarde", 0.0))
+
     def test_no_se_puede_recibir_otra_caja_que_la_abierta(self):
         caja = relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
         with self.assertRaises(ValueError):
@@ -275,12 +295,12 @@ class TestCerrarLaCajaDeOtra(_BaseDeCajas):
 
 
 class TestCierreForzoso(_BaseDeCajas):
-    def test_el_boton_titila_desde_5_minutos_antes_y_vence_a_los_30_despues(self):
+    def test_el_boton_titila_desde_5_minutos_antes_y_vence_a_la_hora(self):
         relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
 
         for momento, titilar, vencida in (
             (_a_las(13, 54), False, False), (_a_las(13, 55), True, False),
-            (_a_las(14, 29), True, False), (_a_las(14, 30), True, True),
+            (_a_las(14, 59), True, False), (_a_las(15, 0), True, True),
         ):
             with self.subTest(momento=momento):
                 estado = relevo_repo.estado_de_la_caja(momento)
@@ -293,21 +313,21 @@ class TestCierreForzoso(_BaseDeCajas):
         self.assertTrue(relevo_repo.estado_de_la_caja(_a_las(17, 55, DOMINGO))["titilar"])
         self.assertEqual(relevo_repo.estado_de_la_caja(_a_las(17, 55, DOMINGO))["turno_label"], "Domingo T1")
 
-    def test_a_los_30_minutos_la_caja_se_cierra_sola(self):
+    def test_a_la_hora_la_caja_se_cierra_sola(self):
         relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
         self._vender(self.lucia_id, _a_las(9), 1000.0)
 
-        self.assertIsNone(relevo_repo.cierre_forzoso_si_corresponde(_a_las(14, 29)))
-        cierre = relevo_repo.cierre_forzoso_si_corresponde(_a_las(14, 30))
+        self.assertIsNone(relevo_repo.cierre_forzoso_si_corresponde(_a_las(14, 59)))
+        cierre = relevo_repo.cierre_forzoso_si_corresponde(_a_las(15, 0))
 
         self.assertTrue(cierre["forzoso"])
         self.assertEqual((cierre["monto_a_retirar"], cierre["responsable"]), (1000.0, "Lucia"))
         guardado = turnos_repo.listar_cierres()[0]
         self.assertTrue(guardado["cierre_forzoso"])
         self.assertFalse(guardado["cerrada_en_ausencia"])
-        self.assertEqual(guardado["minutos_despues_del_fin"], 30)
+        self.assertEqual(guardado["minutos_despues_del_fin"], 60)
         # Lucía, si sigue atendiendo, vuelve a entrar sin contar.
-        self.assertFalse(self._situacion(self.lucia_id, _a_las(14, 16))["cuenta_cambio"])
+        self.assertFalse(self._situacion(self.lucia_id, _a_las(15, 5))["cuenta_cambio"])
 
     def test_si_el_programa_estuvo_cerrado_la_propia_caja_vencida_se_cierra_al_entrar(self):
         relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
@@ -427,9 +447,9 @@ class TestUnCierreHechoSeVeComoAlCerrarlo(_BaseDeCajas):
 
     def test_un_cierre_forzoso_se_ve_igual_que_si_lo_hubiera_cerrado_ella(self):
         self._turno_de_lucia()
-        al_cerrar = self._en_pantalla_al_cerrar(_a_las(14, 30))
+        al_cerrar = self._en_pantalla_al_cerrar(_a_las(15, 0))
 
-        cierre = relevo_repo.cierre_forzoso_si_corresponde(_a_las(14, 30))
+        cierre = relevo_repo.cierre_forzoso_si_corresponde(_a_las(15, 0))
         resumen = turnos_repo.detalle_cierre(cierre["id"])["resumen"]
 
         self.assertTrue(cierre["forzoso"])

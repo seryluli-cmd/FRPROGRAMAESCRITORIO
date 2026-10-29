@@ -20,7 +20,7 @@ Qué pasa con la caja cuando alguien entra al programa, y el cierre forzoso
 - El Admin (el dueño, que entra a cargar mercadería o cambiar precios) no abre
   caja: entra directo. Lo que cobre va a nombre de la responsable de la caja
   abierta (cajas_repo._quien_vende).
-- A los 30 minutos del fin del turno (turnos.MINUTOS_PARA_CIERRE_FORZOSO) la
+- A la hora del fin del turno (turnos.MINUTOS_PARA_CIERRE_FORZOSO) la
   caja se cierra sola (cierre forzoso):
   lo dispara la pantalla principal (ver cierre_forzoso_si_corresponde), o el
   ingreso de la propia responsable si el programa estuvo cerrado.

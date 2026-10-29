@@ -226,7 +226,7 @@ class TestLoQueViaja(_BaseDeEnvios):
 
     def test_el_cierre_forzoso_va_marcado_y_a_nombre_de_la_responsable(self):
         self._turno_de_toby()
-        cierre = relevo_repo.cierre_forzoso_si_corresponde(_a_las(14, 31))
+        cierre = relevo_repo.cierre_forzoso_si_corresponde(_a_las(15, 1))
 
         datos = self._datos(cierre["id"])
 
@@ -299,8 +299,8 @@ class TestLaCola(_BaseDeEnvios):
     def test_el_forzoso_y_el_de_en_ausencia_tambien_quedan_en_la_cola(self):
         envio_pwa_repo.activar(self.admin_id, True)
         self._turno_de_toby()
-        forzoso = relevo_repo.cierre_forzoso_si_corresponde(_a_las(14, 31))
-        relevo_repo.abrir_caja(self.gabriela_id, 50000.0, _a_las(14, 40))
+        forzoso = relevo_repo.cierre_forzoso_si_corresponde(_a_las(15, 1))
+        relevo_repo.abrir_caja(self.gabriela_id, 50000.0, _a_las(15, 10))
         en_ausencia = relevo_repo.cerrar_para_entrar(self.toby_id, relevo_repo.SITUACION_CERRAR_LA_DE_OTRA,
                                                       _a_las(22, 10))
 
