@@ -21,6 +21,35 @@ from turnos import limites_de_los_dias, sql_dia_del_local
 # es el 1 a las 06:00 hasta el 2 a las 06:00, con la Noche del 1 entera adentro
 # y sin la madrugada del 1 (que es la Noche del 30). Cada función pasa sus dos
 # fechas por turnos.limites_de_los_dias antes de consultar.
+#
+# Lo que se reparte POR TURNO sigue a la caja, no al reloj (pedido del dueño,
+# 2026-10-29): el turno cambia con la persona, hasta una hora antes o después
+# (turnos.TURNO_GRACIA_MIN y MINUTOS_PARA_CIERRE_FORZOSO), y una venta de las
+# 13:30 en la caja de la Tarde es de la Tarde. Así Por Turno suma lo mismo que
+# los cierres de cada turno (Control de Cierres, Resumen del Día). El turno y el
+# día son los de la caja de la venta (cajas.turno, cajas.fecha); una venta sin
+# caja sigue con su hora (ventas.turno, el día del local de ventas.fecha).
+_CON_SU_CAJA = """
+            LEFT JOIN ventas_caja ON ventas_caja.venta_id = ventas.id
+            LEFT JOIN cajas ON cajas.id = ventas_caja.caja_id"""
+_TURNO_DE_LA_CAJA = "COALESCE(cajas.turno, ventas.turno)"
+_DIA_DE_LA_CAJA = f"COALESCE(cajas.fecha, {sql_dia_del_local('ventas.fecha')})"
+# El filtro por día de la caja no puede usar el índice de ventas.fecha y
+# recorrería todas las ventas de la base: primero se acota por la hora con este
+# margen y después se mira el día de la caja. Una venta y su caja difieren en
+# horas (el turno se adelanta o se atrasa hasta una hora); lo que el Admin
+# cobró sin caja pasa a la caja siguiente, que se abre enseguida.
+_MARGEN_DE_DIAS_POR_CAJA = 2
+
+
+def _filtro_por_caja(desde: str, hasta: str) -> tuple:
+    """(condición SQL, parámetros) de las ventas cuya caja es de un día entre
+    `desde` y `hasta` ("YYYY-MM-DD", incluidos los dos), para una consulta con
+    _CON_SU_CAJA."""
+    margen = timedelta(days=_MARGEN_DE_DIAS_POR_CAJA)
+    inicio, fin = limites_de_los_dias(date.fromisoformat(desde) - margen, date.fromisoformat(hasta) + margen)
+    return (f"ventas.fecha >= ? AND ventas.fecha < ? AND {_DIA_DE_LA_CAJA} BETWEEN ? AND ?",
+            (inicio, fin, desde, hasta))
 
 def resumen_ventas(desde: str, hasta: str):
     """
@@ -72,28 +101,31 @@ def resumen_por_turno(desde: str, hasta: str):
     (por ejemplo, si el rango son puros domingos, Tarde da $0 — ver
     turnos.calcular_turno, que ese día no genera ventas con turno
     "TARDE"). La Noche de cada día entra entera (días de 06:00 a 06:00).
+    El turno y el día de cada venta son los de su caja (ver _CON_SU_CAJA):
+    lo de cada turno es lo que suman sus cierres.
     """
-    desde, hasta = limites_de_los_dias(desde, hasta)
+    filtro, parametros = _filtro_por_caja(desde, hasta)
     with conexion_db() as conexion:
         por_turno = conexion.execute(
-            """
-            SELECT turno, COALESCE(SUM(total), 0) AS total, COUNT(*) AS cantidad_ventas
-            FROM ventas
-            WHERE estado = ? AND fecha >= ? AND fecha < ?
-            GROUP BY turno
+            f"""
+            SELECT {_TURNO_DE_LA_CAJA} AS turno, COALESCE(SUM(ventas.total), 0) AS total,
+                   COUNT(*) AS cantidad_ventas
+            FROM ventas{_CON_SU_CAJA}
+            WHERE ventas.estado = ? AND {filtro}
+            GROUP BY 1
             """,
-            (dominio.VENTA_CONFIRMADA, desde, hasta),
+            (dominio.VENTA_CONFIRMADA, *parametros),
         ).fetchall()
 
         pagos_por_turno = conexion.execute(
-            """
-            SELECT ventas.turno, venta_pagos.metodo, SUM(venta_pagos.monto) AS total
+            f"""
+            SELECT {_TURNO_DE_LA_CAJA} AS turno, venta_pagos.metodo, SUM(venta_pagos.monto) AS total
             FROM venta_pagos
-            JOIN ventas ON ventas.id = venta_pagos.venta_id
-            WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
-            GROUP BY ventas.turno, venta_pagos.metodo
+            JOIN ventas ON ventas.id = venta_pagos.venta_id{_CON_SU_CAJA}
+            WHERE ventas.estado = ? AND {filtro}
+            GROUP BY 1, venta_pagos.metodo
             """,
-            (dominio.VENTA_CONFIRMADA, desde, hasta),
+            (dominio.VENTA_CONFIRMADA, *parametros),
         ).fetchall()
 
     totales = {turno: {"total": 0.0, "cantidad_ventas": 0, "efectivo": 0.0, "digital": 0.0}
@@ -113,7 +145,7 @@ def resumen_por_turno(desde: str, hasta: str):
 _DIA_DEL_LOCAL = sql_dia_del_local("ventas.fecha")
 
 _COLUMNA_AGRUPACION = {
-    "turno": "ventas.turno",
+    "turno": _TURNO_DE_LA_CAJA,  # con _CON_SU_CAJA, ver resumen_por_origen
     "dia": _DIA_DEL_LOCAL,
     # 'weekday 0' avanza a el próximo domingo (0 = domingo) y '-6 days'
     # retrocede al lunes de esa misma semana -- modismo estándar de
@@ -146,16 +178,24 @@ def _sumar_por_clave(conexion, consulta: str, parametros) -> dict:
 
 
 def resumen_por_origen(desde: str, hasta: str, agrupar_por: str = "rango"):
-    """Ventas de mercadería e impresiones por período; cada peso cuenta una vez."""
+    """Ventas de mercadería e impresiones por período; cada peso cuenta una vez.
+    Por turno, el turno y el día son los de la caja de cada venta, como en
+    resumen_por_turno (ver _CON_SU_CAJA)."""
     columna_grupo = _COLUMNA_AGRUPACION[agrupar_por]
-    rango = (dominio.VENTA_CONFIRMADA, *limites_de_los_dias(desde, hasta))
+    if agrupar_por == "turno":
+        cajas = _CON_SU_CAJA
+        filtro, parametros = _filtro_por_caja(desde, hasta)
+    else:
+        cajas = ""
+        filtro, parametros = "ventas.fecha >= ? AND ventas.fecha < ?", limites_de_los_dias(desde, hasta)
+    rango = (dominio.VENTA_CONFIRMADA, *parametros)
     with conexion_db() as conexion:
         totales = _sumar_por_clave(
             conexion,
             f"""
             SELECT {columna_grupo} AS clave, COALESCE(SUM(ventas.total), 0) AS total
-            FROM ventas
-            WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
+            FROM ventas{cajas}
+            WHERE ventas.estado = ? AND {filtro}
             GROUP BY clave
             """,
             rango,
@@ -165,9 +205,9 @@ def resumen_por_origen(desde: str, hasta: str, agrupar_por: str = "rango"):
             f"""
             SELECT {columna_grupo} AS clave, COALESCE(SUM(venta_detalle.subtotal), 0) AS total
             FROM venta_detalle
-            JOIN ventas ON ventas.id = venta_detalle.venta_id
+            JOIN ventas ON ventas.id = venta_detalle.venta_id{cajas}
             WHERE venta_detalle.articulo_codigo = ?
-              AND ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
+              AND ventas.estado = ? AND {filtro}
             GROUP BY clave
             """,
             (dominio.CODIGO_ARTICULO_IMPRESIONES, *rango),

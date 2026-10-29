@@ -21,8 +21,8 @@ from unittest import mock
 import dominio
 from database import conexion_db
 from repositories import (
-    articulos_repo, compras_repo, relevo_repo, turnos_repo, turnos_ventas_repo, usuarios_repo,
-    ventas_repo,
+    articulos_repo, compras_repo, relevo_repo, reportes_repo, turnos_repo, turnos_ventas_repo,
+    usuarios_repo, ventas_repo,
 )
 from base import BaseConBaseTemporal
 
@@ -414,6 +414,47 @@ class TestVentasSinCaja(_BaseDeCajas):
 
         self.assertTrue(situacion["cuenta_cambio"])
         self.assertEqual(situacion["esperado"], 50700.0)
+
+
+class TestPorTurnoSigueALaCaja(_BaseDeCajas):
+    """Reportes > Por Turno (y Totales por turno) reparten cada venta en el turno
+    de su caja, no en el de su hora (pedido del dueño, 2026-10-29): suman lo
+    mismo que los cierres de cada turno."""
+
+    def _por_turno(self, dia):
+        return {fila["turno"]: fila["total"]
+                for fila in reportes_repo.resumen_por_turno(dia.isoformat(), dia.isoformat())}
+
+    def _totales_por_turno(self, dia):
+        return [(fila["etiqueta"], fila["total"])
+                for fila in reportes_repo.resumen_por_origen(dia.isoformat(), dia.isoformat(), "turno")]
+
+    def test_lo_vendido_a_las_13_30_en_la_caja_de_la_tarde_es_de_la_tarde(self):
+        relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
+        self._vender(self.lucia_id, _a_las(9), 1000.0)
+        manana = turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(13, 0))
+        relevo_repo.abrir_caja(self.gaby_id, 50000.0, _a_las(13, 0))
+        self._vender(self.gaby_id, _a_las(13, 30), 500.0)   # por el reloj sería Mañana
+        tarde = turnos_repo.cerrar_turno(self.gaby_id, ahora_dt=_a_las(21, 59))
+
+        self.assertEqual((manana["turno_label"], manana["ventas_efectivo"]), ("Mañana", 1000.0))
+        self.assertEqual((tarde["turno_label"], tarde["ventas_efectivo"]), ("Tarde", 500.0))
+        self.assertEqual(self._por_turno(LUNES),
+                         {dominio.TURNO_MANANA: 1000.0, dominio.TURNO_TARDE: 500.0, dominio.TURNO_NOCHE: 0.0})
+        self.assertEqual(self._totales_por_turno(LUNES), [("Mañana", 1000.0), ("Tarde", 500.0), ("Noche", 0.0)])
+
+    def test_la_manana_que_abre_a_las_5_cuenta_en_su_dia(self):
+        martes = date(2026, 1, 6)
+        relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 0, martes))
+        self._vender(self.lucia_id, _a_las(5, 30, martes), 300.0)   # por el reloj, Noche del lunes
+
+        self.assertEqual(self._por_turno(LUNES)[dominio.TURNO_NOCHE], 0.0)
+        self.assertEqual(self._por_turno(martes)[dominio.TURNO_MANANA], 300.0)
+
+    def test_una_venta_sin_caja_sigue_con_su_hora(self):
+        self._vender(self.admin_id, _a_las(13, 30), 700.0)   # el Admin, sin nadie en el mostrador
+
+        self.assertEqual(self._por_turno(LUNES)[dominio.TURNO_MANANA], 700.0)
 
 
 class TestSobreLoCargaSoloElAdmin(_BaseDeCajas):

@@ -233,6 +233,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `turnos.etiqueta_turno(fecha, turno)` | se arma el nombre legible de un turno |
 | `turnos.dia_en_que_empezo_el_turno(fecha_hora)` | se decide a qué día pertenece el turno de un momento (antes de las 06:00 es la Noche del día anterior): pasarle eso a `etiqueta_turno`, nunca el día calendario de una venta de madrugada |
 | `turnos.limites_de_los_dias(desde, hasta)` · `turnos.sql_dia_del_local(columna)` | se filtra y se agrupa por día en un reporte de ventas: días de 06:00 a 06:00, con la Noche entera en el día en que empezó |
+| `reportes_repo._CON_SU_CAJA` · `._TURNO_DE_LA_CAJA` · `._filtro_por_caja(desde, hasta)` | se reparte un reporte POR TURNO (Por Turno y Totales por turno): cada venta en el turno y el día de su caja, no los de su hora (pedido del dueño, 2026-10-29: el turno cambia con la persona, hasta una hora antes o después). Así suma lo mismo que los cierres de cada turno; una venta sin caja va por su hora. El filtro acota primero por la hora (con el índice) y después mira el día de la caja |
 | `turnos.dia_del_turno_que_arranca_tras_un_cierre(momento)` | se decide con qué DÍA queda anotado lo que sigue a un cierre (misma tolerancia que el turno) |
 | `ui.utils.hoy_del_local()` | se decide qué es "hoy" en los reportes de ventas (hasta las 06:00, el día anterior) |
 | `turnos.turno_vencimiento(dia, turno)` | se decide si un turno ya debería estar cerrado: su fin + `MINUTOS_PARA_CIERRE_FORZOSO` (60 min). Es también la hora del cierre forzoso de la caja. Los carteles que nombran esos minutos leen la constante |
@@ -640,7 +641,7 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 706 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 709 pruebas
 al 2026-10-29 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.

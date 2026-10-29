@@ -8,7 +8,8 @@ Reportes, una pestaña por cada pregunta que se le hace a las ventas:
   cuadró; Kiosko e Impresiones van en columnas aparte. Abajo, el detalle de lo vendido (venta por venta, por
   producto y por operador) del día o del turno que se toque (en su propio
   archivo, ui/reportes_detalle_dia.py).
-- Por Turno: el total de un rango repartido entre Mañana/Tarde/Noche.
+- Por Turno: el total de un rango repartido entre Mañana/Tarde/Noche, por la
+  caja de cada venta (lo mismo que suman los cierres de cada turno).
 - Totales: Kiosko / Impresiones,
   por turno, día, semana o rango.
 - Ranking de Ventas: qué artículos se vendieron más (las impresiones también:
