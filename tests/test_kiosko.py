@@ -1396,7 +1396,7 @@ class TestTurnosFaltantes(BaseConBaseTemporal):
 
         # "Ahora" es ese mismo lunes a las 20:00: todos los turnos de los
         # días 1 a 4 de enero (y el Mañana del día 5, recién cerrado) ya
-        # vencieron con su gracia de 40 min.
+        # vencieron con su gracia de una hora.
         with mock.patch("repositories.turnos_repo.datetime") as datetime_mock:
             datetime_mock.now.return_value = datetime(2026, 1, 5, 20, 0, 0)
             faltantes = turnos_repo.turnos_faltantes()

@@ -170,10 +170,13 @@ def etiqueta_turno(fecha, turno: str) -> str:
 
 
 # Tolerancia para decidir a qué turno pertenece lo que arranca a cierta hora
-# (una caja que se abre, lo que sigue a un cierre): quien llega a las 13:25 ya
-# es de la Tarde. Ver turno_que_arranca_tras_un_cierre. NO es lo que tarda en
-# cerrarse sola una caja: eso es MINUTOS_PARA_CIERRE_FORZOSO.
-TURNO_GRACIA_MIN = 40
+# (una caja que se abre, lo que sigue a un cierre): quien llega a las 13:00 ya
+# es de la Tarde. Ver turno_que_arranca_tras_un_cierre. Desde el 2026-10-29 son
+# 60 (eran 40), la misma hora que MINUTOS_PARA_CIERRE_FORZOSO: quien reemplaza
+# puede llegar hasta una hora antes o una hora después, y el turno cambia con
+# la persona. NO es lo que tarda en cerrarse sola una caja: eso es
+# MINUTOS_PARA_CIERRE_FORZOSO (que hoy vale lo mismo, pero son dos cosas)
+TURNO_GRACIA_MIN = 60
 
 # Cuántos minutos antes del fin del turno empieza a titilar en rojo el botón
 # Cierre de Turno (pedido del dueño, 2026-10-18). Ver inicio_del_aviso_de_cierre.

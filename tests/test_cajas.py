@@ -79,6 +79,19 @@ class TestAbrirCaja(_BaseDeCajas):
         self.assertEqual(caja["diferencia"], -500.0)
         self.assertEqual(self._situacion(self.lucia_id, _a_las(6, 0))["situacion"], relevo_repo.SITUACION_SU_CAJA)
 
+    def test_quien_llega_una_hora_antes_abre_el_turno_que_viene_y_cierra_el_que_termina(self):
+        # Pedido del dueño (2026-10-29): la que viene a recuperar horas y abre a las
+        # 13:00 abre la Tarde; con 12:59 todavía es la Mañana.
+        relevo_repo.abrir_caja(self.lucia_id, 50000.0, _a_las(5, 55))
+        self._vender(self.lucia_id, _a_las(9), 1000.0)
+        self.assertEqual(self._situacion(self.gaby_id, _a_las(12, 59))["situacion"], relevo_repo.SITUACION_RECIBIR)
+
+        manana = turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(13, 0))
+        self.assertEqual((manana["turno"], manana["monto_a_retirar"]), (dominio.TURNO_MANANA, 1000.0))
+        situacion = self._situacion(self.gaby_id, _a_las(13, 0))
+        self.assertEqual((situacion["situacion"], situacion["turno_label"]), (relevo_repo.SITUACION_ABRIR, "Tarde"))
+        self.assertEqual(relevo_repo.abrir_caja(self.gaby_id, 50000.0, _a_las(13, 0))["turno_label"], "Tarde")
+
     def test_si_hay_que_contar_no_se_puede_abrir_sin_el_monto(self):
         with self.assertRaises(ValueError):
             relevo_repo.abrir_caja(self.lucia_id, None, _a_las(5, 55))

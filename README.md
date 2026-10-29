@@ -124,7 +124,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
   **"Domingo T1"/"Domingo T2"** (`turnos.etiqueta_turno`). ⚠️ Para el **cierre de
   turno**, la etiqueta y la **`fecha`** usan el momento en que **empezó** el
   turno (el `fecha_cierre` del cierre anterior, con la tolerancia de
-  `TURNO_GRACIA_MIN`, 40 min: `turnos.turno_que_arranca_tras_un_cierre`), no el
+  `TURNO_GRACIA_MIN`, 60 min: `turnos.turno_que_arranca_tras_un_cierre`), no el
   clic de cerrar. ⚠️ **Con una caja abierta, el turno y el día del cierre son los
   de la caja** (decididos al abrirla).
 - **`turnos.turno_vencimiento(dia, turno)`** — su fin (`turnos.fin_del_turno`)

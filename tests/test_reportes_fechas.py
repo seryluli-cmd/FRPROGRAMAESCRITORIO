@@ -76,7 +76,7 @@ class TestDiaDelLocal(BaseConBaseTemporal):
         self.assertEqual(turnos.dia_del_turno_que_arranca_tras_un_cierre(cierre), date(2026, 1, 31))
 
     def test_un_cierre_de_la_noche_poco_antes_de_las_06_deja_la_manana_del_dia_nuevo(self):
-        # Con la tolerancia de siempre (TURNO_GRACIA_MIN): cerrar la Noche a las 05:30
+        # Con la tolerancia (TURNO_GRACIA_MIN): cerrar la Noche a las 05:30
         # es cerrar la Noche, y lo que sigue es la Mañana del 1/2.
         cierre = datetime(2026, 2, 1, 6, 0) - timedelta(minutes=30)
         self.assertEqual(turnos.turno_que_arranca_tras_un_cierre(cierre), dominio.TURNO_MANANA)

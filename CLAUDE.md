@@ -398,7 +398,7 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   faltantes. El test `TestCadaOrigenSumaEnLaCaja` (`tests/test_cajas.py`) lo atrapa. `ventas.origen`
   tiene un CHECK: agregar un origen a una base ya en uso exige una migración
   que reconstruya `ventas` (ver regla 6). Hoy el único origen es KIOSKO.
-- **El turno de un cierre sale de la hora del cierre ANTERIOR, con 40 minutos
+- **El turno de un cierre sale de la hora del cierre ANTERIOR, con 60 minutos
   de tolerancia.** `cerrar_turno` anota el cierre en el turno donde ARRANCÓ lo
   que cierra, no en el de la hora en que se aprieta el botón (cerrar la Mañana a
   las 14:05 sigue siendo "Mañana"). Pero la hora del cierre anterior se toma con
@@ -409,7 +409,7 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   regla toca lo que ven Caja, Cierre de Turno y Resumen del Día a la vez: todo
   sale de `turnos_repo._desde_y_turno_en_curso`. **Con una caja abierta, el
   turno y el día son los de la caja** (decididos al abrirla con la misma
-  tolerancia). `TURNO_GRACIA_MIN` (40) es SOLO esa tolerancia: lo que tarda en
+  tolerancia). `TURNO_GRACIA_MIN` (60) es SOLO esa tolerancia: lo que tarda en
   cerrarse sola una caja es `MINUTOS_PARA_CIERRE_FORZOSO` (60), no los mezcles.
 - **Cajas con número (reglas en `relevo_repo`).** Una empleada no entra sin
   caja y nunca hay dos abiertas. La caja es de UNA persona por vez. Si el
