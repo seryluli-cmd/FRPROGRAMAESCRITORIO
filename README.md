@@ -423,7 +423,9 @@ Nunca corta un cobro ni un formulario abierto. Solo en el mostrador. Tests:
 
 ## Identidad y permisos
 
-Login por **nombre + clave** (`login_window.py`, vía
+Login por **nombre + clave**: se toca la ficha de cada uno (o se elige con las
+flechas) y se escribe la clave (`login_window.py`, diseño "Elegí tu Jugador" del
+2026-10-30, dibujos en `ui/login_dibujos.py`; vía
 `usuarios_repo.autenticar_por_nombre`) — ignora mayúsculas/minúsculas y
 espacios de más al comparar (en Python, no con el `LOWER()` de SQLite, que no
 pliega acentos). `crear_usuario`/`modificar_usuario` rechazan un nombre vacío

@@ -1,22 +1,26 @@
 """
 login_window.py
 =================
-Pantalla de login. Elige el nombre de la persona de una listita
-desplegable (en vez de tipearlo, para evitar errores de tipeo y que sea
-más cómodo con pantalla táctil) y pide "Clave"; si coinciden, abre la
-ventana principal con los permisos que correspondan según el rol
-(ADMIN o EMPLEADA).
+Pantalla de login con el diseño "Elegí tu Jugador" (la maqueta C que eligió el
+dueño el 2026-10-30): cada usuario es una ficha con un círculo de color y sus
+iniciales, y se elige tocándola o con las flechas (en vez de tipear el nombre,
+para evitar errores de tipeo y que sea cómodo con pantalla táctil). Enter pasa a
+la "Clave"; si coinciden, abre la ventana principal con los permisos que
+correspondan según el rol (ADMIN o EMPLEADA).
+
+Los dibujos (el fondo animado, el nombre en degradado y las fichas) están en
+ui/login_dibujos.py. Los colores de las etiquetas, la clave y ENTRAR van por
+objectName en ui/hoja_de_estilos.py, no en una hoja local: los avisos
+(mostrar_error) y la caja que se abre al entrar son hijos de esta ventana, y una
+hoja local les pasaría el fondo oscuro.
 """
 
 import time
 from pathlib import Path
 
-from PySide6.QtWidgets import (
-    QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QFormLayout, QFrame, QComboBox,
-    QGraphicsDropShadowEffect
-)
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QColor, QPixmap
+from PySide6.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout
+from PySide6.QtCore import Qt, QElapsedTimer, QTimer
+from PySide6.QtGui import QPainter, QPixmap, QFont
 
 import dominio
 from admin_remoto import modo as modo_remoto
@@ -24,10 +28,16 @@ from database import verificar_clave
 # El módulo y no las funciones sueltas: en la copia para administrar desde otra
 # PC, admin_remoto/cliente.py las cambia por las que le preguntan al mostrador.
 from repositories import usuarios_repo
-from ui.utils import mostrar_error, mostrar_aviso, manejar_errores, aplicar_clase, encadenar_enter
+from ui.login_dibujos import AZUL, CIAN, VIOLETA, FichasDeJugadores, FondoDelIngreso, TextoDegradado, brillo, letra
+from ui.utils import mostrar_error, mostrar_aviso, manejar_errores, encadenar_enter
 
 # Mismo ícono que usa main.py para las ventanas (carpeta assets, junto al código).
 RUTA_ICONO_PNG = Path(__file__).resolve().parent.parent / "assets" / "icono.png"
+
+ANCHO, ALTO = 960, 600
+# Unos 30 cuadros por segundo: las rayas se corren 2 px por cuadro y se ven
+# parejas. La animación corre solo con la pantalla a la vista (showEvent/hideEvent).
+MILISEGUNDOS_POR_CUADRO = 33
 
 # Protección simple contra prueba y error de claves: después de
 # MAX_INTENTOS fallidos seguidos con el mismo nombre, se bloquea ese
@@ -49,116 +59,148 @@ class LoginWindow(QWidget):
         """
         super().__init__()
         self._al_loguearse = al_loguearse
+        self._fondo = FondoDelIngreso(ANCHO, ALTO)
+        self._segundos = 0.0
+        self._reloj = QElapsedTimer()
+        self._reloj.start()
+        self._animacion = QTimer(self)
+        self._animacion.setInterval(MILISEGUNDOS_POR_CUADRO)
+        self._animacion.timeout.connect(self._siguiente_cuadro)
         self._armar_interfaz()
 
     def _armar_interfaz(self):
         self.setWindowTitle("FRKiosko - Ingreso")
-        self.setFixedSize(400, 420)
-        # Fondo gris claro detrás de la tarjeta blanca, para que la
-        # tarjeta se destaque en vez de que todo sea un único blanco liso.
-        # Se hace con QPalette (no setStyleSheet): ponerle una hoja de
-        # estilos LOCAL a esta ventana rompe la cascada de la regla
-        # [clase="primario"] de la hoja de estilos global para el botón
-        # "Entrar" de más abajo (limitación del motor de QSS de Qt).
-        self.setAutoFillBackground(True)
-        paleta = self.palette()
-        paleta.setColor(QPalette.Window, QColor("#EEF1F6"))
-        self.setPalette(paleta)
+        self.setFixedSize(ANCHO, ALTO)
 
-        # El ícono real del programa (el carrito, assets/icono.png). Si el archivo no
-        # estuviera, se cae al emoji de siempre en vez de dejar el hueco vacío.
-        icono = QLabel()
+        # Arriba, el ícono real del programa (el carrito, assets/icono.png) y el
+        # nombre en degradado. Si el ícono no estuviera, el nombre queda solo, al medio.
+        cabecera = QHBoxLayout()
+        cabecera.addStretch()
         imagen = QPixmap(str(RUTA_ICONO_PNG))
-        if imagen.isNull():
-            icono.setText("🏪")
-            icono.setStyleSheet("font-size: 42px;")
-        else:
-            icono.setPixmap(imagen.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        icono.setAlignment(Qt.AlignCenter)
+        if not imagen.isNull():
+            escala = self.devicePixelRatioF()
+            imagen = imagen.scaled(round(52 * escala), round(52 * escala), Qt.KeepAspectRatio,
+                                   Qt.SmoothTransformation)
+            imagen.setDevicePixelRatio(escala)
+            icono = QLabel()
+            icono.setPixmap(imagen)
+            brillo(icono, AZUL, 30, 180)
+            cabecera.addWidget(icono)
+            cabecera.addSpacing(10)
+        titulo = TextoDegradado("FRKiosko", letra("Bahnschrift", 34, QFont.Bold, 1), [CIAN, AZUL, VIOLETA])
+        brillo(titulo, AZUL, 26, 140)
+        cabecera.addWidget(titulo)
+        cabecera.addStretch()
 
-        titulo = QLabel("FRKiosko")
-        titulo.setStyleSheet("font-size: 21px; font-weight: 700; color: #1F2430;")
-        titulo.setAlignment(Qt.AlignCenter)
-
-        if modo_remoto.es_copia_remota():
-            subtitulo = QLabel(
-                f"Desde otra PC · mostrador: {modo_remoto.mostrador_en_uso()}\n"
-                "Entra solo un Administrador."
-            )
-        else:
-            subtitulo = QLabel("Elegí tu nombre e ingresá la clave para continuar")
-        subtitulo.setStyleSheet("color: #6B7280; font-size: 12px;")
+        subtitulo = QLabel("ELEGÍ TU JUGADOR")
+        subtitulo.setObjectName("subtituloIngreso")
         subtitulo.setAlignment(Qt.AlignCenter)
-        subtitulo.setWordWrap(True)
 
-        # Lista desplegable en vez de campo de texto: se arma de nuevo
-        # cada vez que se abre esta pantalla (con listar_usuarios(), sin
-        # incluir inactivos) para reflejar altas/bajas recientes de
-        # Usuarios sin tener que reiniciar el programa. Se ordena acá
-        # con Python (nombre.lower()), no con el ORDER BY del repo: en
-        # SQLite el orden por defecto es por valor de byte, así que
-        # "admin" (minúscula) quedaría después de cualquier nombre en
-        # mayúscula en vez de intercalarse alfabéticamente de verdad.
-        self.combo_nombre = QComboBox()
-        usuarios_ordenados = sorted(usuarios_repo.listar_usuarios(), key=lambda u: u["nombre"].lower())
-        for usuario in usuarios_ordenados:
-            self.combo_nombre.addItem(usuario["nombre"])
+        # Las fichas se arman de nuevo cada vez que se abre esta pantalla (con
+        # listar_usuarios(), sin incluir inactivos) para reflejar altas/bajas
+        # recientes de Usuarios sin tener que reiniciar el programa. Se ordena acá
+        # con Python (dominio.sin_acentos), no con el ORDER BY del repo: en SQLite el
+        # orden por defecto es por valor de byte, así que "admin" (minúscula)
+        # quedaría después de cualquier nombre en mayúscula, y "Ángela" después de
+        # "Zulma", en vez de intercalarse alfabéticamente de verdad. Se sigue
+        # llamando combo_nombre: era la lista desplegable, las fichas tienen lo que
+        # se usaba de ella y así la buscan las pruebas.
+        usuarios_ordenados = sorted(usuarios_repo.listar_usuarios(), key=lambda u: dominio.sin_acentos(u["nombre"]))
+        self.combo_nombre = FichasDeJugadores([usuario["nombre"] for usuario in usuarios_ordenados])
+        self.combo_nombre.currentIndexChanged.connect(self._saludar)
+        # Tocar una ficha la elige y deja todo listo para escribir la clave.
+        self.combo_nombre.tocada.connect(self._pasar_a_la_clave)
+
+        self.saludo = QLabel()
+        self.saludo.setObjectName("saludoIngreso")
+        self.saludo.setAlignment(Qt.AlignCenter)
+        self._saludar()
+
         self.campo_clave = QLineEdit()
+        self.campo_clave.setObjectName("claveIngreso")
         self.campo_clave.setEchoMode(QLineEdit.Password)
         # Al apretar Enter en la clave, intenta entrar directamente (más
         # rápido para el uso diario que tener que hacer clic siempre).
         self.campo_clave.returnPressed.connect(self._intentar_ingresar)
-        # Enter en el nombre pasa a la clave, como Tab.
+        # Enter en las fichas pasa a la clave, como Tab.
         encadenar_enter(self.combo_nombre, self.campo_clave)
 
-        formulario = QFormLayout()
-        formulario.setSpacing(10)
-        formulario.addRow("Nombre:", self.combo_nombre)
-        formulario.addRow("Clave:", self.campo_clave)
-
-        boton_entrar = QPushButton("Entrar")
-        aplicar_clase(boton_entrar, "primario")
-        boton_entrar.setFixedHeight(42)
-        boton_entrar.setDefault(True)
+        boton_entrar = QPushButton("ENTRAR")
+        boton_entrar.setObjectName("botonEntrar")
+        boton_entrar.setCursor(Qt.PointingHandCursor)
         boton_entrar.clicked.connect(self._intentar_ingresar)
+        brillo(boton_entrar, VIOLETA, 32, 170)
 
-        # Tarjeta blanca centrada, con borde suave, que agrupa todo el
-        # formulario. Su estilo vive en la hoja de estilos GLOBAL (ui/hoja_de_estilos.py)
-        # (selector "#tarjetaLogin"), no en un setStyleSheet local, por el
-        # mismo motivo que el fondo de arriba: una hoja local rompería la
-        # regla [clase="primario"] del botón "Entrar" que va adentro.
-        tarjeta = QFrame()
-        tarjeta.setObjectName("tarjetaLogin")
-        layout_tarjeta = QVBoxLayout()
-        layout_tarjeta.setContentsMargins(36, 32, 36, 32)
-        layout_tarjeta.setSpacing(6)
-        layout_tarjeta.addWidget(icono)
-        layout_tarjeta.addWidget(titulo)
-        layout_tarjeta.addWidget(subtitulo)
-        layout_tarjeta.addSpacing(20)
-        layout_tarjeta.addLayout(formulario)
-        layout_tarjeta.addSpacing(20)
-        layout_tarjeta.addWidget(boton_entrar)
-        tarjeta.setLayout(layout_tarjeta)
+        fila_clave = QHBoxLayout()
+        fila_clave.setSpacing(12)
+        fila_clave.addStretch()
+        self.campo_clave.setFixedWidth(260)
+        fila_clave.addWidget(self.campo_clave)
+        fila_clave.addWidget(boton_entrar)
+        fila_clave.addStretch()
 
-        # Sombra suave para que la tarjeta se sienta "flotando" sobre el
-        # fondo gris, en vez de quedar pegada — un detalle chico que
-        # ayuda a que la pantalla de entrada se vea más cuidada. Tiene
-        # que ser un efecto de Qt (QGraphicsDropShadowEffect), no CSS:
-        # el motor de hojas de estilo de Qt no soporta box-shadow.
-        sombra = QGraphicsDropShadowEffect(self)
-        sombra.setBlurRadius(28)
-        sombra.setXOffset(0)
-        sombra.setYOffset(6)
-        sombra.setColor(QColor(31, 41, 61, 45))
-        tarjeta.setGraphicsEffect(sombra)
+        ayuda = QLabel("←  →  para elegir     ·     Enter para seguir     ·     o tocá tu ficha")
+        ayuda.setObjectName("ayudaIngreso")
+        ayuda.setAlignment(Qt.AlignCenter)
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.addWidget(tarjeta)
-        self.setLayout(layout)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 40, 0, 30)
+        layout.setSpacing(0)
+        layout.addLayout(cabecera)
+        layout.addSpacing(10)
+        layout.addWidget(subtitulo)
+        layout.addWidget(self.combo_nombre, 1)
+        layout.addWidget(self.saludo)
+        layout.addSpacing(12)
+        layout.addLayout(fila_clave)
+        if modo_remoto.es_copia_remota():
+            # Va en el hueco de arriba de la ayuda: así las fichas no pierden lugar.
+            aviso = QLabel(
+                f"Desde otra PC · mostrador: {modo_remoto.mostrador_en_uso()} · Entra solo un Administrador."
+            )
+            aviso.setObjectName("avisoIngreso")
+            aviso.setAlignment(Qt.AlignCenter)
+            aviso.setWordWrap(True)
+            layout.addSpacing(12)
+            layout.addWidget(aviso)
+            layout.addSpacing(18)
+        else:
+            layout.addSpacing(50)
+        layout.addWidget(ayuda)
 
         self.combo_nombre.setFocus()
+
+    # ------------------------------------------------ la animación
+    def showEvent(self, evento):
+        super().showEvent(evento)
+        self._animacion.start()
+
+    def hideEvent(self, evento):
+        # Cerrada al entrar al programa, no gasta nada dibujando lo que nadie ve.
+        self._animacion.stop()
+        super().hideEvent(evento)
+
+    def _siguiente_cuadro(self):
+        self._segundos = self._reloj.elapsed() / 1000
+        self.combo_nombre.momento = self._segundos
+        self.update()
+
+    def paintEvent(self, _evento):
+        pintor = QPainter(self)
+        pintor.setRenderHint(QPainter.Antialiasing)
+        self._fondo.pintar(pintor, self._segundos)
+        pintor.end()
+
+    # ------------------------------------------------ elegir y entrar
+    def _saludar(self, _indice=None):
+        nombre = self.combo_nombre.currentText()
+        if nombre:
+            self.saludo.setText(f"Hola, {nombre}. Ingresá tu clave")
+        else:
+            self.saludo.setText("Todavía no hay ningún usuario cargado")
+
+    def _pasar_a_la_clave(self, _indice=None):
+        self.campo_clave.setFocus()
 
     @manejar_errores
     def _intentar_ingresar(self):

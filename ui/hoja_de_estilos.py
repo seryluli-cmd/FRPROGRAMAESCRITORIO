@@ -248,10 +248,68 @@ HOJA_DE_ESTILOS = """
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
         height: 0px;
     }
-    #tarjetaLogin {
-        background-color: #FFFFFF;
-        border: 1px solid #E1E4EA;
-        border-radius: 14px;
+    /* Pantalla de ingreso "Elegí tu Jugador" (maqueta C, elegida por el dueño el
+       2026-10-30; ui/login_window.py). El fondo, el nombre y las fichas se dibujan
+       con QPainter (ui/login_dibujos.py); acá van las etiquetas, la clave y ENTRAR,
+       siempre por objectName: los avisos y la caja que se abren al entrar son hijos
+       de esa ventana y tienen que verse como siempre. La letra también va acá y no
+       con setFont, porque la regla QWidget de arriba le gana. */
+    QLabel#subtituloIngreso {
+        color: #7DD8F0;
+        font-family: "Bahnschrift";
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 7px;
+        /* Con el alto justo de la letra, el acento de la Í quedaba cortado. */
+        min-height: 26px;
+    }
+    QLabel#saludoIngreso {
+        color: #E9E5FF;
+        font-size: 15px;
+        font-weight: 600;
+        min-height: 26px;
+    }
+    QLabel#avisoIngreso {
+        color: #FBBF24;
+        font-size: 13px;
+    }
+    QLabel#ayudaIngreso {
+        color: #6C6890;
+        font-size: 12px;
+    }
+    QLineEdit#claveIngreso {
+        background-color: rgba(6, 10, 24, 235);
+        color: #F5F3FF;
+        font-size: 18px;
+        letter-spacing: 5px;
+        border: 1.5px solid #39407A;
+        border-radius: 12px;
+        padding: 10px 16px;
+        min-height: 28px;
+        selection-background-color: #A855F7;
+    }
+    /* Celeste mientras se escribe: así se ve si el teclado está en la clave o en
+       las fichas. */
+    QLineEdit#claveIngreso:focus {
+        border: 1.5px solid #22D3EE;
+    }
+    QPushButton#botonEntrar {
+        color: #FFFFFF;
+        font-family: "Bahnschrift";
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        border: none;
+        border-radius: 12px;
+        min-height: 52px;
+        min-width: 150px;
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #22D3EE, stop:1 #A855F7);
+    }
+    QPushButton#botonEntrar:hover {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4FE0F3, stop:1 #BA7AF9);
+    }
+    QPushButton#botonEntrar:pressed {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #13A9C0, stop:1 #8B3FD6);
     }
     /* Barra superior oscura del mostrador. */
     #encabezadoInicio {
