@@ -19,17 +19,20 @@ import dominio
 
 # (letra, fondo, borde) de las etiquetas, en tonos claros. Una lista con pocos
 # textos fijos (los rubros) les da un color a cada uno en orden, sin repetir
-# (DelegadoEtiqueta.colores_en_orden); si no, cada texto sale de su nombre.
-COLORES_DE_ETIQUETA = (
-    ("#1D4FA8", "#EAF1FF", "#BFD3FB"),   # azul
-    ("#6D3FC0", "#F2ECFE", "#D6C6FA"),   # violeta
-    ("#1D7A48", "#E9F8EF", "#B6E5C8"),   # verde
-    ("#9A5B00", "#FFF4DE", "#F6D79A"),   # ámbar
-    ("#B02A6B", "#FDEBF4", "#F5BCD8"),   # rosa
-    ("#0E6F86", "#E5F7FB", "#AEE2EE"),   # celeste
-    ("#B4471A", "#FFEEE5", "#F6C3A8"),   # naranja
-    ("#3E5672", "#EEF2F7", "#C9D3E0"),   # gris
-)
+# (DelegadoEtiqueta.colores_en_orden); un texto que tiene que ir de un color en
+# particular (ANULADA en rosa) lo elige por nombre (DelegadoEtiqueta.colores_fijos);
+# si no, cada texto sale de su nombre.
+TONOS_DE_ETIQUETA = {
+    "azul": ("#1D4FA8", "#EAF1FF", "#BFD3FB"),
+    "violeta": ("#6D3FC0", "#F2ECFE", "#D6C6FA"),
+    "verde": ("#1D7A48", "#E9F8EF", "#B6E5C8"),
+    "ámbar": ("#9A5B00", "#FFF4DE", "#F6D79A"),
+    "rosa": ("#B02A6B", "#FDEBF4", "#F5BCD8"),
+    "celeste": ("#0E6F86", "#E5F7FB", "#AEE2EE"),
+    "naranja": ("#B4471A", "#FFEEE5", "#F6C3A8"),
+    "gris": ("#3E5672", "#EEF2F7", "#C9D3E0"),
+}
+COLORES_DE_ETIQUETA = tuple(TONOS_DE_ETIQUETA.values())
 
 ROJO = QColor("#D93A45")
 AMBAR = QColor("#E8A317")
@@ -68,6 +71,11 @@ class DelegadoEtiqueta(QStyledItemDelegate):
         recién pasados los ocho)."""
         self._colores = {texto: COLORES_DE_ETIQUETA[numero % len(COLORES_DE_ETIQUETA)]
                          for numero, texto in enumerate(textos)}
+
+    def colores_fijos(self, tonos: dict):
+        """Cada texto con el tono que se le pide por nombre ({"ANULADA": "rosa"}),
+        uno de TONOS_DE_ETIQUETA."""
+        self._colores = {texto: TONOS_DE_ETIQUETA[tono] for texto, tono in tonos.items()}
 
     def paint(self, painter, option, index):
         _pintar_fondo(painter, option, index)

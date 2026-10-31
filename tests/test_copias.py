@@ -26,7 +26,7 @@ from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QGroupBox  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 import database  # noqa: E402
 import dominio  # noqa: E402
@@ -400,9 +400,9 @@ class TestPantallaDeCopias(_ConCopias):
     def test_nombra_la_carpeta_de_verdad(self):
         # El dueño busca ahí la copia para recuperarla (LEEME.txt): en este programa
         # es data_fr\backups, no la data\backups de CYBERCONTROL.
-        titulos = [grupo.title() for grupo in self._dialogo().findChildren(QGroupBox)]
+        titulos = [etiqueta.text() for etiqueta in self._dialogo().findChildren(QLabel)]
         self.assertTrue(any("data_fr\\backups" in titulo for titulo in titulos), titulos)
-        self.assertFalse(any("(carpeta del programa, data\\" in titulo for titulo in titulos), titulos)
+        self.assertFalse(any("data\\backups" in titulo for titulo in titulos), titulos)
 
     def test_agregar_una_carpeta_hace_una_copia_enseguida(self):
         dialogo = self._dialogo()

@@ -21,14 +21,17 @@ Las usa el Admin o una Empleada con `permiso_reportes`.
 """
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout,
     QTableWidgetItem, QComboBox, QTabWidget, QWidget,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 
 import dominio
 from repositories import reportes_repo
+from ui.dibujos_tabla import DelegadoEtiqueta
+from ui.piezas_ventana import (
+    TONO_AZUL, TONO_GRIS, TONO_VERDE, agregar_pastilla, cabecera_oscura, cifra_destacada, panel_de_tabla,
+    pie_de_ventana, titulo_de_seccion,
+)
 # Resumen del Día vive en su propio archivo; se importa también desde acá
 # (ui.reportes_window.PestañaResumenDelDia), como antes de partirlo.
 from ui.reportes_resumen_dia import PestañaResumenDelDia
@@ -39,10 +42,20 @@ from ui.utils import (
     mostrar_columna_entera,
 )
 
+# Margen de arriba del contenido de cada pestaña: con las pestañas sin recuadro
+# (documentMode) el contenido queda alineado con la cabecera y la nota de abajo.
+MARGENES_DE_PESTAÑA = (0, 12, 0, 0)
+
 
 class ReportesWindow(QDialog):
     """Contenedor de las pestañas de reportes (cada una es un QWidget
-    independiente que busca y se muestra sola, ver las clases de abajo)."""
+    independiente que busca y se muestra sola, ver las clases de abajo).
+
+    Con la maqueta B que eligió el dueño el 2026-10-30 (ui/piezas_ventana.py): la
+    cabecera oscura arriba de las pestañas, cada pestaña con su grilla en un panel
+    blanco (panel_de_tabla) y abajo la línea de cómo se cuenta un día. La cabecera no
+    lleva números: cada pestaña tiene su propio rango de fechas y un número arriba
+    no diría de cuál es."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -51,38 +64,44 @@ class ReportesWindow(QDialog):
         # nombre de quien cerró cada turno) queda tan angosta que corta el nombre.
         # No más ancho que la pantalla, para que la ventana no se salga de ella.
         # Alto: el Resumen del Día lleva abajo el detalle de las ventas.
-        ancho, alto = 1100, 820
+        ancho, alto = 1180, 820
         if self.screen() is not None:
             ancho = min(ancho, self.screen().availableGeometry().width() - 20)
             alto = min(alto, self.screen().availableGeometry().height() - 40)
         self.resize(ancho, alto)
 
-        pestañas = QTabWidget()
-        pestañas.addTab(PestañaResumen(), "Resumen de Ventas")
-        pestañas.addTab(PestañaResumenDelDia(), "Resumen del Día")
-        pestañas.addTab(PestañaPorTurno(), "Por Turno")
-        pestañas.addTab(PestañaTotales(), "Totales")
-        pestañas.addTab(PestañaRanking(), "Ranking de Ventas")
-        pestañas.addTab(PestañaPorOperador(), "Por Operador")
+        cabecera = cabecera_oscura("📊", "Reportes", "Lo vendido por día, por turno, por artículo y por operador")
+        agregar_pastilla(cabecera, "DÍAS DE 06:00 A 06:00", TONO_GRIS)
 
-        # Cómo se cuenta un día en TODAS las pestañas (pedido del dueño): sin
-        # esto, ver la madrugada del 2 sumada en el día 1 parecería un error.
-        nota_dias = QLabel(
-            "Cada día va de las 06:00 a las 06:00 del día siguiente: el turno Noche "
-            "(22 a 06) cuenta entero en el día en que empezó."
-        )
-        nota_dias.setStyleSheet("color: #7A869A;")
+        # Sin el recuadro de las pestañas: cada una ya pone sus grillas en un panel
+        # blanco, y con los dos bordes juntos se veía un cuadro adentro de otro.
+        self.pestañas = QTabWidget()
+        self.pestañas.setDocumentMode(True)
+        self.pestañas.addTab(PestañaResumen(), "Resumen de Ventas")
+        self.pestañas.addTab(PestañaResumenDelDia(), "Resumen del Día")
+        self.pestañas.addTab(PestañaPorTurno(), "Por Turno")
+        self.pestañas.addTab(PestañaTotales(), "Totales")
+        self.pestañas.addTab(PestañaRanking(), "Ranking de Ventas")
+        self.pestañas.addTab(PestañaPorOperador(), "Por Operador")
 
         layout = QVBoxLayout()
-        layout.addWidget(pestañas)
-        layout.addWidget(nota_dias)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(12)
+        layout.addWidget(cabecera)
+        layout.addWidget(self.pestañas, 1)
+        # Cómo se cuenta un día en TODAS las pestañas (pedido del dueño): sin
+        # esto, ver la madrugada del 2 sumada en el día 1 parecería un error.
+        layout.addWidget(pie_de_ventana(
+            "Cada día va de las 06:00 a las 06:00 del día siguiente: el turno Noche "
+            "(22 a 06) cuenta entero en el día en que empezó."
+        ))
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
 
 class PestañaResumen(QWidget):
     """Total vendido, cantidad de ventas y desglose Efectivo/Digital de un
-    rango de fechas."""
+    rango de fechas, en las cifras grandes de Caja (piezas_ventana.cifra_destacada)."""
 
     def __init__(self):
         super().__init__()
@@ -92,37 +111,23 @@ class PestañaResumen(QWidget):
     def _armar_interfaz(self):
         self.fecha_desde, self.fecha_hasta, filtros = armar_filtro_por_fechas(self._buscar, solo_hoy=True, dias_del_local=True)
 
-        fuente_grande = QFont()
-        fuente_grande.setPointSize(20)
-        fuente_grande.setBold(True)
-
-        self.etiqueta_total = QLabel()
-        self.etiqueta_total.setFont(fuente_grande)
-        self.etiqueta_total.setStyleSheet("color: #2F6FED;")
-        self.etiqueta_total.setAlignment(Qt.AlignCenter)
-
-        self.etiqueta_cantidad = QLabel()
-        self.etiqueta_cantidad.setAlignment(Qt.AlignCenter)
-
-        self.etiqueta_efectivo = QLabel()
-        self.etiqueta_digital = QLabel()
-        detalle_pagos = QHBoxLayout()
-        detalle_pagos.addStretch()
-        detalle_pagos.addWidget(self.etiqueta_efectivo)
-        detalle_pagos.addSpacing(30)
-        detalle_pagos.addWidget(self.etiqueta_digital)
-        detalle_pagos.addStretch()
+        total = cifra_destacada("TOTAL VENDIDO", "", TONO_AZUL)
+        efectivo = cifra_destacada("EFECTIVO", "Lo cobrado en efectivo", TONO_VERDE)
+        digital = cifra_destacada("DIGITAL", "Lo cobrado por medios digitales", TONO_AZUL)
+        self.etiqueta_total = total.valor
+        self.etiqueta_cantidad = total.aclaracion
+        self.etiqueta_efectivo = efectivo.valor
+        self.etiqueta_digital = digital.valor
+        cifras = QHBoxLayout()
+        cifras.setSpacing(12)
+        for cifra in (total, efectivo, digital):
+            cifras.addWidget(cifra, 1)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(*MARGENES_DE_PESTAÑA)
+        layout.setSpacing(12)
         layout.addLayout(filtros)
-        layout.addSpacing(20)
-        titulo_total = QLabel("TOTAL VENDIDO", alignment=Qt.AlignCenter)
-        titulo_total.setStyleSheet("color: #6B7585; font-size: 12px; font-weight: 600;")
-        layout.addWidget(titulo_total)
-        layout.addWidget(self.etiqueta_total)
-        layout.addWidget(self.etiqueta_cantidad)
-        layout.addSpacing(10)
-        layout.addLayout(detalle_pagos)
+        layout.addLayout(cifras)
         layout.addStretch()
         self.setLayout(layout)
         sin_boton_por_defecto(self)
@@ -133,8 +138,8 @@ class PestañaResumen(QWidget):
         resumen = reportes_repo.resumen_ventas(desde, hasta)
         self.etiqueta_total.setText(formato_pesos(resumen["total"]))
         self.etiqueta_cantidad.setText(f"{resumen['cantidad_ventas']} venta(s)")
-        self.etiqueta_efectivo.setText(f"Efectivo: {formato_pesos(resumen['efectivo'])}")
-        self.etiqueta_digital.setText(f"Digital: {formato_pesos(resumen['digital'])}")
+        self.etiqueta_efectivo.setText(formato_pesos(resumen["efectivo"]))
+        self.etiqueta_digital.setText(formato_pesos(resumen["digital"]))
 
 
 class PestañaPorTurno(QWidget):
@@ -150,12 +155,22 @@ class PestañaPorTurno(QWidget):
     def _armar_interfaz(self):
         self.fecha_desde, self.fecha_hasta, filtros = armar_filtro_por_fechas(self._buscar, solo_hoy=True, dias_del_local=True)
 
-        self.tabla = crear_tabla(["Turno", "Total vendido", "Ventas", "Efectivo", "Digital"], estirar=0)
+        # Se estira la última: estirada la del turno, la etiqueta quedaba sola a la
+        # izquierda y los números lejos, del otro lado.
+        self.tabla = crear_tabla(["Turno", "Total vendido", "Ventas", "Efectivo", "Digital"], estirar=4)
+        for columna, ancho in enumerate((150, 160, 110, 160)):
+            self.tabla.setColumnWidth(columna, ancho)
+        # El turno en una etiqueta de color, siempre el mismo para cada uno (como el
+        # rubro en Artículos); la celda sigue teniendo su texto.
+        etiqueta_turno = DelegadoEtiqueta(self.tabla)
+        etiqueta_turno.colores_en_orden([turno.capitalize() for turno in dominio.TURNOS])
+        self.tabla.setItemDelegateForColumn(0, etiqueta_turno)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(*MARGENES_DE_PESTAÑA)
+        layout.setSpacing(12)
         layout.addLayout(filtros)
-        layout.addSpacing(10)
-        layout.addWidget(self.tabla)
+        layout.addWidget(panel_de_tabla(self.tabla), 1)
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -207,14 +222,12 @@ class PestañaTotales(QWidget):
             estirar=0,
         )
 
-        nota = QLabel("Impresiones se muestran aparte: no están sumadas en Kiosko.")
-        nota.setStyleSheet("color: #7A869A;")
-
         layout = QVBoxLayout()
+        layout.setContentsMargins(*MARGENES_DE_PESTAÑA)
+        layout.setSpacing(12)
         layout.addLayout(filtros)
-        layout.addSpacing(10)
-        layout.addWidget(self.tabla)
-        layout.addWidget(nota)
+        layout.addWidget(panel_de_tabla(self.tabla), 1)
+        layout.addWidget(pie_de_ventana("Impresiones se muestran aparte: no están sumadas en Kiosko."))
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -271,19 +284,19 @@ class PestañaRanking(QWidget):
 
         self.fecha_desde, self.fecha_hasta, filtros = armar_filtro_por_fechas(
             self._buscar, hoy_del_local().addMonths(-1),
-            extras=[("Ordenar:", self.combo_orden)], estirar=False, dias_del_local=True,
+            extras=[("Ordenar:", self.combo_orden)], dias_del_local=True,
         )
 
-        self.etiqueta_titulo = QLabel()
-        self.etiqueta_titulo.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.etiqueta_titulo.setAlignment(Qt.AlignCenter)
+        self.etiqueta_titulo = titulo_de_seccion("")
 
         self.tabla = crear_tabla(["Cantidad", "Código", "Descripción", "Importe"], estirar=2)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(*MARGENES_DE_PESTAÑA)
+        layout.setSpacing(12)
         layout.addLayout(filtros)
         layout.addWidget(self.etiqueta_titulo)
-        layout.addWidget(self.tabla)
+        layout.addWidget(panel_de_tabla(self.tabla), 1)
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -292,9 +305,10 @@ class PestañaRanking(QWidget):
         desde, hasta = rango_de_fechas(self.fecha_desde, self.fecha_hasta)
         orden = self.combo_orden.currentData()
 
+        # En mayúscula, como todo título de sección (titulo_de_seccion lo pone solo al armarlo).
         self.etiqueta_titulo.setText(
             f"Ranking de Ventas del {self.fecha_desde.date().toString('dd/MM/yyyy')} "
-            f"al {self.fecha_hasta.date().toString('dd/MM/yyyy')}"
+            f"al {self.fecha_hasta.date().toString('dd/MM/yyyy')}".upper()
         )
 
         filas = reportes_repo.ranking_ventas(desde, hasta, orden)

@@ -384,7 +384,7 @@ class TestCopiasDeSeguridad(_ConVentanas):
                         mock.patch("ui.copias_dialogo.mostrar_info") as aviso:
                     dialogo.boton_ahora.click()
                     self.assertEqual(self._teclas_de_copias(dialogo), [False, False, False, False])
-                    self.assertTrue(self._tecla(dialogo, "Cerrar").isEnabled())
+                    self.assertTrue(self._tecla(dialogo, "CERRAR").isEnabled())
                     self.assertEqual(dialogo.boton_abrir_extra.isEnabled(), quitar)  # mirar no cambia la lista
                     dejar_andar(0.2)
                     aviso.assert_not_called()
@@ -410,7 +410,7 @@ class TestCopiasDeSeguridad(_ConVentanas):
                 with mock.patch.object(copias_repo, "hacer_copia_ahora", repo), \
                         mock.patch("ui.utils.mostrar_error") as cartel:
                     dialogo.boton_ahora.click()
-                    self._tecla(dialogo, "Cerrar").click()
+                    self._tecla(dialogo, "CERRAR").click()
                     repo.suelta.set()
                     dialogo._espera._hilo.join(5)
                     dejar_andar(0.3)

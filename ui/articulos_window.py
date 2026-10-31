@@ -9,7 +9,7 @@ Compras (ver compras_window.py) y solo se corrige a mano con ORDENAR Stock
 """
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidgetItem, QPushButton, QLineEdit, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout, QTableWidgetItem, QLineEdit, QLabel,
     QComboBox, QSpinBox, QFormLayout, QInputDialog,
 )
 from PySide6.QtCore import Qt, QDate
@@ -17,19 +17,19 @@ from PySide6.QtCore import Qt, QDate
 import dominio
 from repositories import articulos_repo
 from ui.articulos_tabla import (
-    COLUMNA_CODIGO, COLUMNA_PRECIO_COMPRA, COLUMNA_PRECIO_VENTA, COLUMNA_RUBRO, COLUMNA_STOCK, COLUMNA_STOCK_MINIMO, crear_tabla_de_articulos,
-    llenar_tabla_de_articulos,
+    COLUMNA_CODIGO, COLUMNA_PRECIO_COMPRA, COLUMNA_PRECIO_VENTA, COLUMNA_RUBRO, COLUMNA_STOCK,
+    COLUMNA_STOCK_MINIMO, crear_tabla_de_articulos, llenar_tabla_de_articulos,
 )
 from ui.dibujos_tabla import DelegadoEtiqueta, DelegadoStock
 from ui.ordenar_stock_window import OrdenarStockWindow
 from ui.piezas_ventana import (
-    agregar_indicador, buscador, cabecera_oscura, fila_de_filtros, marcar_solo_admin, panel_de_tabla,
-    pie_de_ventana, poner_indicador, tecla,
+    TONO_AZUL, agregar_indicador, agregar_pastilla, buscador, cabecera_oscura, fila_de_filtros,
+    marcar_solo_admin, panel_blanco, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
 )
 from ui.utils import (
-    CampoPesos, mostrar_error, mostrar_aviso, confirmar, manejar_errores, aplicar_clase,
+    CampoPesos, mostrar_error, mostrar_aviso, confirmar, manejar_errores,
     encadenar_enter, armar_filtro_por_fechas, sin_boton_por_defecto, fila_guardar_cancelar,
-    crear_tabla, rango_de_fechas, formato_pesos,
+    crear_tabla, rango_de_fechas, formato_pesos, formato_fecha_hora,
 )
 
 
@@ -225,7 +225,7 @@ class DialogoArticulo(QDialog):
         super().__init__(parent)
         self.codigo_existente = codigo_existente
         self.setWindowTitle("Modificación de Artículos" if codigo_existente else "Nuevo Artículo")
-        self.resize(520, 380)
+        self.resize(640, 560)
         self._armar_interfaz()
         if codigo_existente:
             self._cargar_datos(codigo_existente)
@@ -267,15 +267,13 @@ class DialogoArticulo(QDialog):
         self.spin_pct_desde_costo.setRange(0, 500)
         self.spin_pct_desde_costo.setValue(80)
         self.spin_pct_desde_costo.setSuffix("%")
-        boton_calc_venta = QPushButton("Calcular")
-        boton_calc_venta.clicked.connect(self._calcular_venta_desde_costo)
+        boton_calc_venta = tecla("Calcular", self._calcular_venta_desde_costo)
 
         self.spin_pct_desde_venta = QSpinBox()
         self.spin_pct_desde_venta.setRange(0, 500)
         self.spin_pct_desde_venta.setValue(80)
         self.spin_pct_desde_venta.setSuffix("%")
-        boton_calc_costo = QPushButton("Calcular")
-        boton_calc_costo.clicked.connect(self._calcular_costo_desde_venta)
+        boton_calc_costo = tecla("Calcular", self._calcular_costo_desde_venta)
 
         self.spin_stock_minimo = QSpinBox()
         self.spin_stock_minimo.setMaximum(999_999)
@@ -305,7 +303,16 @@ class DialogoArticulo(QDialog):
         fila_precio_compra.addWidget(self.spin_pct_desde_costo)
         fila_precio_compra.addWidget(boton_calc_venta)
 
+        # Maqueta B (2026-10-30): la cabecera oscura y el formulario en un panel blanco.
+        cabecera = cabecera_oscura(
+            "✎" if self.codigo_existente else "＋",
+            "Modificar artículo" if self.codigo_existente else "Nuevo artículo",
+            f"Código {self.codigo_existente}" if self.codigo_existente
+            else "Escaneá el código y completá los datos: el stock se carga desde Compras",
+        )
+        panel, capa_panel = panel_blanco()
         formulario = QFormLayout()
+        formulario.setVerticalSpacing(10)
         formulario.addRow("Código (de barras):", self.campo_codigo)
         formulario.addRow("Descripción:", self.campo_descripcion)
         formulario.addRow("Marca:", self.combo_marca)
@@ -314,11 +321,16 @@ class DialogoArticulo(QDialog):
         formulario.addRow("Precio Compra (costo):", fila_precio_compra)
         formulario.addRow("Stock Mínimo:", self.spin_stock_minimo)
         formulario.addRow("Stock actual:", self.etiqueta_stock)
+        capa_panel.addLayout(formulario)
 
         botones = fila_guardar_cancelar(self, self._guardar)
 
         layout = QVBoxLayout()
-        layout.addLayout(formulario)
+        layout.setContentsMargins(16, 16, 16, 14)
+        layout.setSpacing(12)
+        layout.addWidget(cabecera)
+        layout.addWidget(panel)
+        layout.addStretch()
         layout.addLayout(botones)
         self.setLayout(layout)
         sin_boton_por_defecto(self)
@@ -397,20 +409,32 @@ class DialogoMovimientos(QDialog):
         super().__init__(parent)
         self.codigo = codigo
         self.setWindowTitle(f"Histórico de Movimientos de {codigo}")
-        self.resize(500, 450)
+        self.resize(700, 560)
         self._armar_interfaz()
         self._buscar()
 
     def _armar_interfaz(self):
         self.fecha_desde, self.fecha_hasta, filtros = armar_filtro_por_fechas(
-            self._buscar, QDate.currentDate().addMonths(-1), estirar=False
+            self._buscar, QDate.currentDate().addMonths(-1)
         )
 
         self.tabla = crear_tabla(["Fecha", "Comprobante", "Nro", "Cantidad"], estirar=0)
+        # El tipo de movimiento (compra, venta, ajuste) en una etiqueta de color.
+        self.tabla.setItemDelegateForColumn(1, DelegadoEtiqueta(self.tabla))
+        self.tabla.setColumnWidth(1, 190)
+
+        # Maqueta B (2026-10-30): cabecera oscura con lo que entró y salió en el rango.
+        cabecera = cabecera_oscura("⇄", "Movimientos", f"Compras, ventas y ajustes del artículo {self.codigo}")
+        self.indicador_entradas = agregar_indicador(cabecera, "Entró")
+        self.indicador_salidas = agregar_indicador(cabecera, "Salió")
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(12)
+        layout.addWidget(cabecera)
         layout.addLayout(filtros)
-        layout.addWidget(self.tabla)
+        layout.addWidget(panel_de_tabla(self.tabla), 1)
+        layout.addWidget(pie_de_ventana("Las cantidades en rojo son lo que salió del estante"))
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -422,13 +446,15 @@ class DialogoMovimientos(QDialog):
         for movimiento in movimientos:
             fila = self.tabla.rowCount()
             self.tabla.insertRow(fila)
-            self.tabla.setItem(fila, 0, QTableWidgetItem(movimiento["fecha"]))
+            self.tabla.setItem(fila, 0, QTableWidgetItem(formato_fecha_hora(movimiento["fecha"])))
             self.tabla.setItem(fila, 1, QTableWidgetItem(movimiento["comprobante"]))
             self.tabla.setItem(fila, 2, QTableWidgetItem(str(movimiento["numero"])))
             item_cantidad = QTableWidgetItem(str(movimiento["cantidad"]))
             if movimiento["cantidad"] < 0:
                 item_cantidad.setForeground(Qt.red)
             self.tabla.setItem(fila, 3, item_cantidad)
+        poner_indicador(self.indicador_entradas, str(sum(m["cantidad"] for m in movimientos if m["cantidad"] > 0)))
+        poner_indicador(self.indicador_salidas, str(-sum(m["cantidad"] for m in movimientos if m["cantidad"] < 0)))
 
 
 class DialogoGestionRubros(QDialog):
@@ -444,44 +470,45 @@ class DialogoGestionRubros(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Gestionar Rubros")
-        self.resize(380, 420)
+        self.resize(520, 560)
         self._armar_interfaz()
         self._cargar()
 
     def _armar_interfaz(self):
         self.lista = crear_tabla(["Rubro"], estirar=0, por_filas=True, una_sola=True)
         self.lista.horizontalHeader().setVisible(False)
+        self.lista.setItemDelegateForColumn(0, DelegadoEtiqueta(self.lista))
 
         self.campo_nuevo = QLineEdit()
         self.campo_nuevo.setPlaceholderText("Nombre del rubro nuevo...")
-        boton_agregar = QPushButton("Agregar")
-        aplicar_clase(boton_agregar, "primario")
-        boton_agregar.clicked.connect(self._agregar)
+        boton_agregar = tecla("＋  AGREGAR", self._agregar, "teclaAzul")
         encadenar_enter(self.campo_nuevo, accion_final=self._agregar)
 
         fila_agregar = QHBoxLayout()
         fila_agregar.addWidget(self.campo_nuevo)
         fila_agregar.addWidget(boton_agregar)
 
-        boton_renombrar = QPushButton("Renombrar seleccionado")
-        boton_renombrar.clicked.connect(self._renombrar)
-        boton_borrar = QPushButton("Borrar seleccionado")
-        aplicar_clase(boton_borrar, "peligro")
-        boton_borrar.clicked.connect(self._borrar)
+        boton_renombrar = tecla("✎  RENOMBRAR", self._renombrar)
+        boton_borrar = tecla("✕  BORRAR", self._borrar, "teclaRoja")
+        boton_cerrar = tecla("CERRAR", self.close)
 
         fila_acciones = QHBoxLayout()
         fila_acciones.addWidget(boton_renombrar)
         fila_acciones.addWidget(boton_borrar)
+        fila_acciones.addStretch()
+        fila_acciones.addWidget(boton_cerrar)
 
-        boton_cerrar = QPushButton("Cerrar")
-        boton_cerrar.clicked.connect(self.close)
+        # Maqueta B (2026-10-30): cabecera oscura con cuántos rubros hay.
+        cabecera = cabecera_oscura("▤", "Rubros", "Los únicos que se pueden elegir al cargar un artículo")
+        self.indicador_rubros = agregar_indicador(cabecera, "Rubros")
 
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Rubros disponibles para cargar en Artículos:"))
-        layout.addWidget(self.lista)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(12)
+        layout.addWidget(cabecera)
         layout.addLayout(fila_agregar)
+        layout.addWidget(panel_de_tabla(self.lista), 1)
         layout.addLayout(fila_acciones)
-        layout.addWidget(boton_cerrar)
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -495,6 +522,9 @@ class DialogoGestionRubros(QDialog):
             fila = self.lista.rowCount()
             self.lista.insertRow(fila)
             self.lista.setItem(fila, 0, QTableWidgetItem(rubro["nombre"]))
+        # Los mismos colores que en la grilla de Artículos (en el mismo orden).
+        self.lista.itemDelegateForColumn(0).colores_en_orden([rubro["nombre"] for rubro in self.rubros])
+        poner_indicador(self.indicador_rubros, str(len(self.rubros)))
 
     def _rubro_seleccionado(self):
         fila = self.lista.currentRow()
@@ -552,49 +582,48 @@ class DialogoGestionMarcas(QDialog):
         super().__init__(parent)
         self.usuario_id = usuario_id
         self.setWindowTitle("Gestionar Marcas")
-        self.resize(420, 480)
+        self.resize(560, 620)
         self._armar_interfaz()
         self._cargar()
 
     def _armar_interfaz(self):
         self.lista = crear_tabla(["Marca", "Artículos"], estirar=0, por_filas=True, una_sola=True)
 
+        self.lista.setColumnWidth(1, 110)
+
         self.campo_nuevo = QLineEdit()
         self.campo_nuevo.setPlaceholderText("Nombre de la marca nueva...")
-        boton_agregar = QPushButton("Agregar")
-        aplicar_clase(boton_agregar, "primario")
-        boton_agregar.clicked.connect(self._agregar)
+        boton_agregar = tecla("＋  AGREGAR", self._agregar, "teclaAzul")
         encadenar_enter(self.campo_nuevo, accion_final=self._agregar)
 
         fila_agregar = QHBoxLayout()
         fila_agregar.addWidget(self.campo_nuevo)
         fila_agregar.addWidget(boton_agregar)
 
-        self.boton_renombrar = QPushButton("Renombrar seleccionada")
-        self.boton_renombrar.clicked.connect(self._renombrar)
-        self.boton_borrar = QPushButton("Borrar seleccionada")
-        aplicar_clase(self.boton_borrar, "peligro")
-        self.boton_borrar.clicked.connect(self._borrar)
+        self.boton_renombrar = tecla("✎  RENOMBRAR", self._renombrar)
+        self.boton_borrar = tecla("✕  BORRAR", self._borrar, "teclaRoja")
+        boton_cerrar = tecla("CERRAR", self.close)
 
         fila_acciones = QHBoxLayout()
         fila_acciones.addWidget(self.boton_renombrar)
         fila_acciones.addWidget(self.boton_borrar)
+        fila_acciones.addStretch()
+        fila_acciones.addWidget(boton_cerrar)
 
-        boton_cerrar = QPushButton("Cerrar")
-        boton_cerrar.clicked.connect(self.close)
-
-        explicacion = QLabel(
-            "Marcas de los artículos. Si dos son la misma escrita distinto, renombrá una "
-            "con el nombre de la otra y se juntan."
-        )
-        explicacion.setWordWrap(True)
+        # Maqueta B (2026-10-30): cabecera oscura con cuántas marcas hay.
+        cabecera = cabecera_oscura("◆", "Marcas", "Solo el Administrador las corrige")
+        agregar_pastilla(cabecera, "ADMIN", TONO_AZUL)
+        self.indicador_marcas = agregar_indicador(cabecera, "Marcas")
 
         layout = QVBoxLayout()
-        layout.addWidget(explicacion)
-        layout.addWidget(self.lista)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(12)
+        layout.addWidget(cabecera)
         layout.addLayout(fila_agregar)
+        layout.addWidget(panel_de_tabla(self.lista), 1)
+        layout.addWidget(pie_de_ventana(
+            "Si dos son la misma escrita distinto, renombrá una con el nombre de la otra y se juntan"))
         layout.addLayout(fila_acciones)
-        layout.addWidget(boton_cerrar)
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -611,6 +640,7 @@ class DialogoGestionMarcas(QDialog):
             cantidad = QTableWidgetItem(str(marca["cantidad"]))
             cantidad.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.lista.setItem(fila, 1, cantidad)
+        poner_indicador(self.indicador_marcas, str(len(self.marcas)))
 
     def _marca_seleccionada(self):
         fila = self.lista.currentRow()

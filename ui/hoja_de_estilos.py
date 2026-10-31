@@ -641,6 +641,9 @@ HOJA_DE_ESTILOS = """
     }
     QLabel#iconoCabecera {
         font-size: 26px;
+        /* Los emojis traen su color; un símbolo (✎, ⇄, ◆) tomaría la letra oscura
+           de siempre y no se vería sobre la cabecera. */
+        color: #8FB4FF;
     }
     QLabel#tituloCabecera {
         color: #F1F4F9;
@@ -999,6 +1002,10 @@ HOJA_DE_ESTILOS = """
     QPushButton[clase="teclaBlanca"][soloAdmin="true"] {
         border: 1px dashed #4C8DFF;
         border-bottom: 3px solid #2F6FED;
+    }
+    QPushButton[clase="teclaRoja"][soloAdmin="true"] {
+        border: 1px dashed #C96870;
+        border-bottom: 3px solid #C9727B;
     }
 
 """.replace("__RUTA_FLECHA_ABAJO__", RUTA_FLECHA_ABAJO)
