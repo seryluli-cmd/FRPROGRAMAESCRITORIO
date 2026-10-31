@@ -270,8 +270,10 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   (`dominio.bajo_el_minimo`: `stock < stock_minimo`). `DialogoArticulo` para
   alta/edición (código no editable una vez creado; marca se tipea y se crea al
   vuelo; **rubro es un combo cerrado**; el stock es solo lectura); su
-  calculadora de margen usa `dominio.precio_con_margen` y
-  `dominio.costo_sin_margen`. Botones
+  calculadora de precios (COSTO + GANANCIA % = PRECIO DE VENTA, cada uno con su
+  "＝ Calcular"; el % arranca en `dominio.MARGEN_POR_DEFECTO`, 80%) usa
+  `dominio.precio_con_margen`, `dominio.costo_sin_margen` y
+  `dominio.porcentaje_de_ganancia`. Botones
   **Gestionar Rubros** (`DialogoGestionRubros`) y, solo para el Admin,
   **Gestionar Marcas** (`DialogoGestionMarcas`: renombrar, juntar, borrar).
   `DialogoMovimientos` muestra el historial de un artículo

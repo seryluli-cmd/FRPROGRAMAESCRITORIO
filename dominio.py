@@ -160,6 +160,11 @@ def texto_pesos(monto) -> str:
 # desde otra PC, y una función de un repo que usen tendría que entrar en la
 # lista blanca (admin_remoto/lista_blanca.py), cambiando la huella.
 
+# La ganancia sobre el costo con que arranca la calculadora de precios de un
+# artículo (pedido del dueño, 2026-10-31: "el margen por defecto, del 80%").
+MARGEN_POR_DEFECTO = 80
+
+
 def precio_con_margen(costo: float, porcentaje: float) -> float:
     """Precio de venta con `porcentaje` de margen sobre el costo. Va como
     costo * (1 + %/100): costo + costo * %/100 da a veces otro centavo."""
@@ -168,8 +173,27 @@ def precio_con_margen(costo: float, porcentaje: float) -> float:
 
 def costo_sin_margen(precio_venta: float, porcentaje: float) -> float:
     """La vuelta de precio_con_margen (estimar el costo si se perdió la
-    factura). La pantalla deja el % entre 0 y 500: nunca divide por cero."""
+    factura). La pantalla no deja un % negativo: nunca divide por cero."""
     return round(precio_venta / (1 + porcentaje / 100), 2)
+
+
+def porcentaje_de_ganancia(costo: float, precio_venta: float):
+    """El % que se le gana sobre el costo vendiendo a `precio_venta`, el que usa
+    precio_con_margen: costo $ 20 y venta $ 200 da 900. Sin costo no hay % (None).
+    Con dos decimales: con ese % precio_con_margen vuelve a dar la misma venta."""
+    if costo <= 0:
+        return None
+    return round((precio_venta / costo - 1) * 100, 2)
+
+
+def ganancia_por_unidad(costo: float, precio_venta: float) -> dict:
+    """Lo que dice la ayuda de la calculadora de precios: cuánto se gana por unidad
+    (negativo si se vende por debajo del costo) y qué parte del precio de venta es
+    ganancia, el margen (venta $ 200 y costo $ 20: se ganan $ 180, el 90%). Con la
+    venta en 0 no hay margen (None)."""
+    ganancia = round(precio_venta - costo, 2)
+    margen = round(ganancia / precio_venta * 100, 2) if precio_venta > 0 else None
+    return {"ganancia": ganancia, "margen": margen}
 
 
 def bajo_el_minimo(stock: int, stock_minimo: int) -> bool:

@@ -10,7 +10,7 @@ Compras (ver compras_window.py) y solo se corrige a mano con ORDENAR Stock
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidgetItem, QLineEdit, QLabel,
-    QComboBox, QSpinBox, QFormLayout, QInputDialog,
+    QComboBox, QSpinBox, QFormLayout, QInputDialog, QFrame, QGridLayout,
 )
 from PySide6.QtCore import Qt, QDate
 
@@ -27,7 +27,7 @@ from ui.piezas_ventana import (
     marcar_solo_admin, panel_blanco, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
 )
 from ui.utils import (
-    CampoPesos, mostrar_error, mostrar_aviso, confirmar, manejar_errores,
+    CampoPesos, CampoPorcentaje, mostrar_error, mostrar_aviso, confirmar, manejar_errores,
     encadenar_enter, armar_filtro_por_fechas, sin_boton_por_defecto, fila_guardar_cancelar,
     crear_tabla, rango_de_fechas, formato_pesos, formato_fecha_hora,
 )
@@ -225,10 +225,11 @@ class DialogoArticulo(QDialog):
         super().__init__(parent)
         self.codigo_existente = codigo_existente
         self.setWindowTitle("Modificación de Artículos" if codigo_existente else "Nuevo Artículo")
-        self.resize(640, 560)
+        self.resize(700, 600)
         self._armar_interfaz()
         if codigo_existente:
             self._cargar_datos(codigo_existente)
+        self._actualizar_ayuda_de_precios()
 
     def _armar_interfaz(self):
         self.campo_codigo = QLineEdit()
@@ -252,28 +253,26 @@ class DialogoArticulo(QDialog):
         for rubro in articulos_repo.listar_rubros():
             self.combo_rubro.addItem(rubro["nombre"], rubro["id"])
 
-        self.spin_precio_venta = CampoPesos()
-
+        # Calculadora de precios, la maqueta D que eligió el dueño el 2026-10-31:
+        # COSTO + GANANCIA % = PRECIO DE VENTA, cada casillero con su "＝ Calcular",
+        # que lo saca de los otros dos. Así sirve para las tres cosas: con el costo
+        # y el % sale la venta; con la venta y el % se estima el costo (cuando se
+        # perdió la factura y se sabe el precio de otro local); y con el costo y la
+        # venta sale el % que se le está ganando (Impresiones: $ 20 y $ 200, 900%).
+        # Es a botón, no en vivo: así no pisa un precio que ya se cargó a mano. El %
+        # arranca en dominio.MARGEN_POR_DEFECTO (80%, pedido del dueño); la línea de
+        # abajo sí va en vivo, con lo que se gana de verdad con los dos precios.
         self.spin_precio_compra = CampoPesos()
-
-        # Calculadora de margen: a veces se pierde la factura de compra y no
-        # se sabe el costo real, pero se puede averiguar el precio de venta
-        # de ese mismo artículo en otro local — con eso y un % de margen
-        # aproximado, se estima el costo (o al revés, con el costo conocido
-        # se estima la venta). El % es editable porque el margen no es
-        # siempre el mismo para todos los rubros. Es a botón, no en vivo:
-        # así no pisa un precio que ya se cargó a mano al tocar el otro campo.
-        self.spin_pct_desde_costo = QSpinBox()
-        self.spin_pct_desde_costo.setRange(0, 500)
-        self.spin_pct_desde_costo.setValue(80)
-        self.spin_pct_desde_costo.setSuffix("%")
-        boton_calc_venta = tecla("Calcular", self._calcular_venta_desde_costo)
-
-        self.spin_pct_desde_venta = QSpinBox()
-        self.spin_pct_desde_venta.setRange(0, 500)
-        self.spin_pct_desde_venta.setValue(80)
-        self.spin_pct_desde_venta.setSuffix("%")
-        boton_calc_costo = tecla("Calcular", self._calcular_costo_desde_venta)
+        self.campo_porcentaje = CampoPorcentaje()
+        self.campo_porcentaje.setValue(dominio.MARGEN_POR_DEFECTO)
+        self.spin_precio_venta = CampoPesos()
+        self.boton_calcular_costo = tecla("＝  Calcular", self._calcular_costo_desde_venta)
+        self.boton_calcular_porcentaje = tecla("＝  Calcular", self._calcular_porcentaje)
+        self.boton_calcular_venta = tecla("＝  Calcular", self._calcular_venta_desde_costo)
+        self.ayuda_de_precios = QLabel()
+        self.ayuda_de_precios.setObjectName("ayudaCalculadora")
+        self.spin_precio_compra.valueChanged.connect(self._actualizar_ayuda_de_precios)
+        self.spin_precio_venta.valueChanged.connect(self._actualizar_ayuda_de_precios)
 
         self.spin_stock_minimo = QSpinBox()
         self.spin_stock_minimo.setMaximum(999_999)
@@ -287,21 +286,9 @@ class DialogoArticulo(QDialog):
         # por todo el formulario, terminando en Guardar (ver encadenar_enter).
         encadenar_enter(
             self.campo_codigo, self.campo_descripcion, self.combo_marca, self.combo_rubro,
-            self.spin_precio_venta, self.spin_precio_compra, self.spin_stock_minimo,
+            self.spin_precio_compra, self.campo_porcentaje, self.spin_precio_venta, self.spin_stock_minimo,
             accion_final=self._guardar,
         )
-
-        fila_precio_venta = QHBoxLayout()
-        fila_precio_venta.addWidget(self.spin_precio_venta)
-        fila_precio_venta.addWidget(QLabel("→ Costo al"))
-        fila_precio_venta.addWidget(self.spin_pct_desde_venta)
-        fila_precio_venta.addWidget(boton_calc_costo)
-
-        fila_precio_compra = QHBoxLayout()
-        fila_precio_compra.addWidget(self.spin_precio_compra)
-        fila_precio_compra.addWidget(QLabel("→ Venta al"))
-        fila_precio_compra.addWidget(self.spin_pct_desde_costo)
-        fila_precio_compra.addWidget(boton_calc_venta)
 
         # Maqueta B (2026-10-30): la cabecera oscura y el formulario en un panel blanco.
         cabecera = cabecera_oscura(
@@ -317,8 +304,7 @@ class DialogoArticulo(QDialog):
         formulario.addRow("Descripción:", self.campo_descripcion)
         formulario.addRow("Marca:", self.combo_marca)
         formulario.addRow("Rubro:", self.combo_rubro)
-        formulario.addRow("Precio Venta:", fila_precio_venta)
-        formulario.addRow("Precio Compra (costo):", fila_precio_compra)
+        formulario.addRow("Precios:", self._armar_calculadora())
         formulario.addRow("Stock Mínimo:", self.spin_stock_minimo)
         formulario.addRow("Stock actual:", self.etiqueta_stock)
         capa_panel.addLayout(formulario)
@@ -352,15 +338,74 @@ class DialogoArticulo(QDialog):
         bajo = dominio.bajo_el_minimo(articulo["stock"], articulo["stock_minimo"])
         self.etiqueta_stock.setStyleSheet("color: red;" if bajo else "")
 
+    def _armar_calculadora(self) -> QFrame:
+        """COSTO + GANANCIA % = PRECIO DE VENTA, en tres casilleros con su
+        "＝ Calcular" debajo, y la ayuda en vivo abajo de todo."""
+        calculadora = QFrame()
+        calculadora.setObjectName("calculadoraPrecios")
+        grilla = QGridLayout(calculadora)
+        grilla.setContentsMargins(12, 10, 12, 12)
+        grilla.setHorizontalSpacing(10)
+        grilla.setVerticalSpacing(6)
+        casilleros = (
+            ("COSTO", self.spin_precio_compra, self.boton_calcular_costo),
+            ("GANANCIA SOBRE EL COSTO", self.campo_porcentaje, self.boton_calcular_porcentaje),
+            ("PRECIO DE VENTA", self.spin_precio_venta, self.boton_calcular_venta),
+        )
+        for numero, (titulo, campo, boton) in enumerate(casilleros):
+            columna = numero * 2
+            etiqueta = QLabel(titulo)
+            etiqueta.setObjectName("tituloCalculadora")
+            grilla.addWidget(etiqueta, 0, columna)
+            grilla.addWidget(campo, 1, columna)
+            grilla.addWidget(boton, 2, columna)
+            grilla.setColumnStretch(columna, 1)
+            if numero < len(casilleros) - 1:
+                signo = QLabel("＋" if numero == 0 else "＝")
+                signo.setObjectName("signoCalculadora")
+                signo.setAlignment(Qt.AlignCenter)
+                grilla.addWidget(signo, 1, columna + 1)
+        grilla.addWidget(self.ayuda_de_precios, 3, 0, 1, 2 * len(casilleros) - 1)
+        return calculadora
+
+    def _actualizar_ayuda_de_precios(self):
+        """La línea de abajo de la calculadora: qué hay que hacer y, con los dos
+        precios cargados, cuánto se gana por unidad y qué parte de la venta es."""
+        texto = "Cargá dos y apretá Calcular en el que falta"
+        costo, venta = self.spin_precio_compra.value(), self.spin_precio_venta.value()
+        cuenta = dominio.ganancia_por_unidad(costo, venta)
+        perdida = costo > 0 and venta > 0 and cuenta["ganancia"] < 0
+        if perdida:
+            texto += f"  ·  ¡Se vende por debajo del costo! Perdés {formato_pesos(-cuenta['ganancia'])} por unidad"
+        elif costo > 0 and venta > 0:
+            margen = dominio.texto_pesos(cuenta["margen"])[2:]
+            texto += f"  ·  Ganás {formato_pesos(cuenta['ganancia'])} por unidad ({margen}% del precio de venta)"
+        self.ayuda_de_precios.setText(texto)
+        self.ayuda_de_precios.setProperty("alerta", perdida)
+        self.ayuda_de_precios.style().unpolish(self.ayuda_de_precios)
+        self.ayuda_de_precios.style().polish(self.ayuda_de_precios)
+
     def _calcular_venta_desde_costo(self):
         costo = self.spin_precio_compra.value()
-        porcentaje = self.spin_pct_desde_costo.value()
+        porcentaje = self.campo_porcentaje.value()
         self.spin_precio_venta.setValue(dominio.precio_con_margen(costo, porcentaje))
 
     def _calcular_costo_desde_venta(self):
         venta = self.spin_precio_venta.value()
-        porcentaje = self.spin_pct_desde_venta.value()
+        porcentaje = self.campo_porcentaje.value()
         self.spin_precio_compra.setValue(dominio.costo_sin_margen(venta, porcentaje))
+
+    def _calcular_porcentaje(self):
+        """El % que se le gana con el costo y la venta que ya están cargados."""
+        costo, venta = self.spin_precio_compra.value(), self.spin_precio_venta.value()
+        porcentaje = dominio.porcentaje_de_ganancia(costo, venta)
+        if porcentaje is None:
+            mostrar_aviso(self, "Calcular la ganancia", "Primero cargá el costo.")
+        elif porcentaje < 0:
+            mostrar_aviso(self, "Calcular la ganancia",
+                          "El precio de venta es menor que el costo: con ese precio se pierde plata.")
+        else:
+            self.campo_porcentaje.setValue(porcentaje)
 
     def _resolver_marca(self):
         texto = self.combo_marca.currentText().strip()

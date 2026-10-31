@@ -21,6 +21,7 @@ Se ejecutan con:
 
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -108,7 +109,7 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
     def test_calcular_la_venta_desde_el_costo(self):
         dialogo = self._dialogo()
         dialogo.spin_precio_compra.setValue(1000)
-        dialogo.spin_pct_desde_costo.setValue(80)
+        dialogo.campo_porcentaje.setValue(80)
         dialogo._calcular_venta_desde_costo()
         self.assertEqual(dialogo.spin_precio_venta.value(), 1800.0)
         self.assertEqual(dialogo.spin_precio_venta.text(), "$ 1.800")
@@ -116,7 +117,7 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
     def test_calcular_el_costo_desde_la_venta(self):
         dialogo = self._dialogo()
         dialogo.spin_precio_venta.setValue(1800)
-        dialogo.spin_pct_desde_venta.setValue(80)
+        dialogo.campo_porcentaje.setValue(80)
         dialogo._calcular_costo_desde_venta()
         self.assertEqual(dialogo.spin_precio_compra.value(), 1000.0)
         self.assertEqual(dialogo.spin_precio_compra.text(), "$ 1.000")
@@ -124,13 +125,58 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
     def test_con_centavos_y_con_costo_0(self):
         dialogo = self._dialogo()
         dialogo.spin_precio_compra.setValue(0.07)
-        dialogo.spin_pct_desde_costo.setValue(250)
+        dialogo.campo_porcentaje.setValue(250)
         dialogo._calcular_venta_desde_costo()
         self.assertEqual(dialogo.spin_precio_venta.value(), 0.25)
 
         dialogo.spin_precio_compra.setValue(0)
         dialogo._calcular_venta_desde_costo()
         self.assertEqual(dialogo.spin_precio_venta.value(), 0.0)
+
+    def test_el_porcentaje_arranca_en_80(self):
+        self.assertEqual(dominio.MARGEN_POR_DEFECTO, 80)
+        self.assertEqual(self._dialogo().campo_porcentaje.value(), 80)
+        self.assertEqual(self._dialogo().campo_porcentaje.text(), "80%")
+
+    def test_calcular_el_porcentaje_con_el_costo_y_la_venta(self):
+        # El caso de Impresiones (pedido del dueño, 2026-10-31): cuesta $ 20 y se vende a $ 200.
+        dialogo = self._dialogo()
+        dialogo.spin_precio_compra.setValue(20)
+        dialogo.spin_precio_venta.setValue(200)
+        dialogo.boton_calcular_porcentaje.click()
+        self.assertEqual(dialogo.campo_porcentaje.value(), 900)
+        self.assertEqual(dialogo.campo_porcentaje.text(), "900%")
+        self.assertIn("Ganás $ 180 por unidad (90% del precio de venta)", dialogo.ayuda_de_precios.text())
+
+    def test_el_porcentaje_con_decimales_vuelve_a_dar_la_misma_venta(self):
+        dialogo = self._dialogo()
+        dialogo.spin_precio_compra.setValue(30)
+        dialogo.spin_precio_venta.setValue(100)
+        dialogo.boton_calcular_porcentaje.click()
+        self.assertEqual(dialogo.campo_porcentaje.text(), "233,33%")
+        dialogo.spin_precio_venta.setValue(0)
+        dialogo.boton_calcular_venta.click()
+        self.assertEqual(dialogo.spin_precio_venta.value(), 100.0)
+
+    def test_sin_costo_o_vendiendo_por_debajo_avisa_y_no_toca_el_porcentaje(self):
+        dialogo = self._dialogo()
+        avisos = []
+        with mock.patch("ui.articulos_window.mostrar_aviso", lambda _p, _t, texto: avisos.append(texto)):
+            dialogo.spin_precio_venta.setValue(200)
+            dialogo.boton_calcular_porcentaje.click()
+            dialogo.spin_precio_compra.setValue(300)
+            dialogo.boton_calcular_porcentaje.click()
+        self.assertEqual(avisos, ["Primero cargá el costo.",
+                                  "El precio de venta es menor que el costo: con ese precio se pierde plata."])
+        self.assertEqual(dialogo.campo_porcentaje.value(), 80)
+        self.assertIn("Perdés $ 100 por unidad", dialogo.ayuda_de_precios.text())
+        self.assertTrue(dialogo.ayuda_de_precios.property("alerta"))
+
+    def test_las_cuentas_de_la_ganancia(self):
+        self.assertEqual(dominio.porcentaje_de_ganancia(20, 200), 900)
+        self.assertIsNone(dominio.porcentaje_de_ganancia(0, 200))
+        self.assertEqual(dominio.ganancia_por_unidad(20, 200), {"ganancia": 180, "margen": 90})
+        self.assertEqual(dominio.ganancia_por_unidad(20, 0), {"ganancia": -20, "margen": None})
 
 
 # ---------------------------------------------------------------------

@@ -997,6 +997,32 @@ HOJA_DE_ESTILOS = """
         color: #7A8699;
         font-size: 11px;
     }
+    /* La calculadora de precios de un artículo (maqueta D, 2026-10-31): COSTO +
+       GANANCIA % = PRECIO DE VENTA en un recuadro celeste. */
+    QFrame#calculadoraPrecios {
+        background-color: #F4F7FC;
+        border: 1px solid #D6DEEA;
+        border-radius: 10px;
+    }
+    QLabel#tituloCalculadora {
+        color: #58677D;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    QLabel#signoCalculadora {
+        color: #2F6FED;
+        font-size: 20px;
+        font-weight: 800;
+    }
+    QLabel#ayudaCalculadora {
+        color: #58677D;
+        font-size: 11px;
+    }
+    QLabel#ayudaCalculadora[alerta="true"] {
+        color: #C62828;
+        font-weight: 700;
+    }
     /* Lo que solo ve el Administrador (piezas_ventana.marcar_solo_admin): la tecla con
        el borde punteado en azul. */
     QPushButton[clase="teclaBlanca"][soloAdmin="true"] {
