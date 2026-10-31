@@ -146,7 +146,8 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
         dialogo.boton_calcular_porcentaje.click()
         self.assertEqual(dialogo.campo_porcentaje.value(), 900)
         self.assertEqual(dialogo.campo_porcentaje.text(), "900%")
-        self.assertIn("Ganás $ 180 por unidad (90% del precio de venta)", dialogo.ayuda_de_precios.text())
+        self.assertTrue(dialogo.ayuda_de_precios.text().endswith("Ganás $ 180 por unidad"))
+        self.assertNotIn("precio de venta", dialogo.ayuda_de_precios.text())
 
     def test_el_porcentaje_con_decimales_vuelve_a_dar_la_misma_venta(self):
         dialogo = self._dialogo()
@@ -175,8 +176,8 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
     def test_las_cuentas_de_la_ganancia(self):
         self.assertEqual(dominio.porcentaje_de_ganancia(20, 200), 900)
         self.assertIsNone(dominio.porcentaje_de_ganancia(0, 200))
-        self.assertEqual(dominio.ganancia_por_unidad(20, 200), {"ganancia": 180, "margen": 90})
-        self.assertEqual(dominio.ganancia_por_unidad(20, 0), {"ganancia": -20, "margen": None})
+        self.assertEqual(dominio.ganancia_por_unidad(20, 200), 180)
+        self.assertEqual(dominio.ganancia_por_unidad(300, 200), -100)
 
 
 # ---------------------------------------------------------------------

@@ -370,16 +370,15 @@ class DialogoArticulo(QDialog):
 
     def _actualizar_ayuda_de_precios(self):
         """La línea de abajo de la calculadora: qué hay que hacer y, con los dos
-        precios cargados, cuánto se gana por unidad y qué parte de la venta es."""
+        precios cargados, cuánto se gana (o se pierde) por unidad."""
         texto = "Cargá dos y apretá Calcular en el que falta"
         costo, venta = self.spin_precio_compra.value(), self.spin_precio_venta.value()
-        cuenta = dominio.ganancia_por_unidad(costo, venta)
-        perdida = costo > 0 and venta > 0 and cuenta["ganancia"] < 0
+        ganancia = dominio.ganancia_por_unidad(costo, venta)
+        perdida = costo > 0 and venta > 0 and ganancia < 0
         if perdida:
-            texto += f"  ·  ¡Se vende por debajo del costo! Perdés {formato_pesos(-cuenta['ganancia'])} por unidad"
+            texto += f"  ·  ¡Se vende por debajo del costo! Perdés {formato_pesos(-ganancia)} por unidad"
         elif costo > 0 and venta > 0:
-            margen = dominio.texto_pesos(cuenta["margen"])[2:]
-            texto += f"  ·  Ganás {formato_pesos(cuenta['ganancia'])} por unidad ({margen}% del precio de venta)"
+            texto += f"  ·  Ganás {formato_pesos(ganancia)} por unidad"
         self.ayuda_de_precios.setText(texto)
         self.ayuda_de_precios.setProperty("alerta", perdida)
         self.ayuda_de_precios.style().unpolish(self.ayuda_de_precios)

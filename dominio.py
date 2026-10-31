@@ -186,14 +186,12 @@ def porcentaje_de_ganancia(costo: float, precio_venta: float):
     return round((precio_venta / costo - 1) * 100, 2)
 
 
-def ganancia_por_unidad(costo: float, precio_venta: float) -> dict:
+def ganancia_por_unidad(costo: float, precio_venta: float) -> float:
     """Lo que dice la ayuda de la calculadora de precios: cuánto se gana por unidad
-    (negativo si se vende por debajo del costo) y qué parte del precio de venta es
-    ganancia, el margen (venta $ 200 y costo $ 20: se ganan $ 180, el 90%). Con la
-    venta en 0 no hay margen (None)."""
-    ganancia = round(precio_venta - costo, 2)
-    margen = round(ganancia / precio_venta * 100, 2) if precio_venta > 0 else None
-    return {"ganancia": ganancia, "margen": margen}
+    (venta $ 200 y costo $ 20: $ 180), negativo si se vende por debajo del costo.
+    Sin el % sobre la venta (90%): al lado del % sobre el costo confundía y el dueño
+    pidió sacarlo (2026-10-31)."""
+    return round(precio_venta - costo, 2)
 
 
 def bajo_el_minimo(stock: int, stock_minimo: int) -> bool:
