@@ -21,6 +21,7 @@ from ui.ventas_window import VentasWindow
 from ui.caja_window import CajaWindow, CierreTurnoWindow
 from ui.usuarios_window import DialogoCambiarClave
 from ui.ingreso_caja import mensaje_del_sobre
+from ui.lista_compras_window import VentanaListaDeCompras
 from ui.vuelta_del_admin import VueltaDelAdmin
 from ui.utils import (
     aplicar_clase, icono_de_emoji, mostrar_error, mostrar_info, solo_en_el_mostrador,
@@ -173,7 +174,8 @@ class MainWindow(QMainWindow):
 
     def _armar_botones_de_la_barra(self, layout_barra):
         """El renglón de botones, de izquierda a derecha empezando por Vender y
-        terminando en "🔄 Operador", pegado a la derecha de Clave (pedido del
+        terminando en "🔄 Operador", pegado a la derecha de Lista de Compras
+        (antes de Clave, hasta que el 2026-10-31 entró esa en el medio; pedido del
         dueño, 2026-10-23; hasta ese día iba solo en la punta derecha y, con la
         pantalla de 1920 del mostrador, quedaba lejos de todo). Se llamaba
         "Cerrar sesión": el dueño pidió que diga lo que hace de verdad, volver
@@ -198,6 +200,8 @@ class MainWindow(QMainWindow):
         self._agregar_boton_barra(layout_barra, "💵  Caja", self._abrir_caja)
         self.boton_cierre_turno = self._agregar_boton_barra(layout_barra, "🧾  Cierre de Turno", self._abrir_cierre_turno)
         self._agregar_boton_barra(layout_barra, "🔑  Clave", self._abrir_cambiar_clave)
+        # Antes de Operador, para cualquiera (pedido del dueño, 2026-10-31).
+        self._agregar_boton_barra(layout_barra, "📝  Lista de Compras", self._abrir_lista_de_compras)
         # Tres espacios entre el dibujito y el texto: uno más que en los otros botones (pedido del dueño).
         boton_operador = self._agregar_boton_barra(layout_barra, "   Operador", self._cambiar_operador, clase="peligro")
         # Su dibujito va un 25% más grande que los de los otros botones (pedido del dueño,
@@ -375,6 +379,9 @@ class MainWindow(QMainWindow):
 
     def _abrir_cambiar_clave(self):
         DialogoCambiarClave(self.usuario, self).exec()
+
+    def _abrir_lista_de_compras(self):
+        VentanaListaDeCompras(self).exec()
 
     def _abrir_administrar_kiosko(self):
         AdministrarKioskoWindow(self.usuario, self.es_admin, self).exec()

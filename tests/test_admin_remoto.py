@@ -685,6 +685,7 @@ _PANTALLAS_DE_OTRA_PC = [
     ("ui/configuracion_admin_window.py", None),
     ("ui/login_window.py", None),
     ("ui/control_stock_window.py", None),
+    ("ui/lista_compras_window.py", None),
 ]
 
 # Lo que las pantallas usan de un repo sin ir a la base (se queda en esta PC), y
@@ -700,6 +701,7 @@ _SE_USAN_SIN_IR_AL_MOSTRADOR = {
 _PANTALLA_PRINCIPAL = [
     ("ui/main_window.py", {"MainWindow"}),
     ("ui/control_stock_window.py", None),
+    ("ui/lista_compras_window.py", None),
 ]
 # Cuentas con lo que ya llegó del mostrador: se hacen en esta PC, sin base.
 _NO_VAN_A_LA_BASE = {
@@ -956,7 +958,7 @@ class TestCopiaRemota(unittest.TestCase):
         self.assertFalse(hasattr(ventana, "panel_pcs"))
         botones = [boton.text() for boton in ventana.findChildren(QPushButton)]
         for texto in ("VENDER", "IMPRESIONES", "ADMIN KIOSKO", "CONFIG ADMIN",
-                      "CAJA", "CIERRE DE TURNO", "CLAVE", "OPERADOR"):
+                      "CAJA", "CIERRE DE TURNO", "CLAVE", "LISTA DE COMPRAS", "OPERADOR"):
             self.assertTrue(any(texto in boton for boton in botones), texto)
         for texto in ("MIEMBROS", "RESERVAS", "TRÁMITES", "DESCONGELAR",
                       "REINICIAR", "APAGAR"):
@@ -980,6 +982,7 @@ class TestCopiaRemota(unittest.TestCase):
         from ui.configuracion_admin_window import ConfiguracionAdminWindow
         from ui.consulta_ventas_window import ConsultaVentasWindow
         from ui.control_stock_window import VentanaControlStock
+        from ui.lista_compras_window import VentanaListaDeCompras
         from ui.login_window import LoginWindow
         from ui.ordenar_stock_window import OrdenarStockWindow
         from ui.reportes_window import ReportesWindow
@@ -999,6 +1002,7 @@ class TestCopiaRemota(unittest.TestCase):
                 AccesosAdminWindow(ventana), ArticulosWindow(ventana, self.usuario),
                 OrdenarStockWindow(ventana, self.usuario["id"], mostrador_de_prueba.CLAVE_ORDENAR_STOCK),
                 VentanaControlStock(self.usuario["id"], ventana),
+                VentanaListaDeCompras(ventana),
             ]
             for pantalla in pantallas:
                 self.addCleanup(pantalla.deleteLater)

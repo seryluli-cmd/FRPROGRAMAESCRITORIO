@@ -310,6 +310,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `ui.utils.fila_guardar_cancelar(dialogo, ...)` | se arma la fila Guardar/Cancelar de un formulario |
 | `ui.detalle_venta.VentanaConDetalleDeVenta` | lista de ventas + artículos de la elegida (Consulta de Ventas y Detalle de un cierre) |
 | `ui.tarjeta_cierre.TarjetaCierreDeTurno` · `.TablaDeNegocios` | se dibuja el resumen de un Cierre de Turno (A RETIRAR, que es `resumen["monto_a_retirar"]`, y TOTAL en grande; en la tabla, cada negocio con su efectivo y digital en columnas, lo cobrado y el Cambio Fijo). La tabla es también la de Caja; la tarjeta la usan la pantalla Cierre de Turno (turno en curso) y "Ver Detalle" de Control de Cierres (cualquier cierre ya hecho, también el forzoso). Un cambio de diseño del Cierre de Turno se hace ahí y se ve en las dos |
+| `dominio.articulos_para_comprar(articulos)` · `dominio.STOCK_PARA_LISTA_DE_COMPRAS` | se arma la LISTA DE COMPRAS (botón de la barra antes de Operador, para cualquiera; `ui/lista_compras_window.py`): los artículos con 4 unidades o menos, también los de 0 o negativo, sin Impresiones, de la A a la Z. Sale de `articulos_repo.listar_articulos`, así también se abre desde otra PC |
 | `ui.imprimir.html_del_listado(...)` · `.vista_previa(parent, html, nombre)` | se imprime un listado: HTML en hojas A4 con los títulos repetidos en cada hoja y vista previa (desde ahí se imprime o se guarda en PDF). Lo usan el "Renglón por renglón" del Detalle del Día y Control de Stock |
 
 Si necesitás uno de esos datos, **llamá a la función existente**.
@@ -636,7 +637,7 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
 ## Estado actual
 
 El programa es el kiosko solo: Vender (diseño "B": total y COBRAR grandes a la
-derecha), Impresiones, Caja, Cierre de Turno, Administrar Kiosko (Artículos con
+derecha), Impresiones, Caja, Cierre de Turno, Lista de Compras, Administrar Kiosko (Artículos con
 ORDENAR Stock y Gestionar Marcas, Compras, Control de Stock, Consulta de Ventas,
 Reportes con el Resumen del Día y su detalle para imprimir, Control de Cierres,
 Usuarios con Copias de Seguridad), Configuración ADMIN (Accesos de Admin,
@@ -644,7 +645,7 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 735 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 744 pruebas
 al 2026-10-31 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.

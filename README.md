@@ -290,6 +290,10 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   mirar mayúsculas ni acentos (`articulos_repo.listar_para_control_de_stock`),
   con sus unidades, para imprimirlos (`ui/imprimir.py`) con una columna
   "Contado" vacía. Solo muestra: corregir es de ORDENAR Stock.
+- **Lista de Compras** (`lista_compras_window.py`, `VentanaListaDeCompras`; botón
+  de la barra antes de Operador, para cualquiera) — los artículos con 4 unidades
+  o menos (`dominio.articulos_para_comprar`, sin Impresiones), de la A a la Z,
+  con filtro por rubro, para imprimirlos con una columna "Comprar" vacía.
 - **Compras** (`compras_window.py`, `ComprasWindow`) — carga de mercadería por
   escaneo (mismos F5/F6/F7 que Ventas). Al escanear pide cantidad y costo.
   Confirmar llama a `compras_repo.registrar_compra` con todo el lote junto.

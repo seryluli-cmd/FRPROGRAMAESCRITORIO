@@ -194,6 +194,24 @@ def numeros_de_los_articulos(articulos) -> dict:
     }
 
 
+# LISTA DE COMPRAS (pedido del dueño, 2026-10-31): salen los artículos que tienen
+# esta cantidad de unidades o menos.
+STOCK_PARA_LISTA_DE_COMPRAS = 4
+
+
+def articulos_para_comprar(articulos) -> list:
+    """
+    Los artículos de la LISTA DE COMPRAS: los que tienen STOCK_PARA_LISTA_DE_COMPRAS
+    unidades o menos (también los que están en 0 o en negativo), de la A a la Z sin
+    mirar mayúsculas ni acentos. Impresiones no entra: no es mercadería que se compra.
+    """
+    return sorted(
+        (a for a in articulos
+         if a["codigo"] != CODIGO_ARTICULO_IMPRESIONES and a["stock"] <= STOCK_PARA_LISTA_DE_COMPRAS),
+        key=lambda a: sin_acentos(a["descripcion"]),
+    )
+
+
 def suma_de_las_filas(filas, claves) -> dict:
     """La fila TOTAL de un reporte: suma las filas tal como se ven (ya
     redondeadas), en su orden y sin redondear de nuevo. Otro SUM en la base
