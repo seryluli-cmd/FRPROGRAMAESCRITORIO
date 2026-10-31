@@ -177,7 +177,8 @@ Ya se hizo con `ventas_window.py` (carrito y diálogo de pago), `turnos.py`
 `_cajas` + `_envios`, migraciones en `database_migraciones.py`), `main.py` (la
 hoja de estilos en `ui/hoja_de_estilos.py`) y `ui/main_window.py`
 (Configuración ADMIN en `ui/configuracion_admin_window.py` y Administrar Kiosko
-en `ui/administrar_kiosko_window.py`).
+en `ui/administrar_kiosko_window.py`) y `ui/articulos_window.py` (el alta y
+modificación de un artículo en `ui/dialogo_articulo.py`).
 Conservá las funciones públicas al partirlos para no tocar otras pantallas.
 
 **13. Comentar el porqué, no el qué.**
@@ -261,8 +262,8 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `dominio.CODIGO_ARTICULO_IMPRESIONES` | se decide qué artículo de kiosko es "Impresiones" (el código "4"), para mostrarlo como renglón propio en Reportes, Caja y Cierre de Turno |
 | `dominio.cuenta_del_cobro(total, efectivo, digital, paga_con)` · `.lo_que_falta_para(total, monto)` | se calcula el cobro: la parte en efectivo y la digital, el billete que da el cliente, el vuelto, lo que falta y los pagos que quedan en la caja; y lo que completa el otro medio al escribir en uno |
 | `dominio.total_cobrado(efectivo, digital)` · `.monto_a_retirar(efectivo_cobrado)` · `.diferencia_de_plata(contado, esperado)` · `.coincide(diferencia)` · `.falta_plata(diferencia)` | se calcula la plata de la caja y del sobre: el TOTAL cobrado (efectivo + digital, sin el Cambio Fijo; es también el `importe` de la app de gastos), lo que va al sobre (todo el efectivo cobrado: el cambio queda en el cajón), la diferencia entre lo contado y lo esperado (negativo = falta; la apertura y el relevo de una caja y el sobre) y si esa diferencia es cero (`TOLERANCIA_DE_PLATA`, medio centavo: todo va al centavo) o si falta plata. `turnos_repo` pone `"monto_a_retirar"` y `"ventas_total"` en el resumen del turno en curso y graba ese mismo monto en el cierre: Caja, la tarjeta del Cierre de Turno, el relevo y la app de gastos leen esa clave, nunca el efectivo suelto. Toda pantalla que dice "coincide"/"faltan"/"sobran" o pinta una diferencia usa `coincide` o `falta_plata` (el Resumen del Día marca en rojo solo lo que falta). Ver `tests/test_reglas_de_la_caja.py` |
-| `dominio.precio_con_margen(costo, porcentaje)` · `.costo_sin_margen(precio_venta, porcentaje)` | se calcula el margen de Artículos (la calculadora COSTO + GANANCIA % = PRECIO DE VENTA, maqueta D del 2026-10-31: costo → precio de venta y al revés). Va como `round(costo * (1 + %/100), 2)` y su vuelta; escrita como `costo + costo * %/100` da a veces otro centavo. El % no puede ser negativo |
-| `dominio.porcentaje_de_ganancia(costo, precio_venta)` · `.ganancia_por_unidad(costo, precio_venta)` · `.MARGEN_POR_DEFECTO` | se saca el % que se le gana a un artículo con su costo y su venta (el "＝ Calcular" del medio: $ 20 y $ 200 dan 900%, con dos decimales para que precio_con_margen vuelva a dar la misma venta), o la línea de ayuda de la calculadora (cuánto se gana por unidad, en pesos; el % sobre la venta se sacó a pedido del dueño: al lado del % sobre el costo confundía). El % de la calculadora arranca en `MARGEN_POR_DEFECTO`, 80% (pedido del dueño) |
+| `dominio.precio_con_margen(costo, porcentaje)` · `.costo_sin_margen(precio_venta, porcentaje)` | se calcula el margen de Artículos (la calculadora COSTO + GANANCIA % = PRECIO DE VENTA de `ui/dialogo_articulo.py`, en la tarjeta oscura del precio de la maqueta B del 2026-10-31: costo → precio de venta y al revés). Va como `round(costo * (1 + %/100), 2)` y su vuelta; escrita como `costo + costo * %/100` da a veces otro centavo. El % no puede ser negativo |
+| `dominio.porcentaje_de_ganancia(costo, precio_venta)` · `.ganancia_por_unidad(costo, precio_venta)` · `.MARGEN_POR_DEFECTO` | se saca el % que se le gana a un artículo con su costo y su venta (el "＝ Calcular" del medio: $ 20 y $ 200 dan 900%, con dos decimales para que precio_con_margen vuelva a dar la misma venta), o la línea debajo del precio grande (cuánto se gana por unidad, en pesos; el % sobre la venta se sacó a pedido del dueño: al lado del % sobre el costo confundía). El % de la calculadora arranca en `MARGEN_POR_DEFECTO`, 80% (pedido del dueño) |
 | `dominio.bajo_el_minimo(stock, stock_minimo)` | se decide si un artículo quedó por debajo de su stock mínimo (`<` estricto: justo en el mínimo no avisa; el stock negativo sí): el rojo de la grilla de Artículos y ORDENAR Stock (`poner_stock`), el de Modificar y el aviso de Ventas, que le pasa el stock menos lo que ya está en el carrito |
 | `dominio.suma_de_las_filas(filas, claves)` | se suma la fila TOTAL de un reporte con las filas que la pantalla ya tiene (Reportes > Totales): tal como se ven, en su orden y sin redondear de nuevo; nunca con otro SUM en la base (Kiosko sale por resta en cada fila). Es pura a propósito: Reportes se abre desde otra PC y así no cambia lo que devuelve ninguna función de la lista blanca |
 | `ui.dialogo_pago.cobrar(parent, monto)` | se cobra algo que no es una venta de kiosko con la ventana de cobro de Ventas (medio, reparto y vuelto). Devuelve los pagos netos de vuelto, o None si se canceló. Hoy no la usa ninguna pantalla; una pantalla nueva que cobre la usa a ella |
@@ -646,7 +647,7 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 749 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 753 pruebas
 al 2026-10-31 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.

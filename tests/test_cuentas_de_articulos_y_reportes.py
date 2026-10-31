@@ -27,7 +27,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QDate, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QTableWidgetItem  # noqa: E402
+from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QTableWidgetItem  # noqa: E402
 
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
@@ -162,7 +162,7 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
     def test_sin_costo_o_vendiendo_por_debajo_avisa_y_no_toca_el_porcentaje(self):
         dialogo = self._dialogo()
         avisos = []
-        with mock.patch("ui.articulos_window.mostrar_aviso", lambda _p, _t, texto: avisos.append(texto)):
+        with mock.patch("ui.dialogo_articulo.mostrar_aviso", lambda _p, _t, texto: avisos.append(texto)):
             dialogo.spin_precio_venta.setValue(200)
             dialogo.boton_calcular_porcentaje.click()
             dialogo.spin_precio_compra.setValue(300)
@@ -172,6 +172,38 @@ class TestCalculadoraDeArticulos(BaseConBaseTemporal):
         self.assertEqual(dialogo.campo_porcentaje.value(), 80)
         self.assertIn("Perdés $ 100 por unidad", dialogo.ayuda_de_precios.text())
         self.assertTrue(dialogo.ayuda_de_precios.property("alerta"))
+
+    def test_el_precio_de_venta_en_grande_y_la_ganancia_en_vivo(self):
+        # Maqueta B (2026-10-31): la tarjeta oscura con el precio de venta grande.
+        dialogo = self._dialogo()
+        self.assertIn("Con el costo y la venta cargados", dialogo.ayuda_de_precios.text())
+        self.assertTrue(dialogo.ayuda_de_precios.property("apagada"))
+        dialogo.spin_precio_compra.setValue(20)
+        dialogo.spin_precio_venta.setValue(1500)
+        self.assertEqual(dialogo.precio_grande.text(), "$ 1.500")
+        self.assertEqual(dialogo.ayuda_de_precios.text(), "▲ Ganás $ 1.480 por unidad")
+        self.assertFalse(dialogo.ayuda_de_precios.property("apagada"))
+
+    def test_los_campos_de_numeros_no_tienen_flechitas(self):
+        dialogo = self._dialogo()
+        for campo in (dialogo.spin_precio_compra, dialogo.campo_porcentaje,
+                      dialogo.spin_precio_venta, dialogo.spin_stock_minimo):
+            self.assertEqual(campo.buttonSymbols(), QAbstractSpinBox.NoButtons)
+            self.assertTrue(campo.alignment() & Qt.AlignRight)
+
+    def test_la_cabecera_muestra_el_articulo_como_se_va_escribiendo(self):
+        nuevo = self._dialogo()
+        self.assertEqual(nuevo.cabecera.titulo.text(), "Nuevo artículo")
+        self.assertIsNone(nuevo.indicador_stock)
+        nuevo.campo_descripcion.setText("Coca 500")
+        self.assertEqual(nuevo.cabecera.titulo.text(), "Coca 500")
+
+        rubro = articulos_repo.crear_rubro("Bebidas Prueba")
+        articulos_repo.crear_articulo("77", "Agua 500", None, rubro, 1000.0, 500.0, 3, nombre_marca_nueva="Villavicencio")
+        dialogo = self._dialogo("77")
+        self.assertEqual(dialogo.cabecera.titulo.text(), "Agua 500")
+        self.assertEqual(dialogo.cabecera.detalle.text(), "Código 77  ·  Villavicencio  ·  Bebidas Prueba")
+        self.assertEqual(dialogo.indicador_minimo.valor.text(), "3")
 
     def test_las_cuentas_de_la_ganancia(self):
         self.assertEqual(dominio.porcentaje_de_ganancia(20, 200), 900)
@@ -211,18 +243,24 @@ class _ConAgua(BaseConBaseTemporal):
 
 
 class TestStockEnRojoEnArticulos(_ConAgua):
-    def _color_de_la_etiqueta(self, stock):
+    def _en_rojo(self, stock):
+        # El stock actual va arriba, en la cabecera (maqueta B, 2026-10-31).
         self._poner_stock(stock)
         dialogo = DialogoArticulo(None, "AGUA")
         self.addCleanup(dialogo.deleteLater)
-        self.assertEqual(dialogo.etiqueta_stock.text(), str(stock))
-        return dialogo.etiqueta_stock.styleSheet()
+        self.assertEqual(dialogo.indicador_stock.valor.text(), dominio.texto_cantidad(stock))
+        return bool(dialogo.indicador_stock.property("alerta"))
 
     def test_modificar_muestra_en_rojo_solo_por_debajo_del_minimo(self):
-        self.assertEqual(self._color_de_la_etiqueta(1), "color: red;")
-        self.assertEqual(self._color_de_la_etiqueta(2), "")
-        self.assertEqual(self._color_de_la_etiqueta(3), "")
-        self.assertEqual(self._color_de_la_etiqueta(-1), "color: red;")
+        self.assertTrue(self._en_rojo(1))
+        self.assertFalse(self._en_rojo(2))
+        self.assertFalse(self._en_rojo(3))
+        self.assertTrue(self._en_rojo(-1))
+
+    def test_el_stock_lleva_el_punto_de_los_miles(self):
+        self.assertEqual(dominio.texto_cantidad(-13055), "-13.055")
+        self.assertEqual(dominio.texto_cantidad(4), "4")
+        self.assertFalse(self._en_rojo(15000))  # y adentro revisa que diga "15.000"
 
     def test_la_grilla_de_articulos_y_ordenar_stock(self):
         # poner_stock es la celda del stock de las dos grillas.

@@ -38,7 +38,7 @@ TEXTO_SOLO_ADMIN = "Solo el Administrador"
 def cabecera_oscura(icono: str, titulo: str, detalle: str = "") -> QFrame:
     """La cabecera oscura de la ventana: dibujito, título y una línea de detalle a la
     izquierda; a la derecha, las pastillas que se le agreguen con `agregar_pastilla`.
-    `cabecera.detalle` es la etiqueta del detalle, por si cambia."""
+    `cabecera.titulo` y `cabecera.detalle` son sus etiquetas, por si cambian."""
     cabecera = QFrame()
     cabecera.setObjectName("cabeceraOscura")
     capa = QVBoxLayout(cabecera)
@@ -49,6 +49,7 @@ def cabecera_oscura(icono: str, titulo: str, detalle: str = "") -> QFrame:
     etiqueta_icono.setObjectName("iconoCabecera")
     etiqueta_titulo = QLabel(titulo)
     etiqueta_titulo.setObjectName("tituloCabecera")
+    cabecera.titulo = etiqueta_titulo
     cabecera.detalle = QLabel(detalle)
     cabecera.detalle.setObjectName("detalleCabecera")
     textos = QVBoxLayout()

@@ -997,31 +997,69 @@ HOJA_DE_ESTILOS = """
         color: #7A8699;
         font-size: 11px;
     }
-    /* La calculadora de precios de un artículo (maqueta D, 2026-10-31): COSTO +
-       GANANCIA % = PRECIO DE VENTA en un recuadro celeste. */
-    QFrame#calculadoraPrecios {
-        background-color: #F4F7FC;
-        border: 1px solid #D6DEEA;
-        border-radius: 10px;
+    /* Modificar artículo (maqueta B, 2026-10-31): la ficha blanca de los datos, con
+       cada rótulo arriba de su campo, y la tarjeta oscura del precio de venta en
+       grande con la calculadora. Las etiquetas van por objectName (y dentro de su
+       recuadro): los avisos que se abren encima no heredan nada. */
+    QFrame#fichaArticulo {
+        background-color: #FFFFFF;
+        border: 1px solid #DCE3EE;
+        border-radius: 12px;
     }
-    QLabel#tituloCalculadora {
+    QFrame#fichaArticulo QLabel#seccionFicha {
+        color: #2F6FED;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 2px;
+    }
+    QFrame#fichaArticulo QFrame#rayaFicha {
+        background-color: #DCE5F5;
+        min-height: 2px;
+        max-height: 2px;
+    }
+    QFrame#fichaArticulo QLabel#rotuloFicha {
         color: #58677D;
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 1px;
     }
-    QLabel#signoCalculadora {
-        color: #2F6FED;
-        font-size: 20px;
+    QFrame#tarjetaPrecio {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1E2A44, stop:1 #24365F);
+        border-radius: 14px;
+    }
+    QFrame#tarjetaPrecio QLabel#tituloTarjetaPrecio {
+        color: #C9D6EE;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+    }
+    QFrame#tarjetaPrecio QLabel#precioGrande {
+        color: #FFFFFF;
+        font-size: 40px;
         font-weight: 800;
     }
-    QLabel#ayudaCalculadora {
-        color: #58677D;
-        font-size: 11px;
-    }
-    QLabel#ayudaCalculadora[alerta="true"] {
-        color: #C62828;
+    QFrame#tarjetaPrecio QLabel#gananciaGrande {
+        color: #5BE39A;
+        font-size: 15px;
         font-weight: 700;
+    }
+    QFrame#tarjetaPrecio QLabel#gananciaGrande[apagada="true"] {
+        color: #8FA3C8;
+        font-size: 12px;
+        font-weight: 400;
+    }
+    QFrame#tarjetaPrecio QLabel#gananciaGrande[alerta="true"] {
+        color: #FF8A8A;
+    }
+    QFrame#tarjetaPrecio QLabel#rotuloTarjetaPrecio {
+        color: #C9D6EE;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    QFrame#tarjetaPrecio QLabel#pistaTarjetaPrecio {
+        color: #8FA3C8;
+        font-size: 11px;
     }
     /* Lo que solo ve el Administrador (piezas_ventana.marcar_solo_admin): la tecla con
        el borde punteado en azul. */

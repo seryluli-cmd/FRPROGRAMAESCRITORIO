@@ -153,6 +153,12 @@ def texto_pesos(monto) -> str:
     return "$ " + texto.replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
 
 
+def texto_cantidad(cantidad) -> str:
+    """Unidades con el punto de los miles, como los pesos pero sin el "$":
+    -13055 -> "-13.055" (el stock de Modificar artículo)."""
+    return f"{int(cantidad):,}".replace(",", ".")
+
+
 # ---------------------------------------------------------------------
 # Cuentas de Artículos, Ventas y Reportes
 # ---------------------------------------------------------------------

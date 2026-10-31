@@ -267,8 +267,12 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
 - **Artículos** (`articulos_window.py`, `ArticulosWindow`) — grilla con
   búsqueda en vivo (`ui/articulos_tabla.py`, compartida con ORDENAR Stock),
   pinta en rojo el stock de los artículos que quedaron por debajo del mínimo
-  (`dominio.bajo_el_minimo`: `stock < stock_minimo`). `DialogoArticulo` para
-  alta/edición (código no editable una vez creado; marca se tipea y se crea al
+  (`dominio.bajo_el_minimo`: `stock < stock_minimo`). `DialogoArticulo`
+  (`ui/dialogo_articulo.py`) para alta/edición, con la maqueta B del 2026-10-31:
+  la cabecera con el nombre, código, marca, rubro, stock actual y mínimo; los
+  datos en una ficha a la izquierda y a la derecha una tarjeta oscura con el
+  precio de venta en grande y lo que se gana por unidad; los campos de números
+  sin flechitas (código no editable una vez creado; marca se tipea y se crea al
   vuelo; **rubro es un combo cerrado**; el stock es solo lectura); su
   calculadora de precios (COSTO + GANANCIA % = PRECIO DE VENTA, cada uno con su
   "＝ Calcular"; el % arranca en `dominio.MARGEN_POR_DEFECTO`, 80%) usa
