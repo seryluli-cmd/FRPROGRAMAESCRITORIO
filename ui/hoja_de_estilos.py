@@ -911,4 +911,94 @@ HOJA_DE_ESTILOS = """
         font-weight: 600;
     }
 
+    /* Las listas con la maqueta B (2026-10-30, ui/piezas_ventana.py): indicadores con
+       un número grande en la cabecera oscura, el buscador grande, los filtros en
+       pastillas, la grilla en un panel blanco con los títulos en azul y la línea de
+       ayuda de abajo. */
+    QFrame#indicadorCabecera {
+        background-color: rgba(255, 255, 255, 14);
+        border: 1px solid #36405A;
+        border-radius: 10px;
+    }
+    QFrame#indicadorCabecera[alerta="true"] {
+        background-color: rgba(248, 113, 113, 34);
+        border-color: #F87171;
+    }
+    QFrame#indicadorCabecera > QLabel {
+        background: transparent;
+    }
+    QLabel#valorIndicador {
+        color: #F3F7FF;
+        font-size: 20px;
+        font-weight: 800;
+    }
+    QLabel#valorIndicador[alerta="true"] {
+        color: #FCA5A5;
+    }
+    QLabel#tituloIndicador {
+        color: #9AA8C0;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    QLineEdit#buscador {
+        background-color: #FFFFFF;
+        border: 1px solid #D5DCE8;
+        border-radius: 10px;
+        padding: 9px 12px;
+        font-size: 14px;
+    }
+    QLineEdit#buscador:focus {
+        border: 1px solid #2F6FED;
+    }
+    QPushButton[clase="filtro"] {
+        background-color: #FFFFFF;
+        border: 1px solid #D5DCE8;
+        border-radius: 13px;
+        padding: 4px 13px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #5B6472;
+    }
+    QPushButton[clase="filtro"]:hover {
+        border-color: #4C8DFF;
+        color: #1D4FA8;
+    }
+    QPushButton[clase="filtro"]:checked {
+        background-color: #2F6FED;
+        border-color: #2F6FED;
+        color: #FFFFFF;
+    }
+    QFrame#panelTabla {
+        background-color: #FFFFFF;
+        border: 1px solid #DCE2EC;
+        border-radius: 12px;
+    }
+    QFrame#panelTabla > QTableWidget {
+        border: none;
+        border-radius: 12px;
+        alternate-background-color: #F6F8FC;
+        selection-background-color: #D6E4FF;
+    }
+    QFrame#panelTabla > QTableWidget QHeaderView::section:horizontal {
+        background-color: #F1F4F9;
+        color: #4B5B75;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        border: none;
+        border-bottom: 2px solid #2F6FED;
+        padding: 10px 8px;
+    }
+    QLabel#pieDeVentana {
+        color: #7A8699;
+        font-size: 11px;
+    }
+    /* Lo que solo ve el Administrador (piezas_ventana.marcar_solo_admin): la tecla con
+       el borde punteado en azul. */
+    QPushButton[clase="teclaBlanca"][soloAdmin="true"] {
+        border: 1px dashed #4C8DFF;
+        border-bottom: 3px solid #2F6FED;
+    }
+
 """.replace("__RUTA_FLECHA_ABAJO__", RUTA_FLECHA_ABAJO)

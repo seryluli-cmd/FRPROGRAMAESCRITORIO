@@ -16,12 +16,20 @@ from PySide6.QtCore import Qt, QDate
 
 import dominio
 from repositories import articulos_repo
-from ui.articulos_tabla import COLUMNA_CODIGO, crear_tabla_de_articulos, llenar_tabla_de_articulos
+from ui.articulos_tabla import (
+    COLUMNA_CODIGO, COLUMNA_PRECIO_COMPRA, COLUMNA_PRECIO_VENTA, COLUMNA_RUBRO, COLUMNA_STOCK, COLUMNA_STOCK_MINIMO, crear_tabla_de_articulos,
+    llenar_tabla_de_articulos,
+)
+from ui.dibujos_tabla import DelegadoEtiqueta, DelegadoStock
 from ui.ordenar_stock_window import OrdenarStockWindow
+from ui.piezas_ventana import (
+    agregar_indicador, buscador, cabecera_oscura, fila_de_filtros, marcar_solo_admin, panel_de_tabla,
+    pie_de_ventana, poner_indicador, tecla,
+)
 from ui.utils import (
     CampoPesos, mostrar_error, mostrar_aviso, confirmar, manejar_errores, aplicar_clase,
     encadenar_enter, armar_filtro_por_fechas, sin_boton_por_defecto, fila_guardar_cancelar,
-    crear_tabla, rango_de_fechas,
+    crear_tabla, rango_de_fechas, formato_pesos,
 )
 
 
@@ -29,61 +37,105 @@ class ArticulosWindow(QDialog):
     """Grilla de artículos con buscador; desde acá se abre el alta/edición,
     los movimientos de stock, la gestión de rubros y, para el Admin, la de
     marcas y ORDENAR Stock (`usuario` es quien la abrió; sin él no aparecen
-    esos dos botones)."""
+    esos dos botones).
+
+    Con la maqueta B que eligió el dueño el 2026-10-30 (ui/piezas_ventana.py): la
+    cabecera oscura con los números del catálogo, las teclas, el buscador con los
+    filtros por rubro y la grilla con el rubro en una etiqueta de color y el stock
+    con su barrita (ui/dibujos_tabla.py). Es el modelo de las demás listas."""
 
     def __init__(self, parent=None, usuario=None):
         super().__init__(parent)
         self.usuario = usuario
         self.setWindowTitle("Artículos")
-        self.resize(950, 550)
+        self.resize(1180, 720)
+        self._rubro_elegido = None
         self._armar_interfaz()
         self._cargar_grilla()
 
     def _armar_interfaz(self):
+        cabecera = cabecera_oscura("📦", "Artículos", "Precios, stock, rubros y marcas")
+        self.indicador_articulos = agregar_indicador(cabecera, "Artículos")
+        self.indicador_rubros = agregar_indicador(cabecera, "Rubros")
+        self.indicador_bajo_minimo = agregar_indicador(cabecera, "Bajo el mínimo")
+        self.indicador_valor = agregar_indicador(cabecera, "Valor del stock")
+
         barra_botones = QHBoxLayout()
-        self.boton_nuevo = QPushButton("Nuevo")
-        self.boton_modificar = QPushButton("Modificar")
-        self.boton_borrar = QPushButton("Borrar")
-        self.boton_movimientos = QPushButton("Movimientos")
-        self.boton_rubros = QPushButton("Gestionar Rubros")
-        self.boton_marcas = QPushButton("Gestionar Marcas")
-        self.boton_ordenar_stock = QPushButton("ORDENAR Stock")
-        self.boton_salir = QPushButton("Salir")
-        for boton in (self.boton_nuevo, self.boton_modificar, self.boton_borrar,
-                      self.boton_movimientos, self.boton_rubros, self.boton_marcas, self.boton_ordenar_stock,
-                      self.boton_salir):
+        barra_botones.setSpacing(8)
+        self.boton_nuevo = tecla("＋  NUEVO", self._nuevo_articulo, "teclaAzul")
+        self.boton_modificar = tecla("✎  MODIFICAR", self._modificar_articulo)
+        self.boton_movimientos = tecla("⇄  MOVIMIENTOS", self._ver_movimientos)
+        self.boton_rubros = tecla("▤  RUBROS", self._gestionar_rubros)
+        self.boton_marcas = tecla("◆  MARCAS", self._gestionar_marcas)
+        self.boton_ordenar_stock = tecla("⚙  ORDENAR STOCK", self._ordenar_stock)
+        self.boton_borrar = tecla("✕  BORRAR", self._borrar_articulo, "teclaRoja")
+        self.boton_salir = tecla("SALIR", self.close)
+        for boton in (self.boton_nuevo, self.boton_modificar, self.boton_movimientos, self.boton_rubros,
+                      self.boton_marcas, self.boton_ordenar_stock, self.boton_borrar):
             barra_botones.addWidget(boton)
         barra_botones.addStretch()
-
-        aplicar_clase(self.boton_nuevo, "primario")
-        aplicar_clase(self.boton_borrar, "peligro")
-        self.boton_nuevo.clicked.connect(self._nuevo_articulo)
-        self.boton_modificar.clicked.connect(self._modificar_articulo)
-        self.boton_borrar.clicked.connect(self._borrar_articulo)
-        self.boton_movimientos.clicked.connect(self._ver_movimientos)
-        self.boton_rubros.clicked.connect(self._gestionar_rubros)
-        self.boton_marcas.clicked.connect(self._gestionar_marcas)
-        self.boton_ordenar_stock.clicked.connect(self._ordenar_stock)
-        self.boton_salir.clicked.connect(self.close)
+        barra_botones.addWidget(self.boton_salir)
         # Solo lo ve un Admin (pedido del dueño, 2026-10-20); una empleada con
         # permiso de Artículos no. El repo lo vuelve a exigir en cada cambio.
         self.boton_ordenar_stock.setVisible(dominio.es_admin(self.usuario))
         # Corregir las marcas, también solo el Admin (pedido del dueño, 2026-10-23).
         self.boton_marcas.setVisible(dominio.es_admin(self.usuario))
+        marcar_solo_admin(self.boton_ordenar_stock)
+        marcar_solo_admin(self.boton_marcas)
 
-        self.campo_buscar = QLineEdit()
-        self.campo_buscar.setPlaceholderText("Buscar por código o descripción...")
+        self.campo_buscar = buscador("Buscar por código o descripción...")
+        self.campo_buscar.setMinimumWidth(380)
         self.campo_buscar.textChanged.connect(self._cargar_grilla)
+        self.fila_buscar = QHBoxLayout()
+        self.fila_buscar.setSpacing(12)
+        self.fila_buscar.addWidget(self.campo_buscar)
 
         self.tabla = crear_tabla_de_articulos()
         self.tabla.doubleClicked.connect(self._modificar_articulo)
+        # El rubro en una etiqueta de color y el stock con su barrita: los dibuja la
+        # celda, que sigue teniendo su texto (ordenar por columna sigue andando).
+        self.etiqueta_rubro = DelegadoEtiqueta(self.tabla)
+        self.tabla.setItemDelegateForColumn(COLUMNA_RUBRO, self.etiqueta_rubro)
+        self.tabla.setItemDelegateForColumn(COLUMNA_STOCK, DelegadoStock(COLUMNA_STOCK_MINIMO, self.tabla))
+        self.tabla.setColumnWidth(COLUMNA_RUBRO, 170)
+        self.tabla.setColumnWidth(COLUMNA_STOCK, 150)
+        for columna in (COLUMNA_PRECIO_VENTA, COLUMNA_PRECIO_COMPRA):
+            self.tabla.setColumnWidth(columna, 125)
+        self.filtros = None
+        self._armar_filtros()
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(12)
+        layout.addWidget(cabecera)
         layout.addLayout(barra_botones)
-        layout.addWidget(self.campo_buscar)
-        layout.addWidget(self.tabla)
+        layout.addLayout(self.fila_buscar)
+        layout.addWidget(panel_de_tabla(self.tabla), 1)
+        layout.addWidget(pie_de_ventana(
+            "Doble clic en un artículo para modificarlo  ·  El stock en rojo quedó por debajo del mínimo  ·  "
+            "Las teclas con borde punteado las ve solo el Administrador"))
         self.setLayout(layout)
         sin_boton_por_defecto(self)
+
+    def _armar_filtros(self):
+        """Las pastillas de los rubros, al lado del buscador. Se vuelven a armar
+        después de Gestionar Rubros (puede haber uno nuevo o uno renombrado)."""
+        if self.filtros is not None:
+            self.fila_buscar.removeWidget(self.filtros)
+            self.filtros.deleteLater()
+        nombres = [rubro["nombre"] for rubro in articulos_repo.listar_rubros()]
+        if self._rubro_elegido not in nombres:
+            self._rubro_elegido = None
+        self.filtros = fila_de_filtros(nombres, self._elegir_rubro)
+        for pastilla in self.filtros.pastillas:
+            pastilla.setChecked(pastilla.text() == (self._rubro_elegido or "Todos").upper())
+        self.fila_buscar.addWidget(self.filtros, 1)
+        self.etiqueta_rubro.colores_en_orden(nombres)
+        poner_indicador(self.indicador_rubros, str(len(nombres)))
+
+    def _elegir_rubro(self, rubro):
+        self._rubro_elegido = rubro
+        self._cargar_grilla()
 
     @manejar_errores
     def _cargar_grilla(self, _=None):
@@ -91,7 +143,16 @@ class ArticulosWindow(QDialog):
         # (ver ControlCierresWindow._ver_detalle en control_cierres_window.py, que
         # explica por qué hace falta con @manejar_errores).
         texto = self.campo_buscar.text().strip()
-        llenar_tabla_de_articulos(self.tabla, articulos_repo.listar_articulos(texto))
+        articulos = articulos_repo.listar_articulos(texto)
+        if self._rubro_elegido is not None:
+            articulos = [a for a in articulos if a["rubro"] == self._rubro_elegido]
+        llenar_tabla_de_articulos(self.tabla, articulos)
+        # Los números de arriba son de todo el catálogo, no de lo que se está buscando.
+        numeros = dominio.numeros_de_los_articulos(articulos_repo.listar_articulos())
+        poner_indicador(self.indicador_articulos, str(numeros["cantidad"]))
+        poner_indicador(self.indicador_bajo_minimo, str(numeros["bajo_el_minimo"]),
+                        alerta=numeros["bajo_el_minimo"] > 0)
+        poner_indicador(self.indicador_valor, formato_pesos(numeros["valor_del_stock"]))
 
     def _codigo_seleccionado(self):
         fila = self.tabla.currentRow()
@@ -135,6 +196,8 @@ class ArticulosWindow(QDialog):
 
     def _gestionar_rubros(self):
         DialogoGestionRubros(self).exec()
+        self._armar_filtros()
+        self._cargar_grilla()   # la grilla muestra el nombre del rubro
 
     def _gestionar_marcas(self):
         DialogoGestionMarcas(self, self.usuario["id"]).exec()

@@ -9,6 +9,8 @@ mismos números de antes:
 - El "bajo el stock mínimo" (en rojo en Artículos y ORDENAR Stock, el aviso de
   Ventas con lo que ya está en el carrito): `dominio.bajo_el_minimo`.
 - La fila TOTAL de Reportes > Totales: `dominio.suma_de_las_filas`.
+- Los números de arriba de Artículos (maqueta B, 2026-10-30):
+  `dominio.numeros_de_los_articulos`, y el filtro por rubro de esa grilla.
 
 Las pantallas se prueban sin abrir ninguna ventana (plataforma "offscreen" de Qt).
 
@@ -30,7 +32,7 @@ import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
 from repositories import articulos_repo, reportes_repo, usuarios_repo  # noqa: E402
 from ui.articulos_tabla import poner_stock  # noqa: E402
-from ui.articulos_window import DialogoArticulo  # noqa: E402
+from ui.articulos_window import ArticulosWindow, DialogoArticulo  # noqa: E402
 from ui.reportes_window import PestañaTotales  # noqa: E402
 from ui.utils import formato_pesos  # noqa: E402
 from ui.ventas_window import VentasWindow  # noqa: E402
@@ -184,6 +186,59 @@ class TestStockEnRojoEnArticulos(_ConAgua):
         self.assertIsNone(item.data(Qt.ForegroundRole))
         poner_stock(item, 3, self.MINIMO)
         self.assertIsNone(item.data(Qt.ForegroundRole))
+
+
+class TestNumerosDeLosArticulos(unittest.TestCase):
+    def _articulo(self, codigo, stock, minimo, compra):
+        return {"codigo": codigo, "stock": stock, "stock_minimo": minimo, "precio_compra": compra}
+
+    def test_cuenta_los_bajo_el_minimo_y_el_valor_a_precio_de_compra(self):
+        numeros = dominio.numeros_de_los_articulos([
+            self._articulo("A", 10, 2, 150.5),   # 1505
+            self._articulo("B", 1, 2, 100.0),    # bajo el mínimo: 100
+            self._articulo("C", 2, 2, 300.0),    # justo en el mínimo: no avisa; 600
+        ])
+        self.assertEqual(numeros, {"cantidad": 3, "bajo_el_minimo": 1, "valor_del_stock": 2205.0})
+
+    def test_el_stock_negativo_vale_cero_pero_cuenta_como_bajo_el_minimo(self):
+        numeros = dominio.numeros_de_los_articulos([self._articulo("A", -5, 0, 100.0)])
+        self.assertEqual(numeros, {"cantidad": 1, "bajo_el_minimo": 1, "valor_del_stock": 0})
+
+    def test_impresiones_no_entra(self):
+        numeros = dominio.numeros_de_los_articulos(
+            [self._articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, -130, 0, 40.0)])
+        self.assertEqual(numeros, {"cantidad": 0, "bajo_el_minimo": 0, "valor_del_stock": 0})
+
+
+class TestArticulosConLaMaquetaB(_ConAgua):
+    def setUp(self):
+        super().setUp()
+        self.bebidas = articulos_repo.crear_rubro("BEBIDAS")
+        articulos_repo.crear_rubro("GOLOSINAS")
+        articulos_repo.crear_articulo("COCA", "Coca", None, self.bebidas, 2000.0, 1000.0, 0)
+        self.ventana = ArticulosWindow(None, None)
+        self.addCleanup(self.ventana.deleteLater)
+
+    def _codigos(self):
+        return sorted(self.ventana.tabla.item(fila, 0).text() for fila in range(self.ventana.tabla.rowCount()))
+
+    def test_arriba_dice_cuantos_hay_y_cuantos_quedaron_bajo_el_minimo(self):
+        self._poner_stock(1)
+        self.ventana._cargar_grilla()
+        self.assertEqual(self.ventana.indicador_articulos.valor.text(), "2")
+        self.assertEqual(self.ventana.indicador_bajo_minimo.valor.text(), "1")
+        self.assertTrue(self.ventana.indicador_bajo_minimo.property("alerta"))
+        self.assertEqual(self.ventana.indicador_rubros.valor.text(), str(len(articulos_repo.listar_rubros())))
+
+    def test_el_filtro_por_rubro_y_el_buscador_se_suman(self):
+        self.assertEqual(self._codigos(), ["AGUA", "COCA"])
+        pastilla = next(p for p in self.ventana.filtros.pastillas if p.text() == "BEBIDAS")
+        pastilla.click()
+        self.assertEqual(self._codigos(), ["COCA"])
+        self.ventana.campo_buscar.setText("AGUA")
+        self.assertEqual(self._codigos(), [])
+        self.ventana.filtros.pastillas[0].click()   # Todos
+        self.assertEqual(self._codigos(), ["AGUA"])
 
 
 class TestAvisoDeStockEnVentas(_ConAgua):
