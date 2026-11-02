@@ -407,12 +407,14 @@ negocio `gestionfr`), no a la de CyberBIOS. Las constantes están arriba de
   "tarde", "noche", también los domingos), `fecha` (el día en que ARRANCÓ el
   turno), `registradoPor` = el NOMBRE de la **responsable de la caja**,
   `creadoEn`, `origen: "frkiosko"`, `cierreId`, `caja`, `forzoso`, `enAusencia`,
-  `cerradoPor` y **`detalle`** (la tarjeta del cierre: Cambio Fijo, a retirar,
-  cada negocio de `dominio.NEGOCIOS_DEL_CIERRE` con su efectivo y digital, desde
-  y hasta). La app de FR todavía no muestra ese `detalle` al tocar el cierre
-  (eso se portó solo a la app de CyberBIOS); lo demás lo entiende como un cierre
-  cargado a mano. **Los nombres tienen que estar escritos igual en las dos
-  apps.**
+  `cerradoPor`, con caja `abiertaPor` y `abiertaEn` (quién la abrió y a qué
+  hora) y **`detalle`** (la tarjeta del cierre: Cambio Fijo, a retirar, cada
+  negocio de `dominio.NEGOCIOS_DEL_CIERRE` con su efectivo y digital, desde y
+  hasta). Desde el 2026-11-02 la app de FR marca esos cierres con 🖥️ y, al
+  tocarlos, muestra la misma tarjeta (repo FRWEB, `facturado.js` >
+  `openDetalleCierre`), igual que la app de CyberBIOS; un cierre de antes de ese
+  día no trae quién abrió la caja y sale sin esa línea. **Los nombres tienen que
+  estar escritos igual en las dos apps.**
 - **Cuándo:** `turnos_repo.cerrar_turno` deja una fila en `envios_pwa` en la
   misma transacción del cierre, solo si el envío está prendido (viene apagado).
   Un hilo (`iniciar_envios_automaticos`) lo manda en ese momento y, si falló, lo

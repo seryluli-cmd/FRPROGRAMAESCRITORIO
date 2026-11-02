@@ -284,7 +284,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `ui.utils.solo_en_el_mostrador` · `.avisar_que_es_en_el_mostrador(padre)` | se decide qué hace desde otra PC un botón que vende, cobra o cierra: está igual que en el mostrador y avisa "Esto se hace en el mostrador". En el mostrador no cambia nada |
 | `copias_repo.copia_automatica_si_corresponde()` · `.toca_copia(...)` · `.nombres_a_borrar(...)` · `.agregar_carpeta_extra(...)` | se decide cuándo se hace una copia de seguridad (después de cada Cierre de Turno y cada `HORAS_ENTRE_COPIAS`, con el programa abierto; lo corre el hilo de `iniciar_copias_automaticas`), cuántas quedan y en qué otras carpetas se guarda. La pantalla es `ui/copias_dialogo.py` (Usuarios > "Copias de Seguridad") |
 | `database.carpeta_de_copias()` | se decide en qué carpeta de esta PC quedan las copias (data_fr/backups): la usan `copias_repo.carpeta_local()` y la copia de antes de migrar. Está en `database.py` porque las migraciones no pueden importar un repo (regla 1) |
-| `envio_pwa_repo.encolar(conexion, cierre_id)` · `.enviar_pendientes(ahora, transporte)` · `.datos_del_cierre(conexion, cierre_id)` · `.mandar_cierre(usuario_id, cierre_id)` · `.activar(usuario_id, prendido)` · `.probar_conexion()` · `.estado()` | se manda cada Cierre de Turno a la app de gastos de FR ("Gestión Central", proyecto `frkioskos`, negocio `gestionfr`): la cola `envios_pwa` se llena en la transacción de `turnos_repo.cerrar_turno` solo con el envío prendido (Configuración ADMIN > "Cierres a la app de gastos", solo Admin y solo en el mostrador; viene apagado), un hilo la manda cada minuto con reintentos, y lo que viaja es lo que carga una empleada a mano más el desglose de la tarjeta del cierre (`dominio.NEGOCIOS_DEL_CIERRE`). Se habla con Firestore como un celular: login anónimo con la clave pública de la PWA y REST con `urllib` |
+| `envio_pwa_repo.encolar(conexion, cierre_id)` · `.enviar_pendientes(ahora, transporte)` · `.datos_del_cierre(conexion, cierre_id)` · `.mandar_cierre(usuario_id, cierre_id)` · `.activar(usuario_id, prendido)` · `.probar_conexion()` · `.estado()` | se manda cada Cierre de Turno a la app de gastos de FR ("Gestión Central", proyecto `frkioskos`, negocio `gestionfr`): la cola `envios_pwa` se llena en la transacción de `turnos_repo.cerrar_turno` solo con el envío prendido (Configuración ADMIN > "Cierres a la app de gastos", solo Admin y solo en el mostrador; viene apagado), un hilo la manda cada minuto con reintentos, y lo que viaja es lo que carga una empleada a mano más el desglose de la tarjeta del cierre (`dominio.NEGOCIOS_DEL_CIERRE`) y quién abrió la caja y a qué hora (`abiertaPor`, `abiertaEn`). La app (repo FRWEB, `facturado.js` > `openDetalleCierre`, desde el 2026-11-02) marca esos cierres con 🖥️ y al tocarlos muestra la misma tarjeta, igual que la app de CyberBIOS. Se habla con Firestore como un celular: login anónimo con la clave pública de la PWA y REST con `urllib` |
 | `vuelta_admin_repo.volver(usuario_id)` · `ui.vuelta_del_admin.VueltaDelAdmin` | se decide si la sesión del Administrador vuelve sola a la empleada: a los `dominio.MINUTOS_ADMIN_VUELVE_SOLO` de entrar, en silencio (sin cartel: el dueño pidió sacarlo; no lo vuelvas a poner), vuelve a quien dejó el mostrador con "🔄 Operador" sin pedirle la clave, solo si su caja sigue abierta a su nombre y en hora; si no, a la pantalla de ingreso. Nunca corta un cobro ni un formulario abierto. Solo en el mostrador |
 | `errores.registrar_error(excepcion, contexto)` | la UI y el servidor guardan fallos inesperados en `data_fr/errores.log` sin depender de Qt |
 | `main.aplicar_estilo(app)` | se fija el aspecto de TODO el programa: estilo Fusion, esquema de color CLARO y la hoja de estilos (`HOJA_DE_ESTILOS`, en `ui/hoja_de_estilos.py`) |
@@ -619,8 +619,6 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
 
 ## Roadmap (a futuro, fuera de alcance hoy)
 
-- Que la app de gastos de FR muestre el `detalle` de cada cierre que llega de
-  acá (en la app de CyberBIOS ya está hecho).
 - Lo que el dueño vaya pidiendo cuando el programa esté en el kiosko.
 
 ---
@@ -657,7 +655,7 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 803 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 806 pruebas
 al 2026-11-02 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
