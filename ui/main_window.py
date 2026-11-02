@@ -16,6 +16,7 @@ from repositories import impresiones_repo, relevo_repo, usuarios_repo
 from turnos import MINUTOS_PARA_CIERRE_FORZOSO
 from ui.administrar_kiosko_window import AdministrarKioskoWindow
 from ui.configuracion_admin_window import ConfiguracionAdminWindow
+from ui.gestion_impresiones_window import VentanaGestionImpresiones
 from ui.impresiones_window import DialogoImpresiones
 from ui.ventas_window import VentasWindow
 from ui.caja_window import CajaWindow, CierreTurnoWindow
@@ -41,9 +42,10 @@ AGRANDAR_DIBUJITO_OPERADOR = 1.25
 # estilos). Con eso la barra mide ~1410 px de ancho: en una pantalla de 1366 ya no entra.
 ALTO_BOTON_BARRA = 42
 SEPARACION_BOTONES_BARRA = 7
-# Los tres accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja):
-# todos del mismo tamaño, uno debajo del otro a la izquierda (pedido del dueño,
-# 2026-11-02, con un dibujo: antes eran tres botones que ocupaban toda la fila).
+# Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja y
+# Gestión Impresiones): todos del mismo tamaño, uno debajo del otro a la izquierda
+# (pedido del dueño, 2026-11-02, con un dibujo: antes eran tres botones que ocupaban
+# toda la fila; Gestión Impresiones se sumó el mismo día).
 ANCHO_ACCESO = 240
 ALTO_ACCESO = 110
 SEPARACION_ACCESOS = 20
@@ -173,6 +175,7 @@ class MainWindow(QMainWindow):
             ("🛒", "VENTA DE MERCADERÍA", self._abrir_ventas),
             ("🖨️", "IMPRESIONES", self._abrir_impresiones),
             ("💵", "CAJA", self._abrir_caja),
+            ("📑", "GESTIÓN IMPRESIONES", self._abrir_gestion_impresiones),
         ):
             # Sin AlignLeft, un botón de tamaño fijo queda centrado en la fila.
             accesos.addWidget(self._acceso_de_inicio(dibujito, texto, accion), 0, Qt.AlignLeft)
@@ -183,7 +186,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(contenedor)
 
     def _acceso_de_inicio(self, dibujito, texto, funcion):
-        """Uno de los tres accesos de la pantalla de inicio: botón azul de tamaño fijo
+        """Uno de los accesos de la pantalla de inicio: botón azul de tamaño fijo
         con el dibujito arriba y el nombre abajo. Van como etiquetas adentro del botón (y
         no como ícono + texto) porque cada emoji recortado mide distinto: con el ícono, el
         nombre quedaba a otra altura en cada botón. Colores en ui/hoja_de_estilos.py
@@ -403,6 +406,10 @@ class MainWindow(QMainWindow):
 
     def _abrir_caja(self):
         CajaWindow(self).exec()
+
+    @solo_en_el_mostrador
+    def _abrir_gestion_impresiones(self):
+        VentanaGestionImpresiones(self.usuario, self).exec()
 
     @solo_en_el_mostrador
     def _abrir_cierre_turno(self):

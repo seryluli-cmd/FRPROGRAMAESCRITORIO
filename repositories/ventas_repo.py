@@ -219,12 +219,25 @@ def anular_venta(venta_id: int, usuario_admin_id: int, motivo: str):
     plata de la caja y de los reportes, y también se pide desde otra PC.
     El motivo es obligatorio: sin él, una anulación no se puede explicar
     cuando se audita un faltante.
+
+    La seña o la entrega de un pedido de Gestión Impresiones no se anula suelta:
+    el pedido seguiría diciendo que se cobró. Se anula el pedido entero
+    (pedidos_impresion_repo.anular_pedido), que anula sus ventas.
     """
     usuarios_repo.exigir_admin(usuario_admin_id, "anular una venta")
     motivo = (motivo or "").strip()
     if not motivo:
         raise ValueError("Escribí por qué se anula la venta: sin motivo no se puede anular.")
     with conexion_db() as conexion:
+        pedido = conexion.execute(
+            "SELECT id FROM pedidos_impresion WHERE venta_sena_id = ? OR venta_entrega_id = ?",
+            (venta_id, venta_id),
+        ).fetchone()
+        if pedido is not None:
+            raise ValueError(
+                f"Esta venta es del pedido de impresiones Nº {pedido['id']}: anulá el pedido en "
+                "Gestión Impresiones (anula también sus cobros)."
+            )
         _anular_venta(conexion, venta_id, usuario_admin_id, motivo)
 
 

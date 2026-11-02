@@ -141,7 +141,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
 
     def test_los_accesos_del_inicio_van_uno_debajo_del_otro_y_miden_igual(self):
         # Pedido del dueño (2026-11-02, con un dibujo): Venta de Mercadería, Impresiones y Caja
-        # como tres botones iguales, apilados a la izquierda y a la misma distancia.
+        # como botones iguales, apilados a la izquierda y a la misma distancia; ese mismo día
+        # se sumó Gestión Impresiones abajo.
         admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
         ventana = MainWindow(admin, lambda: None)
         self.addCleanup(ventana.deleteLater)
@@ -151,12 +152,13 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         _app.processEvents()
 
         accesos = [b for b in ventana.findChildren(QPushButton) if b.objectName() == "accesoInicio"]
-        self.assertEqual([b.accessibleName() for b in accesos], ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA"])
+        self.assertEqual([b.accessibleName() for b in accesos],
+                         ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES"])
         self.assertEqual(len({(b.width(), b.height()) for b in accesos}), 1)
         self.assertEqual(len({b.x() for b in accesos}), 1)
         arriba = [b.y() for b in accesos]
         self.assertEqual(arriba, sorted(arriba))
-        self.assertEqual(arriba[1] - arriba[0], arriba[2] - arriba[1])
+        self.assertEqual(len({abajo - encima for encima, abajo in zip(arriba, arriba[1:])}), 1)
 
     def test_operador_va_pegado_a_la_derecha_de_lista_de_compras(self):
         # Pedido del dueño (2026-10-23): antes iba solo en la punta derecha y con

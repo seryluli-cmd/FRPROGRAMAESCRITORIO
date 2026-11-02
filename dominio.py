@@ -1,6 +1,7 @@
 """Valores y cuentas compartidos por el kiosko, sin dependencias de interfaz ni base."""
 
 import unicodedata
+from urllib.parse import quote
 
 
 ROL_ADMIN = "ADMIN"
@@ -245,3 +246,91 @@ def suma_de_las_filas(filas, claves) -> dict:
     redondeadas), en su orden y sin redondear de nuevo. Otro SUM en la base
     podría no dar lo mismo que lo de arriba: Kiosko sale por resta en cada fila."""
     return {clave: sum(fila[clave] for fila in filas) for clave in claves}
+
+
+# GESTIÓN IMPRESIONES (pedido del dueño, 2026-11-02): pedidos grandes que se dejan
+# con seña (o pagados enteros) y se retiran después. Reglas en
+# repositories/pedidos_impresion_repo.py.
+PEDIDO_PENDIENTE = "PENDIENTE"        # tomado, todavía no lo retiraron
+PEDIDO_RETIRADO = "RETIRADO"          # lo retiraron y pagaron lo que faltaba
+PEDIDO_SENA_PERDIDA = "SEÑA PERDIDA"  # no vino nunca: la seña queda para el local
+PEDIDO_ANULADO = "ANULADO"            # mal cargado: se anularon sus cobros
+ESTADOS_PEDIDO = (PEDIDO_PENDIENTE, PEDIDO_RETIRADO, PEDIDO_SENA_PERDIDA, PEDIDO_ANULADO)
+
+# El renglón de la seña en la venta (artículo Impresiones, 1 x la seña) y, con la
+# misma descripción, el que la descuenta al retirar (-1 x la seña): en los reportes
+# se compensan, y las hojas se cuentan una sola vez, al retirar.
+DESCRIPCION_SENA_IMPRESIONES = "SEÑA DE IMPRESIONES"
+
+# Un pedido de más hojas es casi seguro un número tipeado de más.
+HOJAS_MAXIMAS_POR_PEDIDO = 9_999
+
+
+def total_del_pedido(hojas: int, precio_hoja: float) -> float:
+    """Lo que cuesta un pedido: las hojas por el precio de Impresiones (el mismo en
+    color o en blanco y negro, sin descuento por cantidad: lo dijo el dueño)."""
+    return round(hojas * precio_hoja, 2)
+
+
+def falta_abonar(total: float, sena: float) -> float:
+    """Lo que el cliente paga al retirar: el total menos la seña."""
+    return round(total - sena, 2)
+
+
+def revisar_sena(total: float, sena: float):
+    """ValueError si la seña no sirve: sin seña no se toma el pedido (dueño), y no
+    puede pasar del total (pagarlo entero de entrada sí se puede)."""
+    if round(sena, 2) <= 0:
+        raise ValueError("Sin seña no se toma el pedido: cobrá una seña o el total.")
+    if round(sena, 2) > round(total, 2):
+        raise ValueError(f"La seña no puede ser más que el total ({texto_pesos(total)}).")
+
+
+def numeros_de_los_pedidos(pedidos) -> dict:
+    """Los números de arriba de Gestión Impresiones: cuántos pedidos esperan que los
+    retiren, cuánto se cobró de seña de esos y cuánto falta cobrar."""
+    pendientes = [p for p in pedidos if p["estado"] == PEDIDO_PENDIENTE]
+    return {
+        "pendientes": len(pendientes),
+        "senas": round(sum(p["sena"] for p in pendientes), 2),
+        "falta": round(sum(falta_abonar(p["total"], p["sena"]) for p in pendientes), 2),
+    }
+
+
+# WhatsApp del cliente: en el kiosko se escribe el celular con la característica,
+# sin el 0 y sin el 15 (11 5555 1234: 10 números). Para WhatsApp va con el 54 del
+# país y el 9 de los celulares adelante.
+CARACTERISTICA_WHATSAPP = "549"
+_AYUDA_TELEFONO = "Escribí el celular con la característica, sin 0 y sin 15 (por ejemplo, 11 5555 1234)."
+
+
+def telefono_limpio(telefono) -> str:
+    """El celular como se guarda: solo los 10 números ("1155551234"), o "" si no se
+    escribió. Acepta espacios, guiones y paréntesis, y que lo peguen con el 0 o
+    con +54 9 adelante. ValueError si no quedan 10 números."""
+    numeros = "".join(caracter for caracter in str(telefono or "") if caracter.isdigit())
+    if not numeros:
+        return ""
+    if len(numeros) == 13 and numeros.startswith(CARACTERISTICA_WHATSAPP):
+        numeros = numeros[3:]
+    elif len(numeros) == 12 and numeros.startswith("54"):
+        numeros = numeros[2:]
+    elif len(numeros) == 11 and numeros.startswith("0"):
+        numeros = numeros[1:]
+    if len(numeros) != 10:
+        raise ValueError(_AYUDA_TELEFONO)
+    return numeros
+
+
+def mensaje_pedido_listo(nombre: str, hojas: int, falta: float) -> str:
+    """Lo que se le escribe al cliente cuando el pedido está listo."""
+    mensaje = f"Hola {nombre}! Tu pedido de {hojas} impresiones ya está listo para retirar en el kiosko."
+    if round(falta, 2) > 0:
+        mensaje += f" Te falta abonar {texto_pesos(falta)}."
+    return mensaje + " ¡Gracias!"
+
+
+def enlace_whatsapp(telefono: str, mensaje: str) -> str:
+    """La dirección que abre WhatsApp Web con el chat del cliente y el mensaje ya
+    escrito (lo manda quien atiende, con Enter)."""
+    return f"https://web.whatsapp.com/send?phone={CARACTERISTICA_WHATSAPP}{telefono}&text={quote(mensaje)}"

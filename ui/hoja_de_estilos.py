@@ -416,8 +416,8 @@ HOJA_DE_ESTILOS = """
         background-color: #E5404C;
     }
 
-    /* Los tres accesos de la pantalla de inicio (Venta de Mercadería, Impresiones,
-       Caja; pedido del dueño, 2026-11-02): todos del mismo tamaño, azules con relieve
+    /* Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja y
+       Gestión Impresiones; pedido del dueño, 2026-11-02): todos del mismo tamaño, azules con relieve
        como Vender en la barra (MainWindow._acceso_de_inicio). El dibujito y el nombre
        son etiquetas adentro del botón: transparentes y en blanco. No se hunden al
        apretarlos como las teclas de la barra porque el margen no mueve las etiquetas. */
