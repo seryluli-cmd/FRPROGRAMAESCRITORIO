@@ -334,7 +334,12 @@ HOJA_DE_ESTILOS = """
        pasarle el mouse y se hunde al apretarla (baja 2 px y pierde el relieve).
        Vender (primario) en azul lleno y 🔄 Operador (peligro) con borde rojo,
        pegado a la derecha de Clave. Todos en negrita y mayúscula (pedido del dueño, 2026-10-22;
-       la mayúscula la pone MainWindow._agregar_boton_barra). */
+       la mayúscula la pone MainWindow._agregar_boton_barra). Letra, relleno y alto un
+       10% más grandes desde el 2026-11-02 (pedido del dueño): la letra va en pt porque
+       en px Qt corta los decimales y 14,3 px quedaba en 14. */
+    #encabezadoInicio QPushButton {
+        font-size: 10.7pt;
+    }
     QPushButton[clase="barra"] {
         background-color: #2C3345;
         border: 1px solid #3A4358;
@@ -342,7 +347,7 @@ HOJA_DE_ESTILOS = """
         border-bottom: 3px solid #0B0D12;
         color: #E6EAF2;
         font-weight: 700;
-        padding: 7px 12px;
+        padding: 8px 13px;
     }
     QPushButton[clase="barra"]:hover {
         background-color: #323B50;
@@ -367,7 +372,7 @@ HOJA_DE_ESTILOS = """
         border-bottom: 3px solid #173A85;
         color: #FFFFFF;
         font-weight: 700;
-        padding: 7px 16px;
+        padding: 8px 18px;
     }
     #encabezadoInicio QPushButton[clase="primario"]:hover {
         background-color: #3D7BFF;
@@ -383,7 +388,7 @@ HOJA_DE_ESTILOS = """
         border-bottom: 3px solid #4A1A1F;
         color: #FF8A93;
         font-weight: 700;
-        padding: 7px 16px;
+        padding: 8px 18px;
     }
     #encabezadoInicio QPushButton[clase="peligro"]:hover {
         background-color: #3A2328;
@@ -405,10 +410,40 @@ HOJA_DE_ESTILOS = """
         border-bottom: 3px solid #6E141C;
         color: #FFFFFF;
         font-weight: 700;
-        padding: 7px 12px;
+        padding: 8px 13px;
     }
     QPushButton[clase="alerta"]:hover {
         background-color: #E5404C;
+    }
+
+    /* Los tres accesos de la pantalla de inicio (Venta de Mercadería, Impresiones,
+       Caja; pedido del dueño, 2026-11-02): todos del mismo tamaño, azules con relieve
+       como Vender en la barra (MainWindow._acceso_de_inicio). El dibujito y el nombre
+       son etiquetas adentro del botón: transparentes y en blanco. No se hunden al
+       apretarlos como las teclas de la barra porque el margen no mueve las etiquetas. */
+    QPushButton#accesoInicio {
+        background-color: #2F6FED;
+        border: 1px solid #4C8DFF;
+        border-top-color: #7AAAFF;
+        border-bottom: 4px solid #173A85;
+        border-radius: 12px;
+        padding: 0px;
+    }
+    QPushButton#accesoInicio:hover {
+        background-color: #3D7BFF;
+        border-color: #7AAAFF;
+        border-bottom-color: #173A85;
+    }
+    QPushButton#accesoInicio:pressed {
+        background-color: #255BC7;
+    }
+    QPushButton#accesoInicio QLabel {
+        background: transparent;
+        color: #FFFFFF;
+    }
+    QPushButton#accesoInicio QLabel#nombreAcceso {
+        font-size: 15px;
+        font-weight: 800;
     }
 
     /* Aviso informativo, en azul suave (no es una alarma): lo usa el Resumen del

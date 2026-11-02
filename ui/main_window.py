@@ -7,7 +7,7 @@ consulta y gestión. Los cobros y el cierre de turno se hacen en el mostrador.
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
 )
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 
 import dominio
 from admin_remoto import modo as modo_remoto
@@ -36,6 +36,18 @@ INTERVALO_PARPADEO_MS = 600
 # va que los de los otros botones de la barra.
 DIBUJITO_OPERADOR = "🔄"
 AGRANDAR_DIBUJITO_OPERADOR = 1.25
+# Alto de los botones de la barra de arriba: 38 hasta el 2026-11-02, cuando el dueño
+# pidió los botones y su letra un 10% más grandes (la letra y el relleno, en la hoja de
+# estilos). Con eso la barra mide ~1410 px de ancho: en una pantalla de 1366 ya no entra.
+ALTO_BOTON_BARRA = 42
+SEPARACION_BOTONES_BARRA = 7
+# Los tres accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja):
+# todos del mismo tamaño, uno debajo del otro a la izquierda (pedido del dueño,
+# 2026-11-02, con un dibujo: antes eran tres botones que ocupaban toda la fila).
+ANCHO_ACCESO = 240
+ALTO_ACCESO = 110
+SEPARACION_ACCESOS = 20
+TAMANO_DIBUJITO_ACCESO = 34
 
 
 class MainWindow(QMainWindow):
@@ -132,7 +144,7 @@ class MainWindow(QMainWindow):
         layout_barra.addLayout(renglon_nombre)
 
         botones = QHBoxLayout()
-        botones.setSpacing(6)
+        botones.setSpacing(SEPARACION_BOTONES_BARRA)
         layout_barra.addLayout(botones)
         self._armar_botones_de_la_barra(botones)
         barra.setLayout(layout_barra)
@@ -155,22 +167,50 @@ class MainWindow(QMainWindow):
         descripcion.setStyleSheet("font-size: 15px; color: #58677D;")
         columna_inicio.addWidget(descripcion)
         columna_inicio.addSpacing(16)
-        accesos = QHBoxLayout()
-        for texto, accion in (
-            ("🛒  VENTA DE MERCADERÍA", self._abrir_ventas),
-            ("🖨️  IMPRESIONES", self._abrir_impresiones),
-            ("💵  CAJA", self._abrir_caja),
+        accesos = QVBoxLayout()
+        accesos.setSpacing(SEPARACION_ACCESOS)
+        for dibujito, texto, accion in (
+            ("🛒", "VENTA DE MERCADERÍA", self._abrir_ventas),
+            ("🖨️", "IMPRESIONES", self._abrir_impresiones),
+            ("💵", "CAJA", self._abrir_caja),
         ):
-            boton = QPushButton(texto)
-            boton.setMinimumHeight(64)
-            aplicar_clase(boton, "primario")
-            boton.clicked.connect(accion)
-            accesos.addWidget(boton)
+            # Sin AlignLeft, un botón de tamaño fijo queda centrado en la fila.
+            accesos.addWidget(self._acceso_de_inicio(dibujito, texto, accion), 0, Qt.AlignLeft)
         columna_inicio.addLayout(accesos)
         columna_inicio.addStretch()
         layout.addWidget(inicio, 1)
         contenedor.setLayout(layout)
         self.setCentralWidget(contenedor)
+
+    def _acceso_de_inicio(self, dibujito, texto, funcion):
+        """Uno de los tres accesos de la pantalla de inicio: botón azul de tamaño fijo
+        con el dibujito arriba y el nombre abajo. Van como etiquetas adentro del botón (y
+        no como ícono + texto) porque cada emoji recortado mide distinto: con el ícono, el
+        nombre quedaba a otra altura en cada botón. Colores en ui/hoja_de_estilos.py
+        (#accesoInicio); el nombre queda en accessibleName()."""
+        boton = QPushButton()
+        boton.setObjectName("accesoInicio")
+        boton.setAccessibleName(texto)
+        boton.setFixedSize(ANCHO_ACCESO, ALTO_ACCESO)
+        capa = QVBoxLayout(boton)
+        capa.setContentsMargins(8, 8, 8, 8)
+        capa.setSpacing(6)
+        icono, tamano = icono_de_emoji(dibujito, TAMANO_DIBUJITO_ACCESO)
+        dibujo = QLabel()
+        dibujo.setPixmap(icono.pixmap(tamano))
+        dibujo.setFixedHeight(round(TAMANO_DIBUJITO_ACCESO * 1.2))
+        dibujo.setAlignment(Qt.AlignCenter)
+        nombre = QLabel(texto)
+        nombre.setObjectName("nombreAcceso")
+        nombre.setAlignment(Qt.AlignCenter)
+        capa.addStretch()
+        for etiqueta in (dibujo, nombre):
+            # El clic tiene que llegarle al botón, no a la etiqueta que tiene encima.
+            etiqueta.setAttribute(Qt.WA_TransparentForMouseEvents)
+            capa.addWidget(etiqueta)
+        capa.addStretch()
+        boton.clicked.connect(funcion)
+        return boton
 
     def _armar_botones_de_la_barra(self, layout_barra):
         """El renglón de botones, de izquierda a derecha empezando por Vender y
@@ -225,7 +265,7 @@ class MainWindow(QMainWindow):
         pedido del dueño 2026-10-22; acá y no en la hoja porque Qt no tiene
         text-transform."""
         boton = QPushButton(texto.upper())
-        boton.setFixedHeight(38)
+        boton.setFixedHeight(ALTO_BOTON_BARRA)
         # Los que no son ni "primario" ni "peligro" son teclas oscuras con relieve
         # (clase "barra", ver ui/hoja_de_estilos.py).
         aplicar_clase(boton, clase or "barra")
