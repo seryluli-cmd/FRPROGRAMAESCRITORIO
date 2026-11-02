@@ -75,7 +75,7 @@ def _datos_de_la_caja(conexion, cierre) -> dict:
       apertura y los relevos de la caja (vacío si no hay caja).
     - "cambio_inicial": con cuánto cambio arrancó (cajas_repo.cambio_inicial);
       sin caja, el Cambio Fijo que tenía el cierre. Es el "Cambio Fijo" que
-      muestra la pantalla Cierre de Turno.
+      muestran la pantalla Cierre de Turno y la lista de Control de Cierres.
     - "minutos_despues_del_fin": ver _minutos_despues_del_fin.
     """
     caja = cajas_repo._caja_del_cierre(conexion, cierre["id"])

@@ -219,9 +219,15 @@ class ControlCierresWindow(QDialog):
         panel_layout.addWidget(nota_faltantes)
         self.panel_faltantes.hide()
 
+        # La plata dice lo mismo que la tarjeta de "Ver Detalle" (maqueta A, elegida
+        # por el dueño el 2026-11-02): el Cambio Fijo es con el que arrancó la caja,
+        # no el configurado, y cada número va una sola vez (A Retirar + Digital =
+        # Total). Antes había "Ventas Ef.", que siempre daba lo mismo que A Retirar,
+        # y un "Kiosko" que era el total con impresiones, mientras que en la tarjeta
+        # Kiosko va sin ellas.
         self.tabla = crear_tabla(
-            ["Fecha", "Turno", "Caja", "Responsable", "Apertura", "Cierre", "Cambio Fijo", "Ventas Ef.",
-             "Kiosko", "A Retirar", "Contado", "Diferencia"],
+            ["Fecha", "Turno", "Caja", "Responsable", "Apertura", "Cierre", "Cambio Fijo", "A Retirar",
+             "Digital", "Total", "Contado", "Diferencia"],
             estirar=3, por_filas=True,
         )
         self.tabla.doubleClicked.connect(self._ver_detalle)
@@ -233,7 +239,7 @@ class ControlCierresWindow(QDialog):
         # Justos para los títulos en negrita y espaciados de la maqueta B: así entran
         # las 12 columnas sin barra para correr de costado y Responsable no se corta.
         for columna, ancho in zip((_COLUMNA_FECHA, _COLUMNA_TURNO, _COLUMNA_CAJA, *_COLUMNAS_DE_PLATA),
-                                  (92, 90, 76, 100, 98, 84, 90, 86, 96)):
+                                  (92, 90, 76, 100, 90, 84, 98, 86, 96)):
             self.tabla.setColumnWidth(columna, ancho)
 
         self.boton_detalle = tecla("☰  VER DETALLE", self._ver_detalle, "teclaAzul")
@@ -309,6 +315,10 @@ class ControlCierresWindow(QDialog):
             item_cierre = QTableWidgetItem(texto_del_cierre(cierre))
             if cierre["cierre_forzoso"] or cierre["cerrada_en_ausencia"]:
                 item_cierre.setForeground(Qt.red)
+            # El mismo TOTAL que la tarjeta, sacado de lo grabado en el cierre. Con
+            # dominio y no con una clave nueva del repo: la lista también se abre
+            # desde otra PC y así no cambia lo que manda el mostrador.
+            total = dominio.total_cobrado(cierre["ventas_efectivo"], cierre["ventas_digital"])
             valores = [
                 QTableWidgetItem(cierre["fecha"]),
                 QTableWidgetItem(etiqueta_turno(cierre["fecha"], cierre["turno"])),
@@ -316,10 +326,10 @@ class ControlCierresWindow(QDialog):
                 QTableWidgetItem(" → ".join(cierre["responsables"])),
                 QTableWidgetItem(texto_de_la_apertura(cierre)),
                 item_cierre,
-                QTableWidgetItem(formato_pesos(cierre["fondo_cambio"])),
-                QTableWidgetItem(formato_pesos(cierre["ventas_efectivo"])),
-                QTableWidgetItem(formato_pesos(cierre["kiosko_efectivo"] + cierre["kiosko_digital"])),
+                QTableWidgetItem(formato_pesos(cierre["cambio_inicial"])),
                 QTableWidgetItem(formato_pesos(cierre["monto_a_retirar"])),
+                QTableWidgetItem(formato_pesos(cierre["ventas_digital"])),
+                QTableWidgetItem(formato_pesos(total)),
             ]
             contado = cierre["monto_contado"]
             valores.append(QTableWidgetItem(formato_pesos(contado) if contado is not None else "—"))

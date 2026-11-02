@@ -335,9 +335,10 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
 - **Control de Cierres de Turno** (`control_cierres_window.py`,
   `ControlCierresWindow`; se reexporta desde `caja_window.py`) — lista
   `turnos_repo.listar_cierres()`: Turno, Caja, Responsable, Apertura, Cierre ("A
-  horario", "Forzoso" o "en ausencia", en rojo), Cambio Fijo, Ventas Ef., Kiosko,
-  A Retirar, Contado, Diferencia (en rojo si no coincide, desde $ 0,01:
-  `dominio.coincide`). "Cargar monto contado" (solo Admin) guarda
+  horario", "Forzoso" o "en ausencia", en rojo), Cambio Fijo (con el que arrancó
+  la caja), A Retirar, Digital, Total, Contado, Diferencia (en rojo si no
+  coincide, desde $ 0,01: `dominio.coincide`). La plata dice lo mismo que la
+  tarjeta de "Ver Detalle". "Cargar monto contado" (solo Admin) guarda
   cada conteo en `verificaciones_cierre`. "Ver Detalle" muestra cada cierre con
   la misma tarjeta del Cierre de Turno (también el forzoso), cómo se cerró, la
   caja, los relevos, los conteos del sobre y las ventas. "Mandar a la app de

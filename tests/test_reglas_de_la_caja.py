@@ -51,7 +51,10 @@ LUNES = date(2026, 1, 5)
 MARTES = date(2026, 1, 6)
 
 # Columnas de la tabla de Control de Cierres.
-_COLUMNA_A_RETIRAR = 9
+_COLUMNA_CAMBIO_FIJO = 6
+_COLUMNA_A_RETIRAR = 7
+_COLUMNA_DIGITAL = 8
+_COLUMNA_TOTAL = 9
 _COLUMNA_DIFERENCIA = 11
 
 _ROJO_DEL_RESUMEN = QColor("#C62828")
@@ -236,6 +239,30 @@ class TestElMismoMontoARetirarEnTodosLados(_BaseDeLaCaja):
 
         self.assertEqual(ultimo["total"], self._datos_del_envio(cierre["id"])["importe"])
         self.assertEqual(ultimo["total"], 1600.3)
+
+
+class TestLaListaDeCierresDiceLoMismoQueVerDetalle(_BaseDeLaCaja):
+    def test_cambio_fijo_a_retirar_digital_y_total_como_en_la_tarjeta(self):
+        # Contó $ 500 menos que el Cambio Fijo de $ 50.000: la caja arrancó con
+        # $ 49.500, y eso es lo que tiene que decir la lista (antes decía el fijo).
+        relevo_repo.abrir_caja(self.lucia_id, 49500.0, _a_las(5, 55))
+        self._turno_con_centavos(self.lucia_id)
+        turnos_repo.cerrar_turno(self.lucia_id, ahora_dt=_a_las(14, 0))
+
+        control = self._ventana(ControlCierresWindow(usuarios_repo.obtener_usuario(self.admin_id)))
+        detalle = self._ventana(DialogoDetalleCierre(control.cierres[0]))
+
+        columnas = (_COLUMNA_CAMBIO_FIJO, _COLUMNA_A_RETIRAR, _COLUMNA_DIGITAL, _COLUMNA_TOTAL)
+        fila = [control.tabla.item(0, columna).text() for columna in columnas]
+        tarjeta = detalle.tarjeta
+        self.assertEqual(fila, ["$ 49.500", "$ 1.000,30", "$ 600", "$ 1.600,30"])
+        self.assertEqual(
+            fila,
+            [tarjeta.valor_fondo.text(), tarjeta.valor_retirar.text(), tarjeta.valor_digital.text(),
+             tarjeta.valor_total.text()],
+        )
+        titulos = [control.tabla.horizontalHeaderItem(columna).text() for columna in columnas]
+        self.assertEqual(titulos, ["Cambio Fijo", "A Retirar", "Digital", "Total"])
 
 
 class TestElRelevoAnunciaElMismoSobre(_BaseDeLaCaja):
