@@ -164,6 +164,12 @@ abre la base de esa carpeta: le habla al programa del mostrador.
   15 min; en cada llamada, `admin_remoto_repo.exigir_admin_habilitado`;
   `inspect.signature(...).bind` de los argumentos y el `ACTOR` se pisa con el
   usuario del token; tope de 16 MB por pedido; nunca loguea claves ni cuerpos.
+- `ui/espera_del_mostrador.py`: la espera de cada pedido (`cliente.conectar(...,
+  esperar=...)`, desde main.py). El pedido va en un hilo aparte; si no contesta en
+  0,7 s sale un cartel modal "Esperando al mostrador" con DEJAR DE ESPERAR, que es
+  como un corte (`SinRespuesta`). Desde otro hilo, o con un cartel ya abierto, se
+  espera ahí mismo. La revisión de la caja de la ventana principal (cada 10 s)
+  pregunta en su propio hilo, sin cartel.
 - `admin_remoto/codec.py`: JSON con etiquetas de una clave (`__t` tupla, `__s`
   conjunto, `__d` diccionario con claves no-texto, `__r` fila, `__dt`/`__da`
   fechas, `__b` bytes en base64). Del otro lado solo se arman esos tipos.

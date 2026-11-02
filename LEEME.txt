@@ -220,6 +220,11 @@ aviso dice que el mostrador puede haberlo guardado igual: antes de
 repetirlo, fijate si ya está (una compra, en los Movimientos del artículo
 o en su stock; un precio, en Artículos). Si repetís una compra que ya se
 grabó, queda cargada dos veces.
+Si el mostrador tarda en contestar (la red lenta, un reporte largo), en la
+otra PC sale el cartel "Esperando al mostrador" con los segundos que van:
+se cierra solo cuando llega la respuesta. "Dejar de esperar" es como un
+corte de la red: el mostrador puede haberlo guardado igual, fijate antes
+de repetirlo.
 Al terminar, cerrá sesión o cerrá el programa en la otra PC: mientras
 quede abierto, la sesión sigue abierta.
 Las empleadas no pueden entrar desde otra PC. Cada vez que entrás queda

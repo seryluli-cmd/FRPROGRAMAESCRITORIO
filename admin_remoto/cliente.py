@@ -23,7 +23,8 @@ muestran igual que en el mostrador. Sin red, o con el mostrador cerrado, es
 SinConexion (un ValueError: las pantallas lo muestran como un aviso, no como un
 error del programa). Si el pedido ya había salido y lo que se cortó fue la
 espera de la respuesta, es SinRespuesta (una SinConexion): el mostrador pudo
-haberlo hecho, y el aviso dice que se fije antes de repetirlo.
+haberlo hecho, y el aviso dice que se fije antes de repetirlo. Lo mismo si se
+dejó de esperar en el cartel de ui/espera_del_mostrador.py.
 """
 
 import http.client
@@ -81,6 +82,12 @@ def _mandar(pedido, espera: float) -> bytes:
         return error.read()
 
 
+def _esperar_aca_mismo(trabajo, *argumentos):
+    """Sin nadie que espere aparte (las pruebas, o antes de que haya pantallas): el
+    pedido se hace y se espera en el mismo hilo."""
+    return trabajo(*argumentos)
+
+
 class SinConexion(ValueError):
     """No se pudo hablar con el FRKiosko del mostrador."""
 
@@ -106,13 +113,18 @@ class _ErrorDelMostrador(Exception):
 class ConexionConElMostrador:
     """La charla con el FRKiosko de una PC del local (su nombre o su IP)."""
 
-    def __init__(self, mostrador: str, puerto: int = PUERTO, huella: str = None):
+    def __init__(self, mostrador: str, puerto: int = PUERTO, huella: str = None, esperar=None):
         self.mostrador = mostrador
         self._base = f"http://{mostrador}:{puerto}/admin/"
         # La huella se calcula ANTES de reemplazar los repos (después, las
         # funciones de la lista serían los representantes).
         self._huella = huella or lista_blanca.huella()
         self._token = None
+        # Quién espera cada respuesta: `esperar(_mandar, pedido, espera)` devuelve
+        # lo que devuelve _mandar o levanta su error. main.py le pasa
+        # ui.espera_del_mostrador.esperar, que no traba la pantalla mientras el
+        # mostrador contesta. Llega de afuera porque este paquete no sabe de Qt.
+        self._esperar = esperar or _esperar_aca_mismo
 
     # --- el ida y vuelta ---------------------------------------------------
 
@@ -135,7 +147,7 @@ class ConexionConElMostrador:
         # espacio, en un acceso directo con --mostrador "PC MOSTRADOR") sale ANTES
         # de mandar nada, pero urllib no la envuelve porque no es un OSError.
         try:
-            contenido = _mandar(pedido, espera)
+            contenido = self._esperar(_mandar, pedido, espera)
         except urllib.error.URLError as error:
             raise SinConexion(
                 f"No encuentro el FRKiosko del mostrador ({self.mostrador}). Fijate que esa PC esté "
@@ -326,14 +338,15 @@ def desinstalar():
     modo.desactivar()
 
 
-def conectar(mostrador: str, puerto: int = PUERTO, huella: str = None) -> ConexionConElMostrador:
+def conectar(mostrador: str, puerto: int = PUERTO, huella: str = None, esperar=None) -> ConexionConElMostrador:
     """
     Se presenta al mostrador y, si todo está bien, devuelve la conexión lista
     para instalar(). Si no, una excepción con el mensaje para mostrar:
     SinConexion (no está), PermissionError (entrada apagada u otra versión).
     `huella` es para las pruebas (la de "otro programa"); si no, la de este.
+    `esperar`: ver ConexionConElMostrador.
     """
-    conexion = ConexionConElMostrador(mostrador, puerto, huella)
+    conexion = ConexionConElMostrador(mostrador, puerto, huella, esperar)
     respuesta = conexion.hola()
     if not respuesta.get("misma_version"):
         raise PermissionError(

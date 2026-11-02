@@ -32,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -952,6 +953,48 @@ class TestCopiaRemota(unittest.TestCase):
         self.addCleanup(ventana.close)
         self.assertEqual(errores, [])
         return ventana
+
+    def _hasta_que(self, condicion, segundos=5.0):
+        """Deja andar la pantalla (sus QTimer incluidos) hasta que se cumple `condicion`."""
+        limite = time.monotonic() + segundos
+        while not condicion():
+            if time.monotonic() > limite:
+                self.fail("La pantalla no mostró la respuesta a tiempo.")
+            QApplication.processEvents()
+            time.sleep(0.01)
+
+    def test_la_revision_de_la_caja_pregunta_en_un_hilo_y_no_traba_la_pantalla(self):
+        from repositories import relevo_repo
+        ventana = self._ventana_principal()
+        suelta, preguntas = threading.Event(), []
+        self.addCleanup(suelta.set)
+
+        def mostrador_lento():
+            preguntas.append(threading.current_thread() is threading.main_thread())
+            suelta.wait(10)
+            return None  # sin caja abierta
+
+        with mock.patch.object(relevo_repo, "estado_de_la_caja", mostrador_lento):
+            ventana._mostrar_texto_de_la_caja("·  antes de la revisión")
+            antes = time.monotonic()
+            ventana._revisar_la_caja()
+            ventana._revisar_la_caja()  # la anterior no volvió: no se pregunta otra vez
+            self.assertLess(time.monotonic() - antes, 0.5)
+            self.assertEqual(ventana.etiqueta_caja.text(), "·  antes de la revisión")
+            suelta.set()
+            self._hasta_que(lambda: "Sin caja abierta" in ventana.etiqueta_caja.text())
+        self.assertEqual(preguntas, [False])
+
+    def test_si_el_mostrador_no_contesta_la_revision_dice_sin_conexion(self):
+        from repositories import relevo_repo
+
+        def sin_mostrador():
+            raise cliente.SinConexion("No encuentro el FRKiosko del mostrador.")
+
+        ventana = self._ventana_principal()
+        with mock.patch.object(relevo_repo, "estado_de_la_caja", sin_mostrador):
+            ventana._revisar_la_caja()
+            self._hasta_que(lambda: "Sin conexión con el mostrador" in ventana.etiqueta_caja.text())
 
     def test_la_pantalla_principal_remota_es_solo_kiosko(self):
         ventana = self._ventana_principal()

@@ -202,7 +202,8 @@ pantallas (margen de Artículos, stock bajo el mínimo y la fila TOTAL de Report
 `tests/test_cuentas_de_articulos_y_reportes.py`), la tabla de configuración y lo
 cobrado por medio en cada venta (`tests/test_config_repo.py`), la base de
 prueba, el formato de pesos, el aspecto de las pantallas y que los botones que
-esperan la red no congelen el mostrador (`tests/test_en_segundo_plano.py`).
+esperan la red no congelen el mostrador (`tests/test_en_segundo_plano.py`), ni la
+copia de otra PC mientras el mostrador contesta (`tests/test_espera_del_mostrador.py`).
 Todo lo que se calcule con plata, fechas o turnos entra ahí antes de darse por
 terminado. La UI se prueba a mano; la lógica, no.
 
@@ -292,6 +293,7 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `ui.utils.formato_fecha_hora(fecha)` | una fecha con hora de la base se convierte en `"16/10/2026 22:13"` |
 | `ui.utils.manejar_errores` | se atrapa un error de una acción de pantalla |
 | `ui.en_segundo_plano.EnSegundoPlano(ventana, teclas)` · `.arrancar(trabajo, *argumentos, al_terminar=...)` | un botón espera la red o una carpeta de red sin congelar el mostrador: la función del repo corre en un hilo daemon aparte, un QTimer de la ventana mira cada 100 ms si terminó, las teclas que mandan algo se apagan (Cerrar no), el cursor ocupado es solo de esa ventana y otro clic o un Enter no arrancan otra vez. `al_terminar(respuesta)` recibe una `Respuesta`: `respuesta.valor()` da lo que devolvió o levanta su error, y con `@manejar_errores` sale el mismo cartel que con la llamada directa. Si la ventana se cerró antes, no se muestra nada, pero un error inesperado igual va a `data_fr/errores.log`. Al hilo van solo la función del repo y datos, nunca un widget (ver la trampa del recolector cíclico). Lo usan "Probar la conexión" y "Reintentar ahora" (`ui/envio_pwa_dialogo.py`) y Copias de Seguridad (copia ahora, copia al pendrive y "Agregar" otra carpeta, que no se cierra mientras prueba). Ver `tests/test_en_segundo_plano.py` |
+| `ui.espera_del_mostrador.esperar(trabajo, *argumentos)` · `.CartelEsperandoAlMostrador` · `.SeDejoDeEsperar` | la copia abierta desde otra PC espera cada pedido al mostrador sin trabarse: `admin_remoto.cliente.ConexionConElMostrador` recibe `esperar` (se lo pasa `main._conectar_con_el_mostrador`; el paquete `admin_remoto` no sabe de Qt) y le da `_mandar` y el pedido. El pedido corre en un hilo aparte (mismas `_correr` y `Respuesta` de `ui.en_segundo_plano`); si tarda más de `SEGUNDOS_SIN_CARTEL` (0,7 s) sale el cartel modal "Esperando al mostrador" con los segundos y DEJAR DE ESPERAR (también Esc y la cruz), que levanta `SeDejoDeEsperar`, un TimeoutError: `_pedir` lo convierte en `SinRespuesta` (o en "no contestó a tiempo" al entrar), porque el mostrador pudo haberlo hecho. El cartel va sin ventana madre (la del frente puede tener un deleteLater pendiente y se lo llevaría). Desde otro hilo, o con un cartel ya abierto, se espera ahí mismo (nunca un cartel encima de otro). La revisión de la caja de `MainWindow` cada 10 s, desde otra PC, pregunta en su propio hilo (`_preguntar_la_caja_al_mostrador`), sin cartel: si no, saldría solo con el mostrador cerrado. Ver `tests/test_espera_del_mostrador.py` |
 | `ui.utils.encadenar_enter(...)` | se arma el salto de campo en campo con Enter, como Tab, y la acción del último campo (todo formulario lo usa). Descarta el Enter repetido de una tecla que quedó apretada. Ojo: en un QSpinBox/QDoubleSpinBox/QDateEdit/QComboBox editable el Enter del teclado le llega al campo de AFUERA, no a su `lineEdit()`; una prueba que le manda el Enter al `lineEdit()` pasa aunque en el mostrador no ande. Ver `TestDondeLlegaElEnter` |
 | `ui.utils.aplicar_clase(widget, clase)` | un botón se marca como primario/peligro/barra |
 | `ui.piezas_ventana.cabecera_oscura(...)` · `.agregar_pastilla(...)` · `.panel_blanco()` · `.titulo_de_seccion(...)` · `.tarjeta_de_menu(...)` · `.bloquear_tarjeta(...)` · `.tecla(...)` · `.cifra_destacada(...)` | se arma una ventana con el diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26 (Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno): cabecera oscura como la barra, con estela celeste y pastillas con números; paneles blancos; tarjetas de menú (dibujito, título y para qué es; la que solo usa el Admin, con candado y "Solo el Administrador"); teclas con relieve (`teclaAzul` lo principal, `teclaRoja` lo peligroso y Cerrar). Los colores van en `ui/hoja_de_estilos.py`, siempre por objectName o "clase" (y `>` para las etiquetas de un panel): los avisos que se abren encima son hijos de la ventana y no heredan nada (`test_estilo_ui`). El título de una tarjeta está en `accessibleName()`, y por ahí la buscan las pruebas |
@@ -484,7 +486,11 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   repetirlo. No lo juntes con el "No encuentro el FRKiosko del mostrador", que es
   solo para cuando el pedido no llegó (repetir a ciegas una compra la carga dos
   veces y suma el stock doble; lo vigila `TestSeCortaEsperandoLaRespuesta`). El
-  saludo y el ingreso no graban nada: ahí un corte da un aviso neutro.
+  saludo y el ingreso no graban nada: ahí un corte da un aviso neutro. DEJAR DE
+  ESPERAR en el cartel de `ui/espera_del_mostrador.py` cuenta como un corte;
+  (7) cada pedido de la copia remota se espera en un hilo aparte con ese cartel:
+  no lo vuelvas a esperar en el hilo de la pantalla (la copia quedaba "No
+  responde" hasta 60 s).
 - **El servidor de red no debe tocar Qt.** Usa conexiones SQLite propias desde
   sus hilos y registra fallos inesperados con `errores.registrar_error`, sin
   incluir claves ni el cuerpo de los pedidos en el contexto del log. Su puerto
@@ -651,8 +657,8 @@ Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
 mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 10 minutos y la plata en miles sin centavos ("$ 1.500").
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 753 pruebas
-al 2026-10-31 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
+La suite se ejecuta con `python -m unittest discover tests` y tiene 803 pruebas
+al 2026-11-02 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
 

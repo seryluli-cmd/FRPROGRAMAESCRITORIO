@@ -4,6 +4,8 @@ La copia para administrar desde otra PC conserva las mismas pantallas de
 consulta y gestión. Los cobros y el cierre de turno se hacen en el mostrador.
 """
 
+import threading
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
 )
@@ -24,6 +26,7 @@ from ui.usuarios_window import DialogoCambiarClave
 from ui.ingreso_caja import mensaje_del_sobre
 from ui.lista_compras_window import VentanaListaDeCompras
 from ui.vuelta_del_admin import VueltaDelAdmin
+from ui.en_segundo_plano import MILISEGUNDOS_ENTRE_VISTAS, Respuesta, _correr
 from ui.utils import (
     aplicar_clase, icono_de_emoji, mostrar_error, mostrar_info, solo_en_el_mostrador,
 )
@@ -100,6 +103,12 @@ class MainWindow(QMainWindow):
         self._timer_parpadeo.setInterval(INTERVALO_PARPADEO_MS)
         self._timer_parpadeo.timeout.connect(self._parpadear)
         self._timer_parpadeo.start()
+        # Desde otra PC, la pregunta de cada revisión va en un hilo aparte (ver
+        # _preguntar_la_caja_al_mostrador): (hilo, resultado) mientras no contesta.
+        self._pregunta_de_la_caja = None
+        self._timer_respuesta_caja = QTimer(self)
+        self._timer_respuesta_caja.setInterval(MILISEGUNDOS_ENTRE_VISTAS)
+        self._timer_respuesta_caja.timeout.connect(self._ver_si_contesto_la_caja)
         # Desde otra PC no: ahí no hay una empleada a la que volver.
         self._vuelta = None
         if self.es_admin and not self._remota:
@@ -293,6 +302,12 @@ class MainWindow(QMainWindow):
         botón Cierre de Turno titila. Devuelve el estado (ver
         relevo_repo.estado_de_la_caja) o None si no hay caja abierta."""
         estado = relevo_repo.estado_de_la_caja()
+        self._poner_estado_de_la_caja(estado)
+        return estado
+
+    def _poner_estado_de_la_caja(self, estado):
+        """Muestra `estado` (ver relevo_repo.estado_de_la_caja) al lado del nombre y
+        decide si el botón Cierre de Turno titila."""
         if estado is None:
             self._mostrar_texto_de_la_caja("·  Sin caja abierta" if self.es_admin else "")
         elif self.es_admin or estado["responsable_id"] != self.usuario["id"]:
@@ -302,7 +317,6 @@ class MainWindow(QMainWindow):
         else:
             self._mostrar_texto_de_la_caja(f"·  Caja Nº {estado['caja_numero']} · {estado['turno_label']}")
         self._titilar = bool(estado and estado["titilar"])
-        return estado
 
     def _mostrar_texto_de_la_caja(self, texto: str):
         """La caja, al lado del nombre (escondida si no hay nada que decir)."""
@@ -310,10 +324,44 @@ class MainWindow(QMainWindow):
         self.etiqueta_caja.setVisible(bool(texto))
 
     def _mostrar_la_caja_del_mostrador(self):
-        """Desde otra PC: el número de caja que ve el mostrador, o que no hay
-        conexión (sin carteles: se vuelve a probar en la próxima revisión)."""
+        """Desde otra PC, al abrir la ventana: el número de caja que ve el mostrador,
+        o que no hay conexión (sin carteles: se vuelve a probar en la próxima
+        revisión, ver _preguntar_la_caja_al_mostrador)."""
         try:
             self._actualizar_estado_de_la_caja()
+        except (ValueError, PermissionError):  # sin red, o se cerró la sesión en el mostrador
+            self._mostrar_texto_de_la_caja("·  Sin conexión con el mostrador")
+
+    def _preguntar_la_caja_al_mostrador(self):
+        """
+        Desde otra PC, en cada revisión: la pregunta va en un hilo aparte y la
+        respuesta se muestra cuando llega (_ver_si_contesto_la_caja). Esperada en el
+        hilo de la pantalla, con el mostrador cerrado o la red lenta la copia se
+        trababa cada 10 segundos aunque nadie tocara nada (y en un hilo tampoco sale
+        el cartel de ui/espera_del_mostrador.py, que acá aparecería solo). Mientras
+        la anterior no vuelve, no se pregunta de nuevo.
+        """
+        if self._pregunta_de_la_caja is not None:
+            return
+        resultado = {}
+        # Al hilo va la función del repo (en la copia remota, la que le pregunta al
+        # mostrador) y el dict, nunca la ventana (ver ui/en_segundo_plano.py).
+        hilo = threading.Thread(
+            target=_correr, args=(relevo_repo.estado_de_la_caja, (), resultado),
+            name="caja-del-mostrador", daemon=True,
+        )
+        self._pregunta_de_la_caja = (hilo, resultado)
+        hilo.start()
+        self._timer_respuesta_caja.start()
+
+    def _ver_si_contesto_la_caja(self):
+        hilo, resultado = self._pregunta_de_la_caja
+        if hilo.is_alive():
+            return
+        self._timer_respuesta_caja.stop()
+        self._pregunta_de_la_caja = None
+        try:
+            self._poner_estado_de_la_caja(Respuesta(resultado).valor())
         except (ValueError, PermissionError):  # sin red, o se cerró la sesión en el mostrador
             self._mostrar_texto_de_la_caja("·  Sin conexión con el mostrador")
 
@@ -355,7 +403,7 @@ class MainWindow(QMainWindow):
         el cierre forzoso lo hace el mostrador.
         """
         if self._remota:
-            self._mostrar_la_caja_del_mostrador()
+            self._preguntar_la_caja_al_mostrador()
             return
         try:
             estado = self._actualizar_estado_de_la_caja()

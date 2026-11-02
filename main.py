@@ -36,6 +36,7 @@ from admin_remoto import cliente as cliente_remoto, modo as modo_remoto
 from database import inicializar_base_de_datos
 from repositories import copias_repo, envio_pwa_repo
 from servidor_red import iniciar_servidor
+from ui import espera_del_mostrador
 from ui.hoja_de_estilos import HOJA_DE_ESTILOS
 from ui.ingreso_caja import resolver_caja_al_entrar
 from ui.login_window import LoginWindow
@@ -317,7 +318,9 @@ def _conectar_con_el_mostrador(mostrador: str):
     .exe).
     """
     try:
-        conexion = cliente_remoto.conectar(mostrador)
+        # Cada pedido al mostrador se espera sin trabar la pantalla (con un cartel si
+        # tarda): ver ui/espera_del_mostrador.py.
+        conexion = cliente_remoto.conectar(mostrador, esperar=espera_del_mostrador.esperar)
     except (ValueError, PermissionError) as error:
         QMessageBox.warning(None, "Administrar desde otra PC", str(error))
         return None
