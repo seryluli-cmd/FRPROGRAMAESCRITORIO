@@ -222,8 +222,12 @@ ingreso (el Admin se queda). Si hay un cobro a medias, espera.
   el dueño: total y COBRAR grandes a la derecha, dibujos en `ui/ventas_dibujos.py`)
   — escaneo por código de barras (Enter en el campo código dispara
   `_escanear()`; Enter con el campo vacío y carrito no vacío pasa directo a
-  cobrar). Atajos F5/F6/F7 abren el buscador (`buscar_articulo.py`) por
-  código/descripción/marca. Botón `*` "Cant." fija la cantidad para el próximo
+  cobrar). F6 Descripción y F7 Marca cambian lo que busca ESE MISMO campo, sin
+  abrir otra ventana (pedido del dueño, 2026-11-02; `ui/venta_buscador.py`): el
+  dibujo de la izquierda pasa a "ABC" o a una etiqueta, y lo encontrado sale en
+  una lista debajo del campo que se elige con las flechas y Enter (o un clic). F5
+  Código (o Esc con el campo vacío) vuelve al código de barras; la pistola anda
+  en los tres. Botón `*` "Cant." fija la cantidad para el próximo
   escaneo. Doble clic en $ Unit. **solo si es Admin**. Avisa (no bloquea) si el
   stock proyectado queda por debajo de `stock_minimo`. Cobra con
   `ui/dialogo_pago.DialogoPago`: Efectivo y Digital siempre a la vista y suman
@@ -301,7 +305,8 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   o menos (`dominio.articulos_para_comprar`, sin Impresiones), de la A a la Z,
   con filtro por rubro, para imprimirlos con una columna "Comprar" vacía.
 - **Compras** (`compras_window.py`, `ComprasWindow`) — carga de mercadería por
-  escaneo (mismos F5/F6/F7 que Ventas). Al escanear pide cantidad y costo.
+  escaneo (F5/F6/F7 abren el cuadro de búsqueda de `buscar_articulo.py`). Al
+  escanear pide cantidad y costo.
   Confirmar llama a `compras_repo.registrar_compra` con todo el lote junto.
 - **Consulta de Ventas** (`consulta_ventas_window.py`,
   `ConsultaVentasWindow`) — últimas 100 ventas, resalta ANULADA. "Anular venta"

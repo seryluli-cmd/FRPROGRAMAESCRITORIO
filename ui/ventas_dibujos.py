@@ -3,18 +3,19 @@ ventas_dibujos.py
 ===================
 Los dibujos del diseño de Venta de Mercadería que eligió el dueño (2026-10-26,
 la maqueta "B": el total y COBRAR siempre grandes a la derecha): las teclas con
-la tecla marcada aparte ("F5" en un recuadro azul y "Código" al lado), el código
-de barras de adentro del campo de escaneo y el renglón del carrito con el código
-y el precio por unidad chiquitos debajo del producto.
+la tecla marcada aparte ("F5" en un recuadro azul y "Código" al lado), el dibujo
+de adentro del campo de escaneo (el código de barras, o "ABC" y la etiqueta cuando
+busca por descripción o por marca) y el renglón del carrito con el código y el
+precio por unidad chiquitos debajo del producto.
 
 Se dibujan con QPainter: un emoji puede salir como un rectángulo en el Windows
 del mostrador (pasó en CYBERCONTROL con el cubito de hielo 🧊 del botón
 DESCONGELAR, que por eso pasó a ser un copo de nieve dibujado).
 """
 
-from PySide6.QtCore import QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPixmap
-from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPixmap, QPolygonF
+from PySide6.QtWidgets import QPushButton, QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 # Se dibujan al doble y Qt los muestra a su tamaño: así salen prolijos también con la
 # escala de Windows al 125 % o al 150 %.
@@ -59,22 +60,79 @@ def icono_de_tecla(tecla: str):
     return QIcon(dibujo), QSize(ancho, ALTO_TECLA)
 
 
-def icono_codigo_de_barras() -> QIcon:
-    """Un código de barras azul (rayas de distinto grueso), para adentro del campo
-    donde se escanea."""
-    lado = 24 * _ESCALA
-    dibujo = QPixmap(lado, lado)
+def boton_con_tecla(tecla: str, nombre: str) -> QPushButton:
+    """Un botón con su tecla dibujada adelante, como F5/F6/F7."""
+    boton = QPushButton(nombre)
+    icono, tamano = icono_de_tecla(tecla)
+    boton.setIcon(icono)
+    boton.setIconSize(tamano)
+    return boton
+
+
+# Los dibujos de adentro del campo de escaneo. Van en una etiqueta propia y no como
+# ícono del campo (QLineEdit.addAction): ahí Qt los achica a 16 px y "ABC" no se leía.
+ANCHO_DIBUJO_CAMPO = 30
+ALTO_DIBUJO_CAMPO = 22
+
+
+def _lienzo():
+    dibujo = QPixmap(ANCHO_DIBUJO_CAMPO * _ESCALA, ALTO_DIBUJO_CAMPO * _ESCALA)
     dibujo.fill(Qt.transparent)
+    return dibujo
+
+
+def _terminado(pincel, dibujo) -> QPixmap:
+    pincel.end()
+    dibujo.setDevicePixelRatio(_ESCALA)
+    return dibujo
+
+
+def dibujo_codigo_de_barras() -> QPixmap:
+    """Un código de barras azul (rayas de distinto grueso): el campo espera la pistola."""
+    dibujo = _lienzo()
     pincel = QPainter(dibujo)
     pincel.setPen(Qt.NoPen)
     pincel.setBrush(QColor(COLOR_BARRAS))
-    x = 2.5 * _ESCALA
-    for grueso, espacio in ((2, 1), (1, 1), (2, 1), (1, 2), (3, 1), (1, 1), (2, 0)):
-        pincel.drawRect(QRectF(x, 4 * _ESCALA, grueso * _ESCALA, 16 * _ESCALA))
+    x = 3 * _ESCALA
+    for grueso, espacio in ((2, 1), (1, 1), (2, 1), (1, 2), (3, 1), (1, 1), (2, 1), (1, 1), (2, 0)):
+        pincel.drawRect(QRectF(x, 2 * _ESCALA, grueso * _ESCALA, 18 * _ESCALA))
         x += (grueso + espacio) * _ESCALA
-    pincel.end()
-    dibujo.setDevicePixelRatio(_ESCALA)
-    return QIcon(dibujo)
+    return _terminado(pincel, dibujo)
+
+
+def dibujo_abc() -> QPixmap:
+    """"ABC" en azul: el campo busca por descripción, se escribe el nombre del producto
+    (pedido del dueño, 2026-11-02)."""
+    dibujo = _lienzo()
+    fuente = QFont()
+    fuente.setBold(True)
+    fuente.setPixelSize(15 * _ESCALA)
+    # Que entre a lo ancho con la letra que tenga la PC.
+    ancho_maximo = ANCHO_DIBUJO_CAMPO * _ESCALA
+    while QFontMetrics(fuente).horizontalAdvance("ABC") > ancho_maximo and fuente.pixelSize() > 8 * _ESCALA:
+        fuente.setPixelSize(fuente.pixelSize() - 1)
+    pincel = QPainter(dibujo)
+    pincel.setRenderHint(QPainter.TextAntialiasing)
+    pincel.setFont(fuente)
+    pincel.setPen(QColor(COLOR_BARRAS))
+    pincel.drawText(QRectF(0, 0, dibujo.width(), dibujo.height()), Qt.AlignCenter, "ABC")
+    return _terminado(pincel, dibujo)
+
+
+def dibujo_de_marca() -> QPixmap:
+    """Una etiqueta azul con su agujerito: el campo busca por marca."""
+    dibujo = _lienzo()
+    e = _ESCALA
+    etiqueta = QPainterPath()
+    etiqueta.addPolygon(QPolygonF([QPointF(2 * e, 11 * e), QPointF(10 * e, 3 * e), QPointF(28 * e, 3 * e),
+                                   QPointF(28 * e, 19 * e), QPointF(10 * e, 19 * e)]))
+    etiqueta.closeSubpath()
+    agujero = QPainterPath()
+    agujero.addEllipse(QPointF(10.5 * e, 11 * e), 2.5 * e, 2.5 * e)
+    pincel = QPainter(dibujo)
+    pincel.setRenderHint(QPainter.Antialiasing)
+    pincel.fillPath(etiqueta.subtracted(agujero), QColor(COLOR_BARRAS))
+    return _terminado(pincel, dibujo)
 
 
 class DelegadoProducto(QStyledItemDelegate):
