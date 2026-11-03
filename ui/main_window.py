@@ -5,11 +5,13 @@ consulta y gestión. Los cobros y el cierre de turno se hacen en el mostrador.
 """
 
 import threading
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QRect, QTimer
+from PySide6.QtGui import QColor, QPainter, QPixmap
 
 import dominio
 from admin_remoto import modo as modo_remoto
@@ -56,6 +58,57 @@ ANCHO_ACCESO = 240
 ALTO_ACCESO = 110
 SEPARACION_ACCESOS = 20
 TAMANO_DIBUJITO_ACCESO = 34
+# La foto del kiosko de noche que va de fondo en toda la ventana (la eligió el dueño,
+# 2026-11-03). Está en assets, junto al código, como el ícono de ui/login_window.py
+# (Kiosko.spec mete la carpeta entera en el .exe). Si faltara, el fondo es este azul
+# oscuro: el título del inicio es claro y sobre el gris de siempre no se leería.
+RUTA_FONDO_INICIO = Path(__file__).resolve().parent.parent / "assets" / "fondo_inicio.jpg"
+COLOR_SIN_FONDO = "#0E1A33"
+# Lo que separa el panel del título y los accesos del borde de la foto.
+MARGEN_DEL_PANEL = 16
+
+
+class FondoDelInicio(QWidget):
+    """El widget de toda la ventana principal, con la foto de fondo. La foto tapa
+    la ventana entera sin deformarse: se agranda hasta cubrirla y se recorta lo que
+    sobra de los costados (o de arriba y abajo), siempre centrada. La agrandada se
+    guarda y se rehace solo si cambia el tamaño: agrandarla en cada repintada le
+    costaría a la PC con cada botón que titila."""
+
+    # La foto y la agrandada son UNA para todo el programa, no una por ventana: la
+    # ventana principal se vuelve a armar con cada "🔄 Operador" y con la vuelta sola
+    # del Admin, y la del Admin, ya cerrada, sigue viva (VueltaDelAdmin la tiene
+    # agarrada): con una agrandada propia, cada salida del Admin dejaba ~8 MB en la
+    # memoria del mostrador. Se lee al armar la primera ventana y no al importar el
+    # módulo: un QPixmap antes de que exista la QApplication cierra el programa.
+    _foto = None
+    _agrandada = None
+    _agrandada_para = None  # (ancho, alto) en puntos reales de la pantalla
+
+    def __init__(self):
+        super().__init__()
+        if FondoDelInicio._foto is None:
+            FondoDelInicio._foto = QPixmap(str(RUTA_FONDO_INICIO))
+
+    def paintEvent(self, _evento):
+        pintor = QPainter(self)
+        foto = FondoDelInicio._foto
+        if foto.isNull():
+            pintor.fillRect(self.rect(), QColor(COLOR_SIN_FONDO))
+            pintor.end()
+            return
+        # En puntos reales de la pantalla: con Windows al 125% la ventana mide menos
+        # "píxeles" que los que se ven, y agrandada a ese tamaño la foto saldría borrosa.
+        escala = self.devicePixelRatioF()
+        ancho, alto = round(self.width() * escala), round(self.height() * escala)
+        if FondoDelInicio._agrandada_para != (ancho, alto):
+            FondoDelInicio._agrandada = foto.scaled(ancho, alto, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            FondoDelInicio._agrandada_para = (ancho, alto)
+        agrandada = FondoDelInicio._agrandada
+        sobra_x = (agrandada.width() - ancho) // 2
+        sobra_y = (agrandada.height() - alto) // 2
+        pintor.drawPixmap(self.rect(), agrandada, QRect(sobra_x, sobra_y, ancho, alto))
+        pintor.end()
 
 
 class MainWindow(QMainWindow):
@@ -163,7 +216,7 @@ class MainWindow(QMainWindow):
         self._armar_botones_de_la_barra(botones)
         barra.setLayout(layout_barra)
 
-        contenedor = QWidget()
+        contenedor = FondoDelInicio()
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(12)
@@ -171,14 +224,25 @@ class MainWindow(QMainWindow):
 
         inicio = QFrame()
         inicio.setObjectName("inicioKiosko")
-        columna_inicio = QVBoxLayout(inicio)
-        columna_inicio.setContentsMargins(28, 24, 28, 24)
+        lugar_del_panel = QVBoxLayout(inicio)
+        lugar_del_panel.setContentsMargins(MARGEN_DEL_PANEL, MARGEN_DEL_PANEL, MARGEN_DEL_PANEL, MARGEN_DEL_PANEL)
+        # El título y los accesos van en un panel oscuro medio transparente, como los
+        # cuadros de vidrio de la foto de fondo: sueltos sobre la foto, el título caía
+        # encima de los paquetes del estante y no se leía. El panel mide lo que su
+        # contenido (no toda la pantalla) y queda arriba a la izquierda.
+        panel = QFrame()
+        panel.setObjectName("panelInicio")
+        lugar_del_panel.addWidget(panel, 0, Qt.AlignLeft | Qt.AlignTop)
+        columna_inicio = QVBoxLayout(panel)
+        columna_inicio.setContentsMargins(24, 20, 24, 24)
         columna_inicio.setSpacing(12)
+        # Letra clara sobre la foto de fondo: "#tituloInicio" y "#detalleInicio" en
+        # ui/hoja_de_estilos.py.
         titulo_inicio = QLabel("KIOSKO")
-        titulo_inicio.setStyleSheet("font-size: 28px; font-weight: 800; color: #263B5A;")
+        titulo_inicio.setObjectName("tituloInicio")
         columna_inicio.addWidget(titulo_inicio)
         descripcion = QLabel("Venta de mercadería, impresiones y control de caja")
-        descripcion.setStyleSheet("font-size: 15px; color: #58677D;")
+        descripcion.setObjectName("detalleInicio")
         columna_inicio.addWidget(descripcion)
         columna_inicio.addSpacing(16)
         accesos = QVBoxLayout()
@@ -193,7 +257,6 @@ class MainWindow(QMainWindow):
             # Sin AlignLeft, un botón de tamaño fijo queda centrado en la fila.
             accesos.addWidget(self._acceso_de_inicio(dibujito, texto, accion), 0, Qt.AlignLeft)
         columna_inicio.addLayout(accesos)
-        columna_inicio.addStretch()
         layout.addWidget(inicio, 1)
         contenedor.setLayout(layout)
         self.setCentralWidget(contenedor)

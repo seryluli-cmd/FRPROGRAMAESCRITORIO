@@ -87,7 +87,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 | [tests/](tests/) | Tests de repositorios, servidor y UI sobre bases SQLite temporales (no tocan `data_fr/kiosko.db`). |
 | [armar_base_de_prueba.py](armar_base_de_prueba.py) | Arma la base de prueba en `data_prueba/` (un año inventado); se abre con `python main.py --base data_prueba`. Ver "Cómo probarlo en local". |
 | [Kiosko.spec](Kiosko.spec) | Config de PyInstaller para generar `dist/FRKiosko.exe`. |
-| [assets/](assets/) | Ícono de la app: el carrito (elegido por el dueño el 2026-10-28). Se dibuja en `icono.svg`; `icono.ico` y `icono.png` salen de ahí con `python assets/armar_icono.py`. |
+| [assets/](assets/) | Ícono de la app: el carrito (elegido por el dueño el 2026-10-28). Se dibuja en `icono.svg`; `icono.ico` y `icono.png` salen de ahí con `python assets/armar_icono.py`. Y `fondo_inicio.jpg`, la foto del kiosko de noche que va de fondo en la ventana principal (la eligió el dueño el 2026-11-03; la dibuja `ui/main_window.FondoDelInicio`). |
 | `data_fr/backups/` | Copias automáticas de la base (después de cada Cierre de Turno y cada 8 horas; todas las de 3 días y una por día hasta 30). |
 
 ## Modelo de datos (SQLite, `database_esquema.py`)
@@ -203,7 +203,10 @@ botones para todos (Vender, Impresiones, Admin Kiosko, Config ADMIN, Caja, Cierr
 de Turno, Clave y Operador; los que no le tocan a alguien se ven igual y no
 hacen nada) y, debajo, un panel de inicio con cinco accesos grandes, uno debajo
 del otro (Venta de Mercadería, Impresiones, Caja, Gestión Impresiones y Pedidos de
-Clientes). Cada módulo se abre como un diálogo modal.
+Clientes). Todo va sobre una foto del kiosko de noche que tapa la ventana entera
+(sin deformarse: se recorta lo que sobra); el título y los accesos van en un panel
+oscuro medio transparente arriba a la izquierda, para que se lean sobre la foto.
+Cada módulo se abre como un diálogo modal.
 
 **Ingreso con caja** (`ui/ingreso_caja.py`, entre el login y la ventana
 principal; reglas en `relevo_repo.situacion_al_entrar`). Una empleada no entra

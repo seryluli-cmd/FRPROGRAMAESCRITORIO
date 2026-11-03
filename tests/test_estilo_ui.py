@@ -6,8 +6,9 @@ de Qt): que se le pida a Qt el esquema de color CLARO aunque Windows esté en mo
 oscuro (si no, los cuadros que la hoja de estilos no pinta salen negros con la letra
 oscura encima), que las tablas no muestren la numeración de filas, que la barra
 oscura de arriba use sus teclas (y que Cierre de Turno no cambie de tamaño al
-titilar) y que los avisos que abren las ventanas del diseño nuevo no hereden su
-estilo.
+titilar), que el inicio tenga la foto de fondo sin deformarla, con el título y los
+accesos en un panel oscuro, y que los avisos que abren las ventanas del diseño
+nuevo no hereden su estilo.
 
 Se ejecutan con:
 
@@ -20,8 +21,8 @@ from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtGui import QPalette  # noqa: E402
+from PySide6.QtCore import QPoint, QRect, Qt  # noqa: E402
+from PySide6.QtGui import QPalette, QPixmap  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QAbstractItemView, QApplication, QDialog, QFrame, QLabel, QLineEdit, QPushButton, QStyle,
     QStyleOptionFrame, QTableWidgetItem, QVBoxLayout,
@@ -31,7 +32,9 @@ import dominio  # noqa: E402
 import main as programa  # noqa: E402
 from repositories import usuarios_repo  # noqa: E402
 from ui.login_window import LoginWindow  # noqa: E402
-from ui.main_window import MainWindow  # noqa: E402
+from ui.main_window import (  # noqa: E402
+    COLOR_SIN_FONDO, MARGEN_DEL_PANEL, RUTA_FONDO_INICIO, FondoDelInicio, MainWindow,
+)
 from ui.utils import crear_tabla, icono_de_emoji  # noqa: E402
 from ui.caja_window import CajaWindow, CierreTurnoWindow  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
@@ -143,6 +146,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         # Pedido del dueño (2026-11-02, con un dibujo): Venta de Mercadería, Impresiones y Caja
         # como botones iguales, apilados a la izquierda y a la misma distancia; ese mismo día
         # se sumó Gestión Impresiones abajo, y el 2026-11-03 Pedidos de Clientes.
+        # Con la hoja de estilos: la letra del título y de la frase de arriba está ahí.
+        self._con_la_hoja_de_estilos()
         admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
         ventana = MainWindow(admin, lambda: None)
         self.addCleanup(ventana.deleteLater)
@@ -156,7 +161,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
                          ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES"])
         # Que los cinco entren en la pantalla del mostrador: abre maximizada en 1920 x 1080, y
         # sin la barra de Windows (~40) ni la de título (~31) quedan ~1009 px. Con la letra de
-        # Windows el inicio mide ~25 px más que acá (offscreen): 903 contra 879 el 2026-11-03.
+        # Windows el inicio mide ~20 px más que acá (offscreen): 933 contra 914 el 2026-11-03,
+        # con el panel sobre la foto de fondo.
         self.assertLessEqual(ventana.minimumSizeHint().height(), 1009 - 25)
         self.assertEqual(len({(b.width(), b.height()) for b in accesos}), 1)
         self.assertEqual(len({b.x() for b in accesos}), 1)
@@ -174,6 +180,116 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         pedidos.assert_not_called()
         aviso.assert_called_once()
         self.assertEqual(len({abajo - encima for encima, abajo in zip(arriba, arriba[1:])}), 1)
+
+    def _con_la_hoja_de_estilos(self):
+        """La hoja de estilos del programa mientras dura la prueba (este archivo no la
+        pone de entrada: el resto de las pruebas miran lo que arma cada pantalla)."""
+        self.addCleanup(_app.setStyleSheet, _app.styleSheet())
+        _app.setStyleSheet(programa.HOJA_DE_ESTILOS)
+
+    def _fondo_dibujado(self, ancho=1400, alto=1000):
+        """La ventana principal de un Admin, con la hoja de estilos, pedida de `ancho` x
+        `alto`: su fondo y lo que dibuja. En "offscreen" la barra de arriba la ensancha
+        más de lo pedido (sin la letra de Windows, sus textos salen más anchos)."""
+        self._con_la_hoja_de_estilos()
+        # Un Admin nuevo por ventana: no puede haber dos usuarios activos con el mismo nombre.
+        self._ventanas_abiertas = getattr(self, "_ventanas_abiertas", 0) + 1
+        admin = usuarios_repo.obtener_usuario(
+            usuarios_repo.crear_usuario(f"Admin {self._ventanas_abiertas}", "1234", dominio.ROL_ADMIN))
+        ventana = MainWindow(admin, lambda: None)
+        self.addCleanup(ventana.deleteLater)
+        self.addCleanup(ventana.close)
+        ventana.resize(ancho, alto)
+        ventana.show()
+        _app.processEvents()
+        fondo = ventana.centralWidget()
+        return ventana, fondo, fondo.grab().toImage()
+
+    @staticmethod
+    def _diferencia_con_la_foto(dibujo, fondo, zona):
+        """Cuánto se aparta lo dibujado de la foto bien puesta (agrandada hasta cubrir
+        todo y centrada), en promedio por canal, mirando `zona` (un QRect en puntos de la
+        ventana) cada 7 puntos. 0 es la foto tal cual."""
+        escala = dibujo.devicePixelRatio()
+        esperada = QPixmap(str(RUTA_FONDO_INICIO)).scaled(
+            dibujo.width(), dibujo.height(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation).toImage()
+        sobra_x = (esperada.width() - dibujo.width()) // 2
+        sobra_y = (esperada.height() - dibujo.height()) // 2
+        diferencias = []
+        for x in range(zona.left(), zona.right(), 7):
+            for y in range(zona.top(), zona.bottom(), 7):
+                real = dibujo.pixelColor(round(x * escala), round(y * escala))
+                foto = esperada.pixelColor(round(x * escala) + sobra_x, round(y * escala) + sobra_y)
+                diferencias += [abs(real.red() - foto.red()), abs(real.green() - foto.green()),
+                                abs(real.blue() - foto.blue())]
+        return sum(diferencias) / len(diferencias)
+
+    def test_la_ventana_principal_tiene_de_fondo_la_foto_sin_deformarla(self):
+        # Pedido del dueño (2026-11-03): la foto del kiosko de noche de fondo en toda la
+        # ventana. Se mira la mitad derecha (lejos del panel, debajo de la barra) en una
+        # ventana más angosta que la foto (se recortan los costados) y en una más ancha
+        # (se recorta arriba y abajo): estirada o sin centrar se aparta 20 o más.
+        self.assertFalse(QPixmap(str(RUTA_FONDO_INICIO)).isNull(), RUTA_FONDO_INICIO)
+        for ancho, alto in ((1400, 1300), (1920, 900)):
+            with self.subTest(ancho=ancho, alto=alto):
+                ventana, fondo, dibujo = self._fondo_dibujado(ancho, alto)
+                self.assertIsInstance(fondo, FondoDelInicio)
+                zona = QRect(fondo.width() // 2, 150, fondo.width() // 2 - 10, fondo.height() - 160)
+                self.assertLess(self._diferencia_con_la_foto(dibujo, fondo, zona), 3)
+
+    def test_el_titulo_y_los_accesos_van_en_un_panel_oscuro_arriba_a_la_izquierda(self):
+        # Sueltos sobre la foto, el título y la frase caían encima de los paquetes del
+        # estante y no se leían: van en un panel oscuro medio transparente, del tamaño de
+        # lo que tiene adentro, y con letra clara.
+        ventana, fondo, dibujo = self._fondo_dibujado()
+
+        panel = ventana.findChild(QFrame, "panelInicio")
+        accesos = panel.findChildren(QPushButton)
+        self.assertEqual([b.accessibleName() for b in accesos],
+                         ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES"])
+        self.assertEqual(panel.size(), panel.sizeHint())
+        self.assertEqual(panel.pos(), QPoint(MARGEN_DEL_PANEL, MARGEN_DEL_PANEL))
+        for nombre, minimo in (("tituloInicio", 200), ("detalleInicio", 150)):
+            etiqueta = panel.findChild(QLabel, nombre)
+            etiqueta.ensurePolished()
+            self.assertGreater(etiqueta.palette().color(QPalette.WindowText).lightness(), minimo, nombre)
+        # Al lado de los accesos, adentro del panel, la foto se ve oscurecida (transparente
+        # daría 0: ahí no hay nada más dibujado).
+        arriba_izquierda = panel.mapTo(fondo, QPoint(accesos[0].geometry().right() + 10, accesos[0].y()))
+        abajo_derecha = panel.mapTo(fondo, QPoint(panel.width() - 10, accesos[-1].geometry().bottom()))
+        zona = QRect(arriba_izquierda, abajo_derecha)
+        self.assertGreater(zona.width(), 20)
+        self.assertGreater(self._diferencia_con_la_foto(dibujo, fondo, zona), 10)
+
+    def test_la_foto_se_agranda_a_los_puntos_reales_de_la_pantalla(self):
+        # Con Windows al 125%, agrandada al tamaño "lógico" de la ventana saldría borrosa.
+        with mock.patch.object(FondoDelInicio, "devicePixelRatioF", return_value=1.25):
+            ventana, fondo, dibujo = self._fondo_dibujado()
+
+        self.assertEqual(FondoDelInicio._agrandada_para, (round(fondo.width() * 1.25), round(fondo.height() * 1.25)))
+
+    def test_la_foto_agrandada_es_una_sola_para_todo_el_programa(self):
+        # La ventana del Admin, ya cerrada, sigue viva (VueltaDelAdmin la tiene agarrada):
+        # con una copia agrandada por ventana, cada salida del Admin dejaba ~8 MB en memoria.
+        # Desde cero, como al abrir el programa: si no, las dos usarían la que dejó otra prueba.
+        with mock.patch.object(FondoDelInicio, "_agrandada", None), \
+                mock.patch.object(FondoDelInicio, "_agrandada_para", None):
+            _, uno, _ = self._fondo_dibujado()
+            _, otro, _ = self._fondo_dibujado()
+            self.assertIsNotNone(FondoDelInicio._agrandada)
+
+        for fondo in (uno, otro):
+            self.assertNotIn("_agrandada", vars(fondo))
+
+    def test_sin_la_foto_el_fondo_es_azul_oscuro_y_no_se_rompe(self):
+        # Si alguna vez faltara assets/fondo_inicio.jpg: el título es claro y sobre el
+        # gris de siempre no se leería.
+        with mock.patch.object(FondoDelInicio, "_foto", QPixmap()):
+            ventana, fondo, dibujo = self._fondo_dibujado()
+
+        escala = dibujo.devicePixelRatio()
+        punto = dibujo.pixelColor(round((fondo.width() - 40) * escala), round((fondo.height() - 40) * escala))
+        self.assertEqual(punto.name(), COLOR_SIN_FONDO.lower())
 
     def test_operador_va_pegado_a_la_derecha_de_lista_de_compras(self):
         # Pedido del dueño (2026-10-23): antes iba solo en la punta derecha y con

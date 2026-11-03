@@ -661,7 +661,7 @@ inicio (`ui/pedidos_clientes_window.py`, maqueta A: campo con GUARDAR, parecidos
 mientras se escribe, +1 y TRAJIMOS en cada renglón, HISTORIAL; RENOMBRAR, JUNTAR y
 BORRAR solo el Admin). Reglas en `repositories/pedidos_clientes_repo.py`.
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 868 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 873 pruebas
 al 2026-11-03 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
@@ -676,3 +676,13 @@ Todos los botones de la barra van en negrita y en mayúscula (la pone
 `MainWindow._agregar_boton_barra`). La barra muestra los mismos botones a
 todos: el que alguien no tiene habilitado (Admin Kiosko, Config ADMIN) se ve
 igual pero no hace nada al apretarlo (lo cuida `tests/test_barra_para_todos.py`).
+
+Desde el 2026-11-03 toda la ventana principal tiene de fondo la foto del kiosko de
+noche que eligió el dueño (`assets/fondo_inicio.jpg`, dibujada por
+`ui/main_window.FondoDelInicio`: tapa todo sin deformarse y se recorta centrada), y
+el título y los accesos van en un panel oscuro medio transparente
+(`#panelInicio`, `#tituloInicio`, `#detalleInicio`). La foto agrandada es una sola
+para todo el programa, no una por ventana: la ventana del Admin ya cerrada sigue
+viva (la agarra `VueltaDelAdmin`) y con una copia propia cada salida del Admin
+dejaba ~8 MB en memoria. Si falta el archivo, el fondo sale en `COLOR_SIN_FONDO`
+(azul oscuro: sobre el gris de siempre el título claro no se leería).

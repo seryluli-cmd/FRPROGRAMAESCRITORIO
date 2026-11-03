@@ -445,6 +445,24 @@ HOJA_DE_ESTILOS = """
         font-size: 15px;
         font-weight: 800;
     }
+    /* El panel del inicio sobre la foto de fondo (ui/main_window.py, FondoDelInicio):
+       oscuro y medio transparente, con borde celeste, como los cuadros de vidrio de
+       la foto. Adentro, el título claro (hasta el 2026-11-03 era azul oscuro sobre
+       el gris) y los accesos. */
+    QFrame#panelInicio {
+        background-color: rgba(8, 14, 32, 185);
+        border: 1px solid rgba(92, 170, 255, 80);
+        border-radius: 18px;
+    }
+    QLabel#tituloInicio {
+        font-size: 28px;
+        font-weight: 800;
+        color: #F1F4F9;
+    }
+    QLabel#detalleInicio {
+        font-size: 15px;
+        color: #B9C6DA;
+    }
 
     /* Aviso informativo, en azul suave (no es una alarma): lo usa el Resumen del
        Día cuando un cierre de ese día quedó anotado en otro. */
