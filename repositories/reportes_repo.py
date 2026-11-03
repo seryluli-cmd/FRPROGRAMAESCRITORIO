@@ -228,7 +228,13 @@ def resumen_por_origen(desde: str, hasta: str, agrupar_por: str = "rango"):
 
 
 def ranking_ventas(desde: str, hasta: str, ordenar_por: str = "cantidad"):
-    """Artículos vendidos, agrupados por código y descripción cobrados."""
+    """
+    Artículos vendidos, agrupados por código y descripción cobrados.
+
+    Se esconden los renglones que dan 0 y $ 0: la seña de un pedido de
+    impresiones entra +1 al tomarlo y -1 al retirarlo, y si las dos caen en
+    las fechas elegidas se anulan entre sí (las hojas ya suman en IMPRESIONES).
+    """
     columna_orden = "cantidad" if ordenar_por == "cantidad" else "importe"
     rango = (dominio.VENTA_CONFIRMADA, *limites_de_los_dias(desde, hasta))
     with conexion_db() as conexion:
@@ -242,6 +248,8 @@ def ranking_ventas(desde: str, hasta: str, ordenar_por: str = "cantidad"):
             JOIN ventas ON ventas.id = venta_detalle.venta_id
             WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
             GROUP BY venta_detalle.articulo_codigo, venta_detalle.descripcion
+            HAVING ROUND(SUM(venta_detalle.cantidad), 3) <> 0
+                OR ROUND(SUM(venta_detalle.subtotal), 2) <> 0
             ORDER BY {columna_orden} DESC, descripcion
             """,
             rango,

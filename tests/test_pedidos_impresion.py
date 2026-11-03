@@ -149,14 +149,20 @@ class TestEntregarPedido(_ConPedidos):
         self.assertEqual(turnos_repo.resumen_turno_actual()["impresiones_digital"], 10000.0)
 
     def test_las_hojas_se_cuentan_una_sola_vez_y_la_plata_suma_el_total(self):
+        hoy = dia_en_que_empezo_el_turno(datetime.now()).isoformat()
+
+        def ranking():
+            return {fila["descripcion"]: (fila["cantidad"], fila["importe"])
+                    for fila in reportes_repo.ranking_ventas(hoy, hoy)}
+
         pedido_id = self._tomar()
+        self.assertEqual(ranking()[dominio.DESCRIPCION_SENA_IMPRESIONES], (1, 5000.0))
+
         pedidos_impresion_repo.entregar_pedido(self.gaby_id, pedido_id, [_pago(EF, 10000.0)])
 
-        hoy = dia_en_que_empezo_el_turno(datetime.now()).isoformat()
-        ranking = {fila["descripcion"]: (fila["cantidad"], fila["importe"])
-                   for fila in reportes_repo.ranking_ventas(hoy, hoy)}
-        self.assertEqual(ranking["IMPRESIONES"], (100, 15000.0))
-        self.assertEqual(ranking[dominio.DESCRIPCION_SENA_IMPRESIONES], (0, 0.0))
+        self.assertEqual(ranking()["IMPRESIONES"], (100, 15000.0))
+        # Seña cobrada y descontada el mismo día: da 0 y $ 0 y no se muestra.
+        self.assertNotIn(dominio.DESCRIPCION_SENA_IMPRESIONES, ranking())
         self.assertEqual(reportes_repo.resumen_por_origen(hoy, hoy)[0]["impresiones"], 15000.0)
         self.assertEqual(articulos_repo.buscar_por_codigo(dominio.CODIGO_ARTICULO_IMPRESIONES)["stock"], -100)
 
