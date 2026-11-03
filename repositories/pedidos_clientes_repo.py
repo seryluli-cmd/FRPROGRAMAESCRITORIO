@@ -18,10 +18,11 @@ Reglas:
 - Cada cliente es una fila de pedidos_clientes_veces con su fecha y hora y el
   operador que estaba en el mostrador. La cantidad de clientes es cuántas filas
   hay: no se guarda aparte, así nunca queda un número que no coincide.
-- Anotar, sumar y "YA LO TRAJIMOS" exigen que quien opera siga habilitado
+- Anotar, sumar y "TRAJIMOS" exigen que quien opera siga habilitado
   (usuarios_repo.usuario_habilitado): una usuaria dada de baja con la sesión
   abierta no sigue anotando, y nunca queda un renglón traído sin saber quién.
-- "YA LO TRAJIMOS" lo puede apretar cualquiera: el renglón sale de la lista y pasa
+- "TRAJIMOS" (así lo pidió el dueño; la función es ya_lo_trajimos) lo puede
+  apretar cualquiera: el renglón sale de la lista y pasa
   al historial con quién y cuándo. Si después lo vuelven a pedir, arranca un
   renglón NUEVO con 1 (lo de antes ya se resolvió trayéndolo). Nunca hay dos
   pendientes del mismo producto: lo cuida además un índice único de la base.
@@ -105,7 +106,7 @@ def parecidos(texto: str, limite: int = 5):
 
 def listar_historial():
     """Lo que ya trajimos, el último que se marcó primero: cada renglón con sus
-    `clientes`, quién apretó "YA LO TRAJIMOS" (`traido_por_nombre`) y cuándo
+    `clientes`, quién apretó "TRAJIMOS" (`traido_por_nombre`) y cuándo
     (`fecha_traido`)."""
     with conexion_db() as conexion:
         return conexion.execute(

@@ -8,12 +8,12 @@ que los clientes vienen a buscar.
   tildes o espacios), tocar un parecido o el +1 suma en el MISMO renglón.
 - Cada cliente queda con su fecha y hora y el operador que lo anotó.
 - La lista va con lo más pedido arriba.
-- "YA LO TRAJIMOS" (cualquiera) lo pasa al historial; si lo vuelven a pedir,
+- "TRAJIMOS" (cualquiera) lo pasa al historial; si lo vuelven a pedir,
   arranca un renglón nuevo con 1.
 - Renombrar, Juntar y Borrar: solo el Administrador, y nada se borra de la base.
 
-Por ahora es solo la parte de adentro (repositories/pedidos_clientes_repo.py): la
-pantalla viene después.
+Acá van las reglas de adentro (repositories/pedidos_clientes_repo.py); la
+pantalla, en tests/test_pedidos_clientes_pantalla.py.
 
 Se ejecutan con:
 
@@ -206,7 +206,7 @@ class TestAnotar(_ConPedidosClientes):
 
 
 class TestQuienOpera(_ConPedidosClientes):
-    """Anotar, sumar y "YA LO TRAJIMOS" son de cualquier operador, pero de uno que
+    """Anotar, sumar y "TRAJIMOS" son de cualquier operador, pero de uno que
     siga habilitado: lo relee el repo, como ORDENAR Stock."""
 
     def _no_puede(self, quien, pedido_id):

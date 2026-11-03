@@ -27,7 +27,7 @@ def crear_tablas_pedidos_clientes(cursor, valores_sql):
     #   "MANTECOL " caen en el mismo renglón.
     # - fecha / creado_por: cuándo y quién abrió el renglón (la primera vez que se
     #   pidió; después de Juntar, la primera vez de verdad sale de las veces).
-    # - traido_por / fecha_traido: quién apretó "YA LO TRAJIMOS" y cuándo.
+    # - traido_por / fecha_traido: quién apretó "TRAJIMOS" y cuándo.
     # - borrado_por / fecha_borrado: el Admin que lo sacó por anotado por error o
     #   porque lo juntó con otro; en ese caso, juntado_con es el renglón que se
     #   quedó con sus clientes. Nunca se borra la fila (regla 7).

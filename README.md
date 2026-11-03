@@ -149,7 +149,8 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
   `repositories/pedidos_clientes_repo.py`) — PEDIDOS DE CLIENTES, lo que vienen
   a buscar y no tenemos: un renglón por producto (`PENDIENTE`/`TRAÍDO`/`BORRADO`,
   uno solo pendiente por producto) y una fila por cliente que lo pidió, con fecha
-  y operador. La parte de adentro ya está; la pantalla viene después.
+  y operador. Se ve en el quinto acceso del inicio
+  (`ui/pedidos_clientes_window.py`).
 - **`configuracion`** — tabla genérica clave/valor: el fondo de cambio, el
   indicador de rubros iniciales, si está prendida la entrada desde otra PC, si
   está prendido el envío a la app de gastos y su sesión, las otras carpetas de
@@ -200,8 +201,9 @@ pisa la lista de carpetas.
 `MainWindow` (`ui/main_window.py`) tiene arriba la barra oscura con los mismos
 botones para todos (Vender, Impresiones, Admin Kiosko, Config ADMIN, Caja, Cierre
 de Turno, Clave y Operador; los que no le tocan a alguien se ven igual y no
-hacen nada) y, debajo, un panel de inicio con tres accesos grandes (Venta de
-Mercadería, Impresiones y Caja). Cada módulo se abre como un diálogo modal.
+hacen nada) y, debajo, un panel de inicio con cinco accesos grandes, uno debajo
+del otro (Venta de Mercadería, Impresiones, Caja, Gestión Impresiones y Pedidos de
+Clientes). Cada módulo se abre como un diálogo modal.
 
 **Ingreso con caja** (`ui/ingreso_caja.py`, entre el login y la ventana
 principal; reglas en `relevo_repo.situacion_al_entrar`). Una empleada no entra

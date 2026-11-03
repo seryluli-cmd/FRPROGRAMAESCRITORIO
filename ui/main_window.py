@@ -20,6 +20,7 @@ from ui.administrar_kiosko_window import AdministrarKioskoWindow
 from ui.configuracion_admin_window import ConfiguracionAdminWindow
 from ui.gestion_impresiones_window import VentanaGestionImpresiones
 from ui.impresiones_window import DialogoImpresiones
+from ui.pedidos_clientes_window import VentanaPedidosClientes
 from ui.ventas_window import VentasWindow
 from ui.caja_window import CajaWindow, CierreTurnoWindow
 from ui.usuarios_window import DialogoCambiarClave
@@ -45,10 +46,12 @@ AGRANDAR_DIBUJITO_OPERADOR = 1.25
 # estilos). Con eso la barra mide ~1410 px de ancho: en una pantalla de 1366 ya no entra.
 ALTO_BOTON_BARRA = 42
 SEPARACION_BOTONES_BARRA = 7
-# Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja y
-# Gestión Impresiones): todos del mismo tamaño, uno debajo del otro a la izquierda
-# (pedido del dueño, 2026-11-02, con un dibujo: antes eran tres botones que ocupaban
-# toda la fila; Gestión Impresiones se sumó el mismo día).
+# Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja,
+# Gestión Impresiones y Pedidos de Clientes): todos del mismo tamaño, uno debajo del
+# otro a la izquierda (pedido del dueño, 2026-11-02, con un dibujo: antes eran tres
+# botones que ocupaban toda la fila; Gestión Impresiones se sumó el mismo día y
+# Pedidos de Clientes el 2026-11-03). Con los cinco, el inicio pide ~930 px de alto:
+# entra en la pantalla de 1920 x 1080 del mostrador.
 ANCHO_ACCESO = 240
 ALTO_ACCESO = 110
 SEPARACION_ACCESOS = 20
@@ -185,6 +188,7 @@ class MainWindow(QMainWindow):
             ("🖨️", "IMPRESIONES", self._abrir_impresiones),
             ("💵", "CAJA", self._abrir_caja),
             ("📑", "GESTIÓN IMPRESIONES", self._abrir_gestion_impresiones),
+            ("🙋", "PEDIDOS DE CLIENTES", self._abrir_pedidos_clientes),
         ):
             # Sin AlignLeft, un botón de tamaño fijo queda centrado en la fila.
             accesos.addWidget(self._acceso_de_inicio(dibujito, texto, accion), 0, Qt.AlignLeft)
@@ -458,6 +462,10 @@ class MainWindow(QMainWindow):
     @solo_en_el_mostrador
     def _abrir_gestion_impresiones(self):
         VentanaGestionImpresiones(self.usuario, self).exec()
+
+    @solo_en_el_mostrador
+    def _abrir_pedidos_clientes(self):
+        VentanaPedidosClientes(self.usuario, self).exec()
 
     @solo_en_el_mostrador
     def _abrir_cierre_turno(self):

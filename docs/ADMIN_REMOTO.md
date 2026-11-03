@@ -50,7 +50,8 @@ este archivo se puede adjuntar tal cual.
 
 Vender, cobrar, Cierre de Turno y las cajas, Copia de Seguridad, prender o
 apagar la entrada desde otra PC y prender o apagar el envío de cierres a la app
-de gastos. El cierre forzoso de la caja y el Administrador que vuelve solo a la
+de gastos. También Gestión Impresiones (cobra señas) y, por ahora, Pedidos de
+Clientes (no cobra, pero todavía no se decidió si se quiere desde otra PC). El cierre forzoso de la caja y el Administrador que vuelve solo a la
 empleada también son cosas del mostrador.
 
 ## Por qué así y no "abriendo la base por la carpeta compartida"

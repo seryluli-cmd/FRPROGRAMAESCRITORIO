@@ -142,22 +142,37 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
     def test_los_accesos_del_inicio_van_uno_debajo_del_otro_y_miden_igual(self):
         # Pedido del dueño (2026-11-02, con un dibujo): Venta de Mercadería, Impresiones y Caja
         # como botones iguales, apilados a la izquierda y a la misma distancia; ese mismo día
-        # se sumó Gestión Impresiones abajo.
+        # se sumó Gestión Impresiones abajo, y el 2026-11-03 Pedidos de Clientes.
         admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
         ventana = MainWindow(admin, lambda: None)
         self.addCleanup(ventana.deleteLater)
         self.addCleanup(ventana.close)
-        ventana.resize(1400, 800)
+        ventana.resize(1400, 1000)
         ventana.show()
         _app.processEvents()
 
         accesos = [b for b in ventana.findChildren(QPushButton) if b.objectName() == "accesoInicio"]
         self.assertEqual([b.accessibleName() for b in accesos],
-                         ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES"])
+                         ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES"])
+        # Que los cinco entren en la pantalla del mostrador: abre maximizada en 1920 x 1080, y
+        # sin la barra de Windows (~40) ni la de título (~31) quedan ~1009 px. Con la letra de
+        # Windows el inicio mide ~25 px más que acá (offscreen): 903 contra 879 el 2026-11-03.
+        self.assertLessEqual(ventana.minimumSizeHint().height(), 1009 - 25)
         self.assertEqual(len({(b.width(), b.height()) for b in accesos}), 1)
         self.assertEqual(len({b.x() for b in accesos}), 1)
         arriba = [b.y() for b in accesos]
         self.assertEqual(arriba, sorted(arriba))
+        # PEDIDOS DE CLIENTES abre su ventana (y, como Gestión Impresiones, solo en el mostrador).
+        with mock.patch("ui.main_window.VentanaPedidosClientes") as pedidos:
+            accesos[-1].click()
+        pedidos.assert_called_once_with(admin, ventana)
+        pedidos.return_value.exec.assert_called_once()
+        with mock.patch("ui.main_window.VentanaPedidosClientes") as pedidos, \
+                mock.patch("ui.main_window.modo_remoto.es_copia_remota", return_value=True), \
+                mock.patch("ui.utils.mostrar_info") as aviso:
+            accesos[-1].click()
+        pedidos.assert_not_called()
+        aviso.assert_called_once()
         self.assertEqual(len({abajo - encima for encima, abajo in zip(arriba, arriba[1:])}), 1)
 
     def test_operador_va_pegado_a_la_derecha_de_lista_de_compras(self):
