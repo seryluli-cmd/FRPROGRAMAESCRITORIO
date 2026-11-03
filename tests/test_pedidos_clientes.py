@@ -21,6 +21,8 @@ Se ejecutan con:
 """
 
 import sqlite3
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -133,6 +135,105 @@ class TestAnotar(_ConPedidosClientes):
         # Justo el máximo, sí.
         self.assertEqual(self._anotar("x" * largo)["clientes"], 1)
 
+    def test_un_texto_pegado_con_caracteres_invisibles_suma_en_el_mismo_renglon(self):
+        # Copiado de WhatsApp Web: se ve igual, y tiene que caer en el mismo renglón.
+        primero = self._anotar("Mantecol")
+        for clientes, pegado in enumerate(("Mantecol‎", "﻿Mantecol", "Mante­col"), start=2):
+            with self.subTest(pegado=pegado):
+                anotado = self._anotar(pegado, quien=self.gaby_id)
+                self.assertEqual((anotado["pedido_id"], anotado["clientes"]), (primero["pedido_id"], clientes))
+        self.assertEqual(self._lista(), [("Mantecol", 4)])
+        # Solo invisibles es como no escribir nada.
+        with self.assertRaisesRegex(ValueError, "Escribí qué producto"):
+            self._anotar("​")
+        self.assertEqual(self._lista(), [("Mantecol", 4)])
+
+    def test_si_algo_falla_antes_de_guardar_no_queda_nada_a_medias(self):
+        # Falla lo último que hace anotar, con el renglón y su cliente ya escritos
+        # (como la base ocupada más de 30 s): se tiene que deshacer todo junto, y
+        # no quedar un renglón con 0 clientes.
+        ocupada = sqlite3.OperationalError("database is locked")
+        with mock.patch.object(repo, "_clientes", side_effect=ocupada):
+            with self.assertRaises(sqlite3.OperationalError):
+                self._anotar("Mantecol")
+        with conexion_db() as conexion:
+            self.assertEqual(conexion.execute("SELECT COUNT(*) FROM pedidos_clientes").fetchone()[0], 0)
+            self.assertEqual(conexion.execute("SELECT COUNT(*) FROM pedidos_clientes_veces").fetchone()[0], 0)
+        self.assertEqual(repo.listar_pendientes(), [])
+
+        # Y sobre uno que ya estaba, no se suma el cliente.
+        self._anotar("Mantecol")
+        with mock.patch.object(repo, "_clientes", side_effect=ocupada):
+            with self.assertRaises(sqlite3.OperationalError):
+                self._anotar("mantecol", quien=self.gaby_id)
+        self.assertEqual(self._lista(), [("Mantecol", 1)])
+
+    def test_dos_que_anotan_lo_mismo_a_la_vez_suman_en_el_mismo_renglon(self):
+        # Una en el mostrador y otra desde otra PC: el segundo pedido llega cuando
+        # el primero ya abrió el renglón pero todavía no guardó. Sin el BEGIN
+        # IMMEDIATE de anotar, el segundo no lo veía, chocaba con el índice único
+        # y se perdía ese cliente.
+        primero = sqlite3.connect(database.DB_PATH, isolation_level=None)
+        resultado = {}
+
+        def segundo_pedido():
+            try:
+                resultado["anotado"] = repo.anotar(self.gaby_id, "Mantecol")
+            except Exception as error:
+                resultado["error"] = error
+
+        try:
+            primero.execute("BEGIN IMMEDIATE")
+            pedido_id = primero.execute(
+                "INSERT INTO pedidos_clientes (fecha, producto, clave, creado_por, estado) VALUES (?, ?, ?, ?, ?)",
+                (self._hora, "Mantecol", "mantecol", self.lucia_id, dominio.PEDIDO_CLIENTE_PENDIENTE),
+            ).lastrowid
+            primero.execute(
+                "INSERT INTO pedidos_clientes_veces (pedido_id, fecha, usuario_id) VALUES (?, ?, ?)",
+                (pedido_id, self._hora, self.lucia_id),
+            )
+            hilo = threading.Thread(target=segundo_pedido)
+            hilo.start()
+            time.sleep(0.5)  # el segundo queda esperando el permiso de escritura
+            primero.execute("COMMIT")
+            hilo.join(10)
+        finally:
+            primero.close()
+        self.assertNotIn("error", resultado)
+        anotado = resultado["anotado"]
+        self.assertEqual((anotado["pedido_id"], anotado["clientes"], anotado["nuevo"]), (pedido_id, 2, False))
+        self.assertEqual(self._lista(), [("Mantecol", 2)])
+
+
+class TestQuienOpera(_ConPedidosClientes):
+    """Anotar, sumar y "YA LO TRAJIMOS" son de cualquier operador, pero de uno que
+    siga habilitado: lo relee el repo, como ORDENAR Stock."""
+
+    def _no_puede(self, quien, pedido_id):
+        for hacer in (lambda: repo.anotar(quien, "Mantecol"),
+                      lambda: repo.sumar_uno(quien, pedido_id),
+                      lambda: repo.ya_lo_trajimos(quien, pedido_id)):
+            with self.assertRaisesRegex(PermissionError, "ya no está habilitado"):
+                hacer()
+
+    def test_uno_que_no_existe_no_anota_ni_suma_ni_marca(self):
+        pedido_id = self._anotar("Mantecol")["pedido_id"]
+        for quien in (999, None):
+            with self.subTest(quien=quien):
+                self._no_puede(quien, pedido_id)
+        self.assertEqual(self._lista(), [("Mantecol", 1)])
+        # Nunca queda un traído sin saber quién lo marcó.
+        self.assertEqual(repo.listar_historial(), [])
+
+    def test_una_empleada_dada_de_baja_con_la_sesion_abierta_no_sigue(self):
+        pedido_id = self._anotar("Mantecol")["pedido_id"]
+        usuarios_repo.desactivar_usuario(self.gaby_id)
+
+        self._no_puede(self.gaby_id, pedido_id)
+
+        self.assertEqual(self._lista(), [("Mantecol", 1)])
+        self.assertEqual(self._veces(pedido_id), [(f"{DIA}T10:00:00", self.lucia_id)])
+
 
 class TestSumarUno(_ConPedidosClientes):
     def test_el_mas_uno_suma_un_cliente_con_quien_lo_anoto(self):
@@ -194,6 +295,16 @@ class TestParecidos(_ConPedidosClientes):
         self.assertEqual(self._productos(repo.parecidos("mante", limite=2)), ["Mantecol", "Mantecol grande"])
         self.assertEqual(repo.parecidos("mante", limite=0), [])
 
+    def test_sin_decir_el_limite_trae_cinco(self):
+        # La pantalla lo va a llamar sin el límite: con 7 que dicen "mante", 5.
+        for numero in range(4):
+            self._anotar(f"Mantequilla {numero}")
+        self.assertEqual(len(repo.parecidos("mante", limite=50)), 7)
+        self.assertEqual(len(repo.parecidos("mante")), 5)
+
+    def test_lo_pegado_con_caracteres_invisibles_tambien_encuentra(self):
+        self.assertEqual(self._productos(repo.parecidos("mante​col")), ["Mantecol", "Mantecol grande"])
+
     def test_los_traidos_y_los_borrados_no_salen(self):
         por_nombre = {p["producto"]: p["id"] for p in repo.listar_pendientes()}
         repo.ya_lo_trajimos(self.lucia_id, por_nombre["Manteca"])
@@ -245,14 +356,20 @@ class TestYaLoTrajimos(_ConPedidosClientes):
         self.assertEqual(self._fila(pedido_id)["traido_por"], self.lucia_id)
 
     def test_el_historial_va_con_el_ultimo_que_se_trajo_primero(self):
-        primero = self._anotar("Mantecol")["pedido_id"]
-        segundo = self._anotar("Manaos")["pedido_id"]
-        self._a_las("12:00")
-        repo.ya_lo_trajimos(self.lucia_id, segundo)
-        self._a_las("15:00")
-        repo.ya_lo_trajimos(self.lucia_id, primero)
+        # Se traen en otro orden que el que se anotaron: ni el orden en que se
+        # abrieron los renglones ni su contrario dan el del historial.
+        alfajor = self._anotar("Alfajor")["pedido_id"]
+        manaos = self._anotar("Manaos")["pedido_id"]
+        mantecol = self._anotar("Mantecol")["pedido_id"]
+        for hora, pedido_id in (("12:00", manaos), ("13:00", mantecol), ("15:00", alfajor)):
+            self._a_las(hora)
+            repo.ya_lo_trajimos(self.lucia_id, pedido_id)
 
-        self.assertEqual([p["producto"] for p in repo.listar_historial()], ["Mantecol", "Manaos"])
+        self.assertEqual([(p["producto"], p["fecha_traido"]) for p in repo.listar_historial()], [
+            ("Alfajor", f"{DIA}T15:00:00"),
+            ("Mantecol", f"{DIA}T13:00:00"),
+            ("Manaos", f"{DIA}T12:00:00"),
+        ])
 
 
 class TestOrdenDeLaLista(_ConPedidosClientes):
@@ -275,6 +392,20 @@ class TestOrdenDeLaLista(_ConPedidosClientes):
                          [("Mantecol", 3), ("Alfajor Jorgito", 2), ("Manaos", 1)])
         self.assertEqual((lista[1]["ultima_vez"], lista[1]["ultima_vez_por"]), (f"{DIA}T11:00:00", "Sergio"))
         self.assertEqual((lista[0]["ultima_vez"], lista[0]["ultima_vez_por"]), (f"{DIA}T10:07:00", "Gaby"))
+
+    def test_entre_dos_con_los_mismos_clientes_va_arriba_el_que_pidieron_ultimo(self):
+        # El renglón que se abrió PRIMERO es el que pidieron último: así no alcanza
+        # con ordenar por cuándo se abrió cada renglón.
+        self._a_las("10:00")
+        alfajor = self._anotar("Alfajor")["pedido_id"]
+        self._a_las("10:30")
+        manaos = self._anotar("Manaos")["pedido_id"]
+        self._a_las("10:40")
+        repo.sumar_uno(self.gaby_id, manaos)
+        self._a_las("11:00")
+        repo.sumar_uno(self.gaby_id, alfajor)
+
+        self.assertEqual(self._lista(), [("Alfajor", 2), ("Manaos", 2)])
 
     def test_dos_anotados_en_el_mismo_segundo_va_arriba_el_ultimo(self):
         self._anotar("Manaos")
@@ -369,6 +500,10 @@ class TestCorrecciones(_ConPedidosClientes):
 
         with self.assertRaisesRegex(ValueError, "mismo pedido"):
             repo.juntar(self.admin_id, uno, uno)
+        # El mismo número escrito como texto es el mismo renglón para la base: no
+        # puede quedar juntado consigo mismo (BORRADO, con sus clientes adentro).
+        with self.assertRaisesRegex(ValueError, "mismo pedido"):
+            repo.juntar(self.admin_id, uno, str(uno))
         with self.assertRaisesRegex(ValueError, "traído"):
             repo.juntar(self.admin_id, uno, traido)
         with self.assertRaisesRegex(ValueError, "traído"):
@@ -378,6 +513,20 @@ class TestCorrecciones(_ConPedidosClientes):
 
         self.assertEqual((len(self._veces(uno)), len(self._veces(traido))), (1, 1))
         self.assertEqual(self._fila(uno)["estado"], dominio.PEDIDO_CLIENTE_PENDIENTE)
+
+    def test_si_juntar_falla_antes_de_guardar_los_dos_quedan_como_estaban(self):
+        origen = self._anotar("Mantecol grande")["pedido_id"]
+        self._anotar("Mantecol grande", quien=self.gaby_id)
+        destino = self._anotar("Mantecol")["pedido_id"]
+
+        # Falla lo último, con los clientes ya pasados y el origen ya BORRADO.
+        with mock.patch.object(repo, "_clientes", side_effect=sqlite3.OperationalError("database is locked")):
+            with self.assertRaises(sqlite3.OperationalError):
+                repo.juntar(self.admin_id, origen, destino)
+
+        self.assertEqual(self._fila(origen)["estado"], dominio.PEDIDO_CLIENTE_PENDIENTE)
+        self.assertEqual((len(self._veces(origen)), len(self._veces(destino))), (2, 1))
+        self.assertEqual(self._lista(), [("Mantecol grande", 2), ("Mantecol", 1)])
 
     def test_borrar_lo_saca_de_la_lista_pero_la_fila_queda(self):
         pedido_id = self._anotar("Mantecoll")["pedido_id"]
@@ -463,6 +612,18 @@ class TestCuentasDelPedidoCliente(unittest.TestCase):
             with self.subTest(escrito=escrito):
                 self.assertEqual(dominio.clave_pedido_cliente(escrito), "mantecol")
         self.assertEqual(dominio.clave_pedido_cliente("Coca   Cola"), "coca cola")
+
+    def test_los_caracteres_invisibles_de_un_texto_pegado_no_cuentan(self):
+        # Espacio de ancho cero, marca de dirección, BOM, guion suave y el que une emojis.
+        for pegado in ("Mantecol​", "﻿Mantecol", "Mante­col", "Mantecol‎", "Mantecol‍",
+                       "​ mantecol"):
+            with self.subTest(pegado=pegado):
+                self.assertEqual(dominio.revisar_pedido_cliente(pegado), ("Mantecol", "mantecol"))
+                self.assertEqual(dominio.clave_pedido_cliente(pegado), "mantecol")
+        for solo_invisibles in ("​", "­", "﻿ ‎"):
+            with self.subTest(solo_invisibles=solo_invisibles):
+                with self.assertRaisesRegex(ValueError, "Escribí qué producto"):
+                    dominio.revisar_pedido_cliente(solo_invisibles)
 
     def test_revisar(self):
         self.assertEqual(dominio.revisar_pedido_cliente(" mantecól "), ("Mantecól", "mantecol"))

@@ -18,6 +18,9 @@ Reglas:
 - Cada cliente es una fila de pedidos_clientes_veces con su fecha y hora y el
   operador que estaba en el mostrador. La cantidad de clientes es cuántas filas
   hay: no se guarda aparte, así nunca queda un número que no coincide.
+- Anotar, sumar y "YA LO TRAJIMOS" exigen que quien opera siga habilitado
+  (usuarios_repo.usuario_habilitado): una usuaria dada de baja con la sesión
+  abierta no sigue anotando, y nunca queda un renglón traído sin saber quién.
 - "YA LO TRAJIMOS" lo puede apretar cualquiera: el renglón sale de la lista y pasa
   al historial con quién y cuándo. Si después lo vuelven a pedir, arranca un
   renglón NUEVO con 1 (lo de antes ya se resolvió trayéndolo). Nunca hay dos
@@ -159,6 +162,7 @@ def anotar(usuario_id: int, texto: str) -> dict:
     "clientes" (cuántos lo pidieron, con este), "nuevo" (si abrió el renglón)}.
     ValueError si está vacío o es demasiado largo.
     """
+    usuarios_repo.usuario_habilitado(usuario_id)
     producto, clave = dominio.revisar_pedido_cliente(texto)
     with conexion_db() as conexion:
         # Con el permiso de escritura tomado antes de buscar: si dos lo anotan a la
@@ -183,6 +187,7 @@ def sumar_uno(usuario_id: int, pedido_id: int) -> int:
     """Otro cliente pidió ese renglón (el +1 o uno de los parecidos): lo suma con la
     fecha y hora y quién lo anotó, y devuelve cuántos clientes lo pidieron. Solo a
     uno pendiente."""
+    usuarios_repo.usuario_habilitado(usuario_id)
     with conexion_db() as conexion:
         conexion.execute("BEGIN IMMEDIATE")
         _exigir_pendiente(_leer_pedido(conexion, pedido_id), "sumarle un cliente")
@@ -193,6 +198,7 @@ def sumar_uno(usuario_id: int, pedido_id: int) -> int:
 def ya_lo_trajimos(usuario_id: int, pedido_id: int):
     """El producto ya está en el kiosko: sale de la lista de pendientes y queda en el
     historial con quién lo marcó y cuándo. Lo puede hacer cualquier operador."""
+    usuarios_repo.usuario_habilitado(usuario_id)
     with conexion_db() as conexion:
         conexion.execute("BEGIN IMMEDIATE")
         _exigir_pendiente(_leer_pedido(conexion, pedido_id), "marcarlo como traído")
@@ -238,12 +244,18 @@ def juntar(usuario_id: int, origen_id: int, destino_id: int) -> int:
     el destino después de juntarlos.
     """
     usuarios_repo.exigir_admin(usuario_id, _PARA_CORREGIR)
-    if origen_id == destino_id:
-        raise ValueError("Es el mismo pedido: elegí otro para juntarlos.")
     with conexion_db() as conexion:
         conexion.execute("BEGIN IMMEDIATE")
-        _exigir_pendiente(_leer_pedido(conexion, origen_id), "juntarlo con otro")
-        _exigir_pendiente(_leer_pedido(conexion, destino_id), "juntarle otro")
+        origen = _leer_pedido(conexion, origen_id)
+        destino = _leer_pedido(conexion, destino_id)
+        # Con los números que dio la base y no con los que llegaron: 5 y "5" son
+        # distintos para Python pero el mismo renglón para SQLite, y juntarlo
+        # consigo mismo lo dejaría BORRADO con todos sus clientes adentro.
+        origen_id, destino_id = origen["id"], destino["id"]
+        if origen_id == destino_id:
+            raise ValueError("Es el mismo pedido: elegí otro para juntarlos.")
+        _exigir_pendiente(origen, "juntarlo con otro")
+        _exigir_pendiente(destino, "juntarle otro")
         conexion.execute(
             "UPDATE pedidos_clientes_veces SET pedido_id = ? WHERE pedido_id = ?", (destino_id, origen_id)
         )
