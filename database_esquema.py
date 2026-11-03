@@ -1,6 +1,7 @@
 """Esquema de la base de FRKiosko: tablas e índices (las de las cajas, la cola de
-envíos y los pedidos de impresiones, en database_esquema_cajas.py,
-database_esquema_envios.py y database_esquema_pedidos.py)."""
+envíos, los pedidos de impresiones y los pedidos de clientes, en
+database_esquema_cajas.py, database_esquema_envios.py, database_esquema_pedidos.py
+y database_esquema_pedidos_clientes.py)."""
 
 import dominio
 
@@ -12,6 +13,7 @@ def inicializar_base_de_datos():
     from database_esquema_cajas import crear_tablas_de_cajas
     from database_esquema_envios import crear_tabla_envios_pwa
     from database_esquema_pedidos import crear_tabla_pedidos_impresion
+    from database_esquema_pedidos_clientes import crear_tablas_pedidos_clientes
 
     conexion = get_connection()
     try:
@@ -170,6 +172,7 @@ def inicializar_base_de_datos():
         crear_tablas_de_cajas(cursor, _valores_sql)
         crear_tabla_envios_pwa(cursor, _valores_sql)
         crear_tabla_pedidos_impresion(cursor, _valores_sql)
+        crear_tablas_pedidos_clientes(cursor, _valores_sql)
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas(fecha)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ventas_turno ON ventas(turno, fecha)")

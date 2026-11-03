@@ -144,6 +144,12 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 - **`envios_pwa`** (`database_esquema_envios.py`) — la cola de cierres que se
   mandan a la app de gastos (ver más abajo): una fila por cierre encolado con
   su estado (`PENDIENTE`/`ENVIADO`/`ERROR`), intentos y último error.
+- **`pedidos_clientes`** + **`pedidos_clientes_veces`**
+  (`database_esquema_pedidos_clientes.py`; reglas en
+  `repositories/pedidos_clientes_repo.py`) — PEDIDOS DE CLIENTES, lo que vienen
+  a buscar y no tenemos: un renglón por producto (`PENDIENTE`/`TRAÍDO`/`BORRADO`,
+  uno solo pendiente por producto) y una fila por cliente que lo pidió, con fecha
+  y operador. La parte de adentro ya está; la pantalla viene después.
 - **`configuracion`** — tabla genérica clave/valor: el fondo de cambio, el
   indicador de rubros iniciales, si está prendida la entrada desde otra PC, si
   está prendido el envío a la app de gastos y su sesión, las otras carpetas de

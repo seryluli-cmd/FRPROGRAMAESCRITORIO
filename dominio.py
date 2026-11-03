@@ -334,3 +334,51 @@ def enlace_whatsapp(telefono: str, mensaje: str) -> str:
     """La dirección que abre WhatsApp Web con el chat del cliente y el mensaje ya
     escrito (lo manda quien atiende, con Enter)."""
     return f"https://web.whatsapp.com/send?phone={CARACTERISTICA_WHATSAPP}{telefono}&text={quote(mensaje)}"
+
+
+# PEDIDOS DE CLIENTES (pedido del dueño, 2026-11-03): mercadería que NO tenemos y
+# que los clientes vienen a buscar ("Mantecol"). Cada vez que alguien lo pide se
+# suma un cliente al mismo renglón. Reglas en repositories/pedidos_clientes_repo.py.
+# No confundir con los PEDIDO_* de Gestión Impresiones de arriba: son otra cosa
+# (pedidos de impresiones con seña) y tienen su propia tabla y sus propios estados.
+PEDIDO_CLIENTE_PENDIENTE = "PENDIENTE"  # lo piden y todavía no lo trajimos
+PEDIDO_CLIENTE_TRAIDO = "TRAÍDO"        # ya lo trajimos: sale de la lista y queda en el historial
+PEDIDO_CLIENTE_BORRADO = "BORRADO"      # anotado por error o juntado con otro (solo el Admin)
+ESTADOS_PEDIDO_CLIENTE = (PEDIDO_CLIENTE_PENDIENTE, PEDIDO_CLIENTE_TRAIDO, PEDIDO_CLIENTE_BORRADO)
+
+# Más largo que esto es casi seguro un texto pegado sin querer: un producto se
+# nombra con pocas palabras ("Alfajor Jorgito de membrillo").
+LARGO_MAXIMO_PEDIDO_CLIENTE = 60
+
+# Con una sola letra los parecidos serían casi toda la lista: recién desde la
+# segunda se muestran.
+LETRAS_MINIMAS_PARECIDOS = 2
+
+
+def pedido_cliente_limpio(texto) -> str:
+    """Lo escrito como se muestra en la lista: sin espacios de más y con la primera
+    letra en mayúscula, sin tocar las demás ("  mantecol  grande" da "Mantecol
+    grande"; "7UP" queda "7UP")."""
+    texto = " ".join(str(texto or "").split())
+    return texto[:1].upper() + texto[1:]
+
+
+def clave_pedido_cliente(texto) -> str:
+    """Con qué se compara un pedido con otro: minúsculas, sin tildes y sin espacios
+    de más ("Mantecól ", "MANTECOL" y "mantecol" son el mismo). Ojo: la ñ también
+    pierde su tilde (sin_acentos), así que "Ñoquis" y "Noquis" son el mismo."""
+    return " ".join(sin_acentos(str(texto or "")).split())
+
+
+def revisar_pedido_cliente(texto) -> tuple:
+    """(como se muestra, clave) de lo que escribió la empleada, o ValueError si está
+    vacío o es más largo que LARGO_MAXIMO_PEDIDO_CLIENTE."""
+    producto = pedido_cliente_limpio(texto)
+    clave = clave_pedido_cliente(producto)
+    if not clave:
+        raise ValueError("Escribí qué producto pidió el cliente.")
+    if len(producto) > LARGO_MAXIMO_PEDIDO_CLIENTE:
+        raise ValueError(
+            f"Es muy largo: escribí el producto con hasta {LARGO_MAXIMO_PEDIDO_CLIENTE} letras."
+        )
+    return producto, clave
