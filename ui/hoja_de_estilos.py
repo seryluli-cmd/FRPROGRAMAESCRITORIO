@@ -848,6 +848,13 @@ HOJA_DE_ESTILOS = """
         border-bottom-color: #E1E4E9;
         color: #A7ADB8;
     }
+    /* El +1 y TRAJIMOS de cada renglón de Pedidos de Clientes: más grandes que una
+       tecla común (el dueño, 2026-11-03: "queda chico, agrandalo"), con la letra de
+       GUARDAR. */
+    QPushButton[teclaDeRenglon="true"] {
+        font-size: 15px;
+        padding: 6px 18px;
+    }
     /* Caja y Cierre de Turno (y el detalle de un cierre en Control de Cierres) con el
        mismo diseño, 2026-10-26 (ui/tarjeta_cierre.py). Las cifras grandes: la verde es
        el efectivo del cajón o del sobre, la azul el TOTAL (los colores que eligió el

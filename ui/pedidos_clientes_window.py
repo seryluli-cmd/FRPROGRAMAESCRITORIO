@@ -47,8 +47,15 @@ COLUMNA_PRODUCTO = 0
 COLUMNA_CLIENTES = 1
 COLUMNA_MAS_UNO = 3
 COLUMNA_TRAJIMOS = 4
-# Los renglones son más altos que en las otras listas: llevan dos teclas adentro.
-ALTO_RENGLON = 46
+# Los renglones son más altos que en las otras listas: llevan dos teclas adentro, y el
+# dueño las pidió más grandes (2026-11-03: "queda chico, agrandalo"). La letra de las
+# teclas, en QPushButton[teclaDeRenglon] de ui/hoja_de_estilos.py.
+ALTO_RENGLON = 58
+ALTO_TECLA_RENGLON = 44
+ANCHO_COLUMNA_MAS_UNO = 96
+ANCHO_COLUMNA_TRAJIMOS = 170
+# Con el nombre de quien anotó ("· Administrador") en un solo renglón.
+ANCHO_COLUMNA_ULTIMA_VEZ = 260
 # El número de clientes, en el azul oscuro de la tecla elegida (ui/hoja_de_estilos.py).
 COLOR_CLIENTES = "#1D48A0"
 # Cuántos parecidos se muestran debajo del campo mientras se escribe, y hasta qué
@@ -82,9 +89,14 @@ def _tecla_del_renglon(texto: str, al_apretar, clase: str) -> QWidget:
     renglón (el botón solo, estirado a toda la celda, queda pegado a la raya)."""
     boton = tecla(texto, al_apretar, clase)
     boton.setAutoDefault(False)
+    boton.setProperty("teclaDeRenglon", True)
+    # Que Qt vuelva a mirar la hoja de estilos con la propiedad nueva (tecla() ya lo pintó).
+    boton.style().unpolish(boton)
+    boton.style().polish(boton)
+    boton.setFixedHeight(ALTO_TECLA_RENGLON)
     caja = QWidget()
     capa = QHBoxLayout(caja)
-    capa.setContentsMargins(4, 4, 4, 4)
+    capa.setContentsMargins(6, 0, 6, 0)
     capa.addWidget(boton)
     caja.boton = boton
     return caja
@@ -101,7 +113,7 @@ class VentanaPedidosClientes(QDialog):
         # Cuándo se armó la lista por última vez (ver _recien_reordenada).
         self._reordenada_a = 0.0
         self.setWindowTitle(TITULO)
-        self.resize(1100, 680)
+        self.resize(1200, 720)
         self._armar_interfaz()
         self._cargar()
 
@@ -155,7 +167,8 @@ class VentanaPedidosClientes(QDialog):
         self.etiqueta_hecho = QLabel()
 
         self.tabla = crear_tabla(COLUMNAS, estirar=COLUMNA_PRODUCTO, por_filas=True, una_sola=True)
-        for columna, ancho in ((COLUMNA_CLIENTES, 100), (2, 200), (COLUMNA_MAS_UNO, 76), (COLUMNA_TRAJIMOS, 130)):
+        for columna, ancho in ((COLUMNA_CLIENTES, 100), (2, ANCHO_COLUMNA_ULTIMA_VEZ),
+                               (COLUMNA_MAS_UNO, ANCHO_COLUMNA_MAS_UNO), (COLUMNA_TRAJIMOS, ANCHO_COLUMNA_TRAJIMOS)):
             self.tabla.setColumnWidth(columna, ancho)
         self.tabla.horizontalHeaderItem(COLUMNA_CLIENTES).setTextAlignment(Qt.AlignCenter)
 
