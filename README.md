@@ -87,7 +87,7 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
 | [tests/](tests/) | Tests de repositorios, servidor y UI sobre bases SQLite temporales (no tocan `data_fr/kiosko.db`). |
 | [armar_base_de_prueba.py](armar_base_de_prueba.py) | Arma la base de prueba en `data_prueba/` (un año inventado); se abre con `python main.py --base data_prueba`. Ver "Cómo probarlo en local". |
 | [Kiosko.spec](Kiosko.spec) | Config de PyInstaller para generar `dist/FRKiosko.exe`. |
-| [assets/](assets/) | Ícono de la app: el carrito (elegido por el dueño el 2026-10-28). Se dibuja en `icono.svg`; `icono.ico` y `icono.png` salen de ahí con `python assets/armar_icono.py`. Y `fondo_inicio.jpg`, la foto del kiosko de noche que va de fondo en la ventana principal (la eligió el dueño el 2026-11-03; la dibuja `ui/main_window.FondoDelInicio`). |
+| [assets/](assets/) | Ícono de la app: el carrito (elegido por el dueño el 2026-10-28). Se dibuja en `icono.svg`; `icono.ico` y `icono.png` salen de ahí con `python assets/armar_icono.py`. Y `fondo_inicio.jpg`, la foto del kiosko de noche que va de fondo en la ventana principal (la eligió el dueño el 2026-11-03; la dibuja `ui/fondo_del_inicio.FondoDelInicio`). |
 | `data_fr/backups/` | Copias automáticas de la base (después de cada Cierre de Turno y cada 8 horas; todas las de 3 días y una por día hasta 30). |
 
 ## Modelo de datos (SQLite, `database_esquema.py`)
@@ -151,6 +151,14 @@ El código separa **acceso a datos** (`repositories/`, sin Qt) de **UI**
   uno solo pendiente por producto) y una fila por cliente que lo pidió, con fecha
   y operador. Se ve en el quinto acceso del inicio
   (`ui/pedidos_clientes_window.py`).
+- **`tareas_turno`** + **`tareas_turno_cambios`** + **`tareas_turno_marcas`**
+  (`database_esquema_tareas_turno.py`; reglas en
+  `repositories/tareas_turno_repo.py`) — TAREAS DEL TURNO, cosas para hacer a una
+  hora: cada tarea con su hora y cuándo se repite (`ACTIVA`/`BORRADA`), cómo era
+  antes de cada cambio, y lo que pasó cada día del local con cada una (HECHA, una
+  sola vez, con quién y cuándo; o cada POSPONER, con sus minutos). Se ve en el
+  sexto acceso del inicio (`ui/tareas_turno_window.py`), y a la hora de cada una
+  sale el aviso de `ui/aviso_tarea.py`.
 - **`configuracion`** — tabla genérica clave/valor: el fondo de cambio, el
   indicador de rubros iniciales, si está prendida la entrada desde otra PC, si
   está prendido el envío a la app de gastos y su sesión, las otras carpetas de
@@ -201,12 +209,46 @@ pisa la lista de carpetas.
 `MainWindow` (`ui/main_window.py`) tiene arriba la barra oscura con los mismos
 botones para todos (Vender, Impresiones, Admin Kiosko, Config ADMIN, Caja, Cierre
 de Turno, Clave y Operador; los que no le tocan a alguien se ven igual y no
-hacen nada) y, debajo, un panel de inicio con cinco accesos grandes, uno debajo
-del otro (Venta de Mercadería, Impresiones, Caja, Gestión Impresiones y Pedidos de
-Clientes). Todo va sobre una foto del kiosko de noche que tapa la ventana entera
-(sin deformarse: se recorta lo que sobra); el título y los accesos van en un panel
-oscuro medio transparente arriba a la izquierda, para que se lean sobre la foto.
-Cada módulo se abre como un diálogo modal.
+hacen nada) y, debajo, un panel de inicio con seis accesos grandes, uno debajo
+del otro (Venta de Mercadería, Impresiones, Caja, Gestión Impresiones, Pedidos de
+Clientes y Tareas del Turno). Todo va sobre una foto del kiosko de noche que tapa
+la ventana entera (sin deformarse: se recorta lo que sobra; `ui/fondo_del_inicio.py`);
+el título y los accesos van en un panel oscuro medio transparente arriba a la
+izquierda, para que se lean sobre la foto. Cada módulo se abre como un diálogo
+modal.
+
+**Tareas del Turno** (pedido del dueño, 2026-11-03; reglas en
+`repositories/tareas_turno_repo.py`). Cosas para hacer a una hora, como "PRENDER
+LAS LUCES DE AFUERA" a las 19:30:
+- **El aviso** (`ui/aviso_tarea.py`). La ventana principal del mostrador mira
+  cada 15 s si llegó la hora de alguna (`RevisorDeTareas`) y saca un aviso
+  **encima de todas las ventanas** (también de Vender, de otro programa o con
+  FRKiosko minimizado) con POSPONER 5 MIN, POSPONER 10 MIN y TAREA HECHA. No
+  tiene cruz, y ni Esc ni Enter ni ninguna tecla lo cierran (la pistola de códigos
+  no puede marcarla sin querer). Los botones responden recién un segundo después
+  de que sale. Pospuesta, vuelve a salir pasado ese rato, hasta que alguien pone
+  TAREA HECHA; si tocan dos a la vez, salen de a una ("1 de 2"). Cerca de las
+  06:00 avisa que, si la posponen, ya no vuelve (los avisos son solo del día del
+  local en curso). El cierre forzoso de la caja y la vuelta sola del Admin lo corren
+  sin grabar nada, y vuelve a salir al minuto; no lo corren si abajo queda otra
+  ventana que igual los hace esperar (Compras, un formulario). Al cerrar la sesión
+  se cierra. Desde otra PC no sale.
+- **El acceso TAREAS DEL TURNO** titila en rojo mientras haya alguna atrasada,
+  con un numerito amarillo que dice cuántas son.
+- **La ventana** (`ui/tareas_turno_window.py`). Arriba, el turno y el día del
+  local, y cuántas hay PARA HACER, ATRASADAS y HECHAS. Pastillas ESTE TURNO (con
+  las atrasadas de un turno anterior de hoy, que siguen avisando), TODO EL DÍA y
+  TODAS LAS TAREAS (las cargadas, con cuándo se repite). En la grilla, cada
+  una con su estado (HECHA · quién y a qué hora, tachada; ATRASADA · 1 h 12 min;
+  EN 18 MIN; MÁS TARDE) y la tecla HECHA, que pregunta antes. + NUEVA TAREA,
+  MODIFICAR y BORRAR son solo del Administrador (con el borde punteado): a los
+  demás no les aparecen, como en Pedidos de Clientes. El formulario
+  (`ui/tareas_turno_dialogos.py`) pide TAREA, HORA (como la escriban: "1930",
+  "19.30"), muestra el turno que le toca y SE REPITE: TODOS LOS DÍAS, ELEGIR DÍAS o
+  SOLO HOY. HISTORIAL muestra los días que ya terminaron, con quién hizo cada
+  tarea, NO SE HIZO y quiénes la pospusieron, como pasó ese día: borrarla o
+  cambiarla más tarde no lo saca. Lo que se contesta en el aviso con la ventana
+  abierta se ve ya en la lista.
 
 **Ingreso con caja** (`ui/ingreso_caja.py`, entre el login y la ventana
 principal; reglas en `relevo_repo.situacion_al_entrar`). Una empleada no entra
@@ -529,7 +571,7 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-714 tests al 2026-10-29. Cubren turnos, caja y cajas con número
+985 tests al 2026-11-03. Cubren turnos, caja y cajas con número
 (`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
 ORDENAR Stock, marcas, rubros (`tests/test_rubros.py`), ventas y anulaciones, el
 cobro con Enter, impresiones, reportes, administrar desde otra PC
@@ -546,7 +588,11 @@ configuración y lo cobrado por medio en cada venta (`tests/test_config_repo.py`
 la base de prueba (`tests/test_base_de_prueba.py`), el formato de pesos, el
 aspecto de las pantallas (Qt "offscreen") y que los botones que esperan la red no
 congelen el mostrador (`tests/test_en_segundo_plano.py`), ni la copia de otra PC
-mientras el mostrador contesta (`tests/test_espera_del_mostrador.py`).
+mientras el mostrador contesta (`tests/test_espera_del_mostrador.py`), Pedidos de
+Clientes (`tests/test_pedidos_clientes.py`, `tests/test_pedidos_clientes_pantalla.py`)
+y Tareas del Turno (`tests/test_tareas_turno.py`, `tests/test_tareas_turno_cambios.py`,
+`tests/test_tareas_turno_cuentas.py`, `tests/test_tareas_turno_aviso.py`,
+`tests/test_tareas_turno_pantalla.py`).
 
 ## Empaquetado (.exe)
 

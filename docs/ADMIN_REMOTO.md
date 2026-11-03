@@ -52,7 +52,10 @@ Vender, cobrar, Cierre de Turno y las cajas, Copia de Seguridad, prender o
 apagar la entrada desde otra PC y prender o apagar el envío de cierres a la app
 de gastos. También Gestión Impresiones (cobra señas) y, por ahora, Pedidos de
 Clientes (no cobra, pero todavía no se decidió si se quiere desde otra PC). El cierre forzoso de la caja y el Administrador que vuelve solo a la
-empleada también son cosas del mostrador.
+empleada también son cosas del mostrador. Y Tareas del Turno con su aviso: el
+aviso "es la hora de prender las luces" es para quien está atendiendo, así que
+sale solo en el mostrador, y el acceso desde otra PC avisa que eso se hace en el
+mostrador (cargar o cambiar una tarea también, por ahora).
 
 ## Por qué así y no "abriendo la base por la carpeta compartida"
 

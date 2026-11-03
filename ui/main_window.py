@@ -5,13 +5,11 @@ consulta y gestión. Los cobros y el cierre de turno se hacen en el mostrador.
 """
 
 import threading
-from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
 )
-from PySide6.QtCore import Qt, QRect, QTimer
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtCore import Qt, QTimer
 
 import dominio
 from admin_remoto import modo as modo_remoto
@@ -23,6 +21,8 @@ from ui.configuracion_admin_window import ConfiguracionAdminWindow
 from ui.gestion_impresiones_window import VentanaGestionImpresiones
 from ui.impresiones_window import DialogoImpresiones
 from ui.pedidos_clientes_window import VentanaPedidosClientes
+from ui.aviso_tarea import RevisorDeTareas
+from ui.tareas_turno_window import VentanaTareasTurno
 from ui.ventas_window import VentasWindow
 from ui.caja_window import CajaWindow, CierreTurnoWindow
 from ui.usuarios_window import DialogoCambiarClave
@@ -30,6 +30,8 @@ from ui.ingreso_caja import mensaje_del_sobre
 from ui.lista_compras_window import VentanaListaDeCompras
 from ui.vuelta_del_admin import VueltaDelAdmin
 from ui.en_segundo_plano import MILISEGUNDOS_ENTRE_VISTAS, Respuesta, _correr
+# La foto de fondo vive en su archivo desde el 2026-11-03; se sigue pidiendo de acá.
+from ui.fondo_del_inicio import COLOR_SIN_FONDO, RUTA_FONDO_INICIO, FondoDelInicio  # noqa: F401
 from ui.utils import (
     aplicar_clase, icono_de_emoji, mostrar_error, mostrar_info, solo_en_el_mostrador,
 )
@@ -49,66 +51,23 @@ AGRANDAR_DIBUJITO_OPERADOR = 1.25
 ALTO_BOTON_BARRA = 42
 SEPARACION_BOTONES_BARRA = 7
 # Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja,
-# Gestión Impresiones y Pedidos de Clientes): todos del mismo tamaño, uno debajo del
-# otro a la izquierda (pedido del dueño, 2026-11-02, con un dibujo: antes eran tres
-# botones que ocupaban toda la fila; Gestión Impresiones se sumó el mismo día y
-# Pedidos de Clientes el 2026-11-03). Con los cinco, el inicio pide ~930 px de alto:
-# entra en la pantalla de 1920 x 1080 del mostrador.
+# Gestión Impresiones, Pedidos de Clientes y Tareas del Turno): todos del mismo
+# tamaño, uno debajo del otro a la izquierda (pedido del dueño, 2026-11-02, con un
+# dibujo: antes eran tres botones que ocupaban toda la fila; Gestión Impresiones se
+# sumó el mismo día, Pedidos de Clientes y Tareas del Turno el 2026-11-03). Medían
+# 110 de alto con 20 entre uno y otro; con el sexto, cada uno quedó un poco más
+# bajito para que el inicio siga entrando en la pantalla de 1920 x 1080 del
+# mostrador (~960 px con la letra de Windows; lo cuida tests/test_estilo_ui.py).
 ANCHO_ACCESO = 240
-ALTO_ACCESO = 110
-SEPARACION_ACCESOS = 20
+ALTO_ACCESO = 98
+SEPARACION_ACCESOS = 14
 TAMANO_DIBUJITO_ACCESO = 34
-# La foto del kiosko de noche que va de fondo en toda la ventana (la eligió el dueño,
-# 2026-11-03). Está en assets, junto al código, como el ícono de ui/login_window.py
-# (Kiosko.spec mete la carpeta entera en el .exe). Si faltara, el fondo es este azul
-# oscuro: el título del inicio es claro y sobre el gris de siempre no se leería.
-RUTA_FONDO_INICIO = Path(__file__).resolve().parent.parent / "assets" / "fondo_inicio.jpg"
-COLOR_SIN_FONDO = "#0E1A33"
+# El numerito amarillo de la esquina de un acceso (cuántas tareas del turno están
+# atrasadas): alto y lo que lo separa del borde.
+ALTO_INSIGNIA = 26
+MARGEN_INSIGNIA = 8
 # Lo que separa el panel del título y los accesos del borde de la foto.
 MARGEN_DEL_PANEL = 16
-
-
-class FondoDelInicio(QWidget):
-    """El widget de toda la ventana principal, con la foto de fondo. La foto tapa
-    la ventana entera sin deformarse: se agranda hasta cubrirla y se recorta lo que
-    sobra de los costados (o de arriba y abajo), siempre centrada. La agrandada se
-    guarda y se rehace solo si cambia el tamaño: agrandarla en cada repintada le
-    costaría a la PC con cada botón que titila."""
-
-    # La foto y la agrandada son UNA para todo el programa, no una por ventana: la
-    # ventana principal se vuelve a armar con cada "🔄 Operador" y con la vuelta sola
-    # del Admin, y la del Admin, ya cerrada, sigue viva (VueltaDelAdmin la tiene
-    # agarrada): con una agrandada propia, cada salida del Admin dejaba ~8 MB en la
-    # memoria del mostrador. Se lee al armar la primera ventana y no al importar el
-    # módulo: un QPixmap antes de que exista la QApplication cierra el programa.
-    _foto = None
-    _agrandada = None
-    _agrandada_para = None  # (ancho, alto) en puntos reales de la pantalla
-
-    def __init__(self):
-        super().__init__()
-        if FondoDelInicio._foto is None:
-            FondoDelInicio._foto = QPixmap(str(RUTA_FONDO_INICIO))
-
-    def paintEvent(self, _evento):
-        pintor = QPainter(self)
-        foto = FondoDelInicio._foto
-        if foto.isNull():
-            pintor.fillRect(self.rect(), QColor(COLOR_SIN_FONDO))
-            pintor.end()
-            return
-        # En puntos reales de la pantalla: con Windows al 125% la ventana mide menos
-        # "píxeles" que los que se ven, y agrandada a ese tamaño la foto saldría borrosa.
-        escala = self.devicePixelRatioF()
-        ancho, alto = round(self.width() * escala), round(self.height() * escala)
-        if FondoDelInicio._agrandada_para != (ancho, alto):
-            FondoDelInicio._agrandada = foto.scaled(ancho, alto, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            FondoDelInicio._agrandada_para = (ancho, alto)
-        agrandada = FondoDelInicio._agrandada
-        sobra_x = (agrandada.width() - ancho) // 2
-        sobra_y = (agrandada.height() - alto) // 2
-        pintor.drawPixmap(self.rect(), agrandada, QRect(sobra_x, sobra_y, ancho, alto))
-        pintor.end()
 
 
 class MainWindow(QMainWindow):
@@ -146,6 +105,10 @@ class MainWindow(QMainWindow):
         self._remota = modo_remoto.es_copia_remota()
         self._titilar = False
         self._encendido = False
+        # Las tareas del turno que llegaron a su hora sin hacerse: el acceso TAREAS DEL
+        # TURNO titila en rojo y muestra cuántas son (ver _poner_tareas_atrasadas).
+        self._tareas_atrasadas = 0
+        self._encendido_tareas = False
         self._armar_interfaz()
         if self._remota:
             self._mostrar_la_caja_del_mostrador()
@@ -169,6 +132,10 @@ class MainWindow(QMainWindow):
         self._vuelta = None
         if self.es_admin and not self._remota:
             self._vuelta = VueltaDelAdmin(self, volver_a, self._volver_sola, self._hay_un_cobro_a_medias)
+        # El aviso de las tareas del turno sale solo en el mostrador (ver ui/aviso_tarea.py).
+        self._tareas = None
+        if not self._remota:
+            self._tareas = RevisorDeTareas(self, usuario, self._poner_tareas_atrasadas)
 
     def _armar_interfaz(self):
         if self._remota:
@@ -253,9 +220,13 @@ class MainWindow(QMainWindow):
             ("💵", "CAJA", self._abrir_caja),
             ("📑", "GESTIÓN IMPRESIONES", self._abrir_gestion_impresiones),
             ("🙋", "PEDIDOS DE CLIENTES", self._abrir_pedidos_clientes),
+            ("⏰", "TAREAS DEL TURNO", self._abrir_tareas_turno),
         ):
+            acceso = self._acceso_de_inicio(dibujito, texto, accion)
             # Sin AlignLeft, un botón de tamaño fijo queda centrado en la fila.
-            accesos.addWidget(self._acceso_de_inicio(dibujito, texto, accion), 0, Qt.AlignLeft)
+            accesos.addWidget(acceso, 0, Qt.AlignLeft)
+        # El último: titila y lleva el numerito de las atrasadas.
+        self.acceso_tareas = acceso
         columna_inicio.addLayout(accesos)
         layout.addWidget(inicio, 1)
         contenedor.setLayout(layout)
@@ -283,9 +254,17 @@ class MainWindow(QMainWindow):
         nombre.setObjectName("nombreAcceso")
         nombre.setAlignment(Qt.AlignCenter)
         capa.addStretch()
-        for etiqueta in (dibujo, nombre):
+        # El numerito de la esquina (hoy lo usa solo Tareas del Turno): fuera del
+        # layout, encima del botón, y escondido mientras no haya nada que contar.
+        boton.insignia = QLabel(boton)
+        boton.insignia.setObjectName("insigniaAcceso")
+        boton.insignia.setAlignment(Qt.AlignCenter)
+        boton.insignia.setFixedHeight(ALTO_INSIGNIA)
+        boton.insignia.hide()
+        for etiqueta in (dibujo, nombre, boton.insignia):
             # El clic tiene que llegarle al botón, no a la etiqueta que tiene encima.
             etiqueta.setAttribute(Qt.WA_TransparentForMouseEvents)
+        for etiqueta in (dibujo, nombre):
             capa.addWidget(etiqueta)
         capa.addStretch()
         boton.clicked.connect(funcion)
@@ -358,6 +337,9 @@ class MainWindow(QMainWindow):
         self._timer_parpadeo.stop()
         if self._vuelta is not None:
             self._vuelta.detener()
+        # Sin nadie adentro no hay quién conteste: el aviso abierto se va con la sesión.
+        if self._tareas is not None:
+            self._tareas.detener()
         super().closeEvent(evento)
 
     # -----------------------------------------------------------------
@@ -441,6 +423,24 @@ class MainWindow(QMainWindow):
         clase = "alerta" if self._encendido else "barra"
         if self.boton_cierre_turno.property("clase") != clase:
             aplicar_clase(self.boton_cierre_turno, clase)
+        # TAREAS DEL TURNO, mientras haya atrasadas: el mismo rojo por propiedad, con
+        # los mismos bordes (QPushButton#accesoInicio[alerta] en la hoja de estilos).
+        self._encendido_tareas = bool(self._tareas_atrasadas) and not self._encendido_tareas
+        if bool(self.acceso_tareas.property("alerta")) != self._encendido_tareas:
+            self.acceso_tareas.setProperty("alerta", self._encendido_tareas)
+            self.acceso_tareas.style().unpolish(self.acceso_tareas)
+            self.acceso_tareas.style().polish(self.acceso_tareas)
+
+    def _poner_tareas_atrasadas(self, cuantas: int):
+        """Lo que cuenta ui/aviso_tarea.RevisorDeTareas: el numerito amarillo arriba a la
+        derecha del acceso (y, con alguna, el titileo de _parpadear)."""
+        self._tareas_atrasadas = cuantas
+        insignia = self.acceso_tareas.insignia
+        insignia.setText(str(cuantas))
+        insignia.setVisible(cuantas > 0)
+        insignia.setMinimumWidth(ALTO_INSIGNIA)
+        insignia.adjustSize()
+        insignia.move(ANCHO_ACCESO - insignia.width() - MARGEN_INSIGNIA, MARGEN_INSIGNIA)
 
     def _hay_un_cobro_a_medias(self) -> bool:
         """
@@ -529,6 +529,20 @@ class MainWindow(QMainWindow):
     @solo_en_el_mostrador
     def _abrir_pedidos_clientes(self):
         VentanaPedidosClientes(self.usuario, self).exec()
+
+    @solo_en_el_mostrador
+    def _abrir_tareas_turno(self):
+        ventana = VentanaTareasTurno(self.usuario, self)
+        # Lo que se contesta en el aviso con la ventana abierta se ve ya en la lista:
+        # esperando su repaso de los 30 s, seguía ATRASADA con su tecla HECHA.
+        al_contestar = ventana._repasar
+        self._tareas.contestaron.connect(al_contestar)
+        try:
+            ventana.exec()
+        finally:
+            self._tareas.contestaron.disconnect(al_contestar)
+        # Lo que se marcó o se cargó adentro se ve ya en el numerito del acceso.
+        self._tareas.contar()
 
     @solo_en_el_mostrador
     def _abrir_cierre_turno(self):

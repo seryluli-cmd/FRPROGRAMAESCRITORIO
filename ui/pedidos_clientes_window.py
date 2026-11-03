@@ -34,6 +34,7 @@ import dominio
 from repositories import pedidos_clientes_repo
 from ui.piezas_ventana import (
     agregar_indicador, cabecera_oscura, marcar_solo_admin, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
+    tecla_de_renglon,
 )
 from ui.utils import (
     aplicar_clase, confirmar, crear_tabla, encadenar_enter, formato_fecha_hora, manejar_errores, mostrar_aviso,
@@ -85,21 +86,8 @@ def _clientes_en_texto(clientes: int) -> str:
 
 
 def _tecla_del_renglon(texto: str, al_apretar, clase: str) -> QWidget:
-    """Una tecla adentro de una celda, con un margen para que no toque el borde del
-    renglón (el botón solo, estirado a toda la celda, queda pegado a la raya)."""
-    boton = tecla(texto, al_apretar, clase)
-    boton.setAutoDefault(False)
-    boton.setProperty("teclaDeRenglon", True)
-    # Que Qt vuelva a mirar la hoja de estilos con la propiedad nueva (tecla() ya lo pintó).
-    boton.style().unpolish(boton)
-    boton.style().polish(boton)
-    boton.setFixedHeight(ALTO_TECLA_RENGLON)
-    caja = QWidget()
-    capa = QHBoxLayout(caja)
-    capa.setContentsMargins(6, 0, 6, 0)
-    capa.addWidget(boton)
-    caja.boton = boton
-    return caja
+    """+1 y TRAJIMOS: la tecla de renglón que comparte con Tareas del Turno."""
+    return tecla_de_renglon(texto, al_apretar, clase, ALTO_TECLA_RENGLON)
 
 
 class VentanaPedidosClientes(QDialog):

@@ -186,6 +186,28 @@ def _repintar(widget):
     widget.style().polish(widget)
 
 
+def tecla_de_renglon(texto: str, al_apretar, clase: str, alto: int) -> QWidget:
+    """
+    Una tecla adentro de una celda de la grilla (el +1 y TRAJIMOS de Pedidos de
+    Clientes, HECHA de Tareas del Turno), con un margen para que no toque el borde
+    del renglón: el botón solo, estirado a toda la celda, queda pegado a la raya. Va
+    para `setCellWidget`; `caja.boton` es la tecla. La letra, más grande que la de
+    una tecla común, está en QPushButton[teclaDeRenglon] de ui/hoja_de_estilos.py.
+    """
+    boton = tecla(texto, al_apretar, clase)
+    boton.setAutoDefault(False)
+    boton.setProperty("teclaDeRenglon", True)
+    # Que Qt vuelva a mirar la hoja de estilos con la propiedad nueva (tecla() ya lo pintó).
+    _repintar(boton)
+    boton.setFixedHeight(alto)
+    caja = QWidget()
+    capa = QHBoxLayout(caja)
+    capa.setContentsMargins(6, 0, 6, 0)
+    capa.addWidget(boton)
+    caja.boton = boton
+    return caja
+
+
 def agregar_indicador(cabecera: QFrame, titulo: str) -> QFrame:
     """Un recuadro a la derecha de la cabecera con un número grande y, debajo, su
     título chiquito en mayúscula ("73 / ARTÍCULOS"). El número se pone con

@@ -7,8 +7,9 @@ oscuro (si no, los cuadros que la hoja de estilos no pinta salen negros con la l
 oscura encima), que las tablas no muestren la numeración de filas, que la barra
 oscura de arriba use sus teclas (y que Cierre de Turno no cambie de tamaño al
 titilar), que el inicio tenga la foto de fondo sin deformarla, con el título y los
-accesos en un panel oscuro, y que los avisos que abren las ventanas del diseño
-nuevo no hereden su estilo.
+seis accesos en un panel oscuro (Tareas del Turno tampoco cambia de tamaño al
+titilar), y que los avisos que abren las ventanas del diseño nuevo no hereden su
+estilo.
 
 Se ejecutan con:
 
@@ -40,6 +41,9 @@ from ui.caja_window import CajaWindow, CierreTurnoWindow  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
+
+ACCESOS_DEL_INICIO = ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES",
+                      "TAREAS DEL TURNO"]
 
 
 def _regla(selector: str) -> dict:
@@ -145,7 +149,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
     def test_los_accesos_del_inicio_van_uno_debajo_del_otro_y_miden_igual(self):
         # Pedido del dueño (2026-11-02, con un dibujo): Venta de Mercadería, Impresiones y Caja
         # como botones iguales, apilados a la izquierda y a la misma distancia; ese mismo día
-        # se sumó Gestión Impresiones abajo, y el 2026-11-03 Pedidos de Clientes.
+        # se sumó Gestión Impresiones abajo, y el 2026-11-03 Pedidos de Clientes y Tareas
+        # del Turno.
         # Con la hoja de estilos: la letra del título y de la frase de arriba está ahí.
         self._con_la_hoja_de_estilos()
         admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
@@ -157,29 +162,73 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         _app.processEvents()
 
         accesos = [b for b in ventana.findChildren(QPushButton) if b.objectName() == "accesoInicio"]
-        self.assertEqual([b.accessibleName() for b in accesos],
-                         ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES"])
-        # Que los cinco entren en la pantalla del mostrador: abre maximizada en 1920 x 1080, y
+        self.assertEqual([b.accessibleName() for b in accesos], ACCESOS_DEL_INICIO)
+        # Que los seis entren en la pantalla del mostrador: abre maximizada en 1920 x 1080, y
         # sin la barra de Windows (~40) ni la de título (~31) quedan ~1009 px. Con la letra de
         # Windows el inicio mide ~20 px más que acá (offscreen): 933 contra 914 el 2026-11-03,
-        # con el panel sobre la foto de fondo.
+        # con el panel sobre la foto de fondo y cinco accesos. Con el sexto, cada acceso pasó
+        # de 110 a 98 de alto y de 20 a 14 entre uno y otro: 942 acá (~962 en Windows).
         self.assertLessEqual(ventana.minimumSizeHint().height(), 1009 - 25)
         self.assertEqual(len({(b.width(), b.height()) for b in accesos}), 1)
         self.assertEqual(len({b.x() for b in accesos}), 1)
         arriba = [b.y() for b in accesos]
         self.assertEqual(arriba, sorted(arriba))
-        # PEDIDOS DE CLIENTES abre su ventana (y, como Gestión Impresiones, solo en el mostrador).
-        with mock.patch("ui.main_window.VentanaPedidosClientes") as pedidos:
-            accesos[-1].click()
-        pedidos.assert_called_once_with(admin, ventana)
-        pedidos.return_value.exec.assert_called_once()
-        with mock.patch("ui.main_window.VentanaPedidosClientes") as pedidos, \
-                mock.patch("ui.main_window.modo_remoto.es_copia_remota", return_value=True), \
-                mock.patch("ui.utils.mostrar_info") as aviso:
-            accesos[-1].click()
-        pedidos.assert_not_called()
-        aviso.assert_called_once()
         self.assertEqual(len({abajo - encima for encima, abajo in zip(arriba, arriba[1:])}), 1)
+        por_nombre = {b.accessibleName(): b for b in accesos}
+        # PEDIDOS DE CLIENTES y TAREAS DEL TURNO abren su ventana (y, como Gestión
+        # Impresiones, solo en el mostrador).
+        for nombre, ventana_que_abre in (("PEDIDOS DE CLIENTES", "VentanaPedidosClientes"),
+                                         ("TAREAS DEL TURNO", "VentanaTareasTurno")):
+            with self.subTest(nombre):
+                with mock.patch(f"ui.main_window.{ventana_que_abre}") as abierta:
+                    por_nombre[nombre].click()
+                abierta.assert_called_once_with(admin, ventana)
+                abierta.return_value.exec.assert_called_once()
+                with mock.patch(f"ui.main_window.{ventana_que_abre}") as abierta, \
+                        mock.patch("ui.main_window.modo_remoto.es_copia_remota", return_value=True), \
+                        mock.patch("ui.utils.mostrar_info") as aviso:
+                    por_nombre[nombre].click()
+                abierta.assert_not_called()
+                aviso.assert_called_once()
+
+    def test_tareas_del_turno_no_cambia_de_tamano_al_titilar(self):
+        # Mientras haya tareas atrasadas, el acceso titila en rojo (2026-11-03). Como
+        # Cierre de Turno en la barra: el rojo lleva los mismos bordes y relleno que el
+        # azul de siempre, o el botón crecería y empujaría a los de abajo cada vez.
+        azul = _regla("QPushButton#accesoInicio")
+        rojo = _regla('QPushButton#accesoInicio[alerta="true"]')
+        for propiedad in ("padding", "border-radius"):
+            self.assertEqual(rojo[propiedad], azul[propiedad], propiedad)
+        for propiedad in ("border", "border-bottom"):
+            self.assertEqual(rojo[propiedad].split()[:2], azul[propiedad].split()[:2], propiedad)
+
+        self._con_la_hoja_de_estilos()
+        empleada = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Carla", "1234", dominio.ROL_EMPLEADA))
+        ventana = MainWindow(empleada, lambda: None)
+        self.addCleanup(ventana.deleteLater)
+        self.addCleanup(ventana.close)
+        ventana.show()
+        _app.processEvents()
+        acceso = ventana.acceso_tareas
+        self.assertEqual(acceso.accessibleName(), "TAREAS DEL TURNO")
+        antes, alto_antes = acceso.size(), ventana.minimumSizeHint().height()
+        ventana._poner_tareas_atrasadas(3)
+        for encendido in (True, False, True):
+            ventana._parpadear()
+            _app.processEvents()
+            self.assertEqual(bool(acceso.property("alerta")), encendido)
+            self.assertEqual(acceso.size(), antes)
+            self.assertEqual(ventana.minimumSizeHint().height(), alto_antes)
+        # El numerito amarillo dice cuántas son, arriba a la derecha y adentro del botón.
+        self.assertEqual(acceso.insignia.text(), "3")
+        self.assertFalse(acceso.insignia.isHidden())
+        self.assertTrue(acceso.rect().contains(acceso.insignia.geometry()))
+        # Sin atrasadas deja de titilar y el numerito se va.
+        ventana._poner_tareas_atrasadas(0)
+        ventana._parpadear()
+        ventana._parpadear()
+        self.assertFalse(acceso.property("alerta"))
+        self.assertTrue(acceso.insignia.isHidden())
 
     def _con_la_hoja_de_estilos(self):
         """La hoja de estilos del programa mientras dura la prueba (este archivo no la
@@ -245,8 +294,7 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
 
         panel = ventana.findChild(QFrame, "panelInicio")
         accesos = panel.findChildren(QPushButton)
-        self.assertEqual([b.accessibleName() for b in accesos],
-                         ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES"])
+        self.assertEqual([b.accessibleName() for b in accesos], ACCESOS_DEL_INICIO)
         self.assertEqual(panel.size(), panel.sizeHint())
         self.assertEqual(panel.pos(), QPoint(MARGEN_DEL_PANEL, MARGEN_DEL_PANEL))
         for nombre, minimo in (("tituloInicio", 200), ("detalleInicio", 150)):
