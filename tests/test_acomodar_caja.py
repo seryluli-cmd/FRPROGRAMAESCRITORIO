@@ -13,6 +13,7 @@ Se ejecutan con:
 """
 
 import os
+from datetime import datetime
 from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -22,7 +23,7 @@ from PySide6.QtWidgets import QApplication, QFrame, QPushButton  # noqa: E402
 import dominio  # noqa: E402
 from database import conexion_db  # noqa: E402
 from repositories import (  # noqa: E402
-    acomodar_caja_repo, articulos_repo, relevo_repo, turnos_repo, usuarios_repo, ventas_repo,
+    acomodar_caja_repo, articulos_repo, envio_pwa_repo, relevo_repo, turnos_repo, usuarios_repo, ventas_repo,
 )
 from repositories.config_repo import obtener_fondo_cambio  # noqa: E402
 from ui.acomodar_caja_window import DialogoAcomodarCaja  # noqa: E402
@@ -108,6 +109,59 @@ class TestAcomodarCaja(_ConCaja):
         venta_id = acomodar_caja_repo.acomodar_caja(self.admin_id, 5000, 0)
         ventas_repo.anular_venta(venta_id, self.admin_id, "me equivoqué de monto")
         self.assertEqual(turnos_repo.resumen_turno_actual()["monto_a_retirar"], 0)
+
+
+class TestPrimerDiaConElPrograma(_ConCaja):
+    """El caso del dueño (2026-11-04): pasa del programa viejo a mitad de la Mañana.
+    Carga con ORDENAR $ lo cobrado hasta ahí, la empleada de la Mañana abre su caja
+    a las 13:20, y a las 14:05, cuando llega la de la Tarde, hace el Cierre de Turno.
+    Ese cierre (y el que va a la app de gastos) es de la MAÑANA, con lo de ORDENAR $
+    y lo que vendió. Sin ese arreglo, la caja de las 13:20 salía como Tarde (la
+    tolerancia de una hora de quien llega temprano)."""
+
+    def _a_las(self, hora, minuto=0):
+        return datetime(2026, 11, 2, hora, minuto)
+
+    def _con_reloj(self, momento, funcion, *argumentos):
+        with mock.patch("repositories.ventas_repo.datetime") as reloj:
+            reloj.now.return_value = momento
+            return funcion(*argumentos)
+
+    def test_lo_de_ordenar_y_lo_vendido_van_en_el_cierre_de_la_manana(self):
+        fondo = obtener_fondo_cambio()
+        self._con_reloj(self._a_las(13, 15), acomodar_caja_repo.acomodar_caja, self.admin_id, 58_550, 87_500)
+
+        situacion = relevo_repo.situacion_al_entrar(self.empleada_id, self._a_las(13, 20))
+        self.assertEqual(situacion["turno_label"], "Mañana")
+        self.assertEqual(situacion["esperado"], fondo + 58_550)
+        caja = relevo_repo.abrir_caja(self.empleada_id, fondo + 58_550, self._a_las(13, 20))
+        self.assertEqual(caja["turno_label"], "Mañana")
+        self.assertEqual(caja["diferencia"], 0)
+
+        self._con_reloj(self._a_las(13, 40), ventas_repo.confirmar_venta, self.empleada_id,
+                        [{"codigo": "COD9", "descripcion": "ALFAJOR", "cantidad": 1, "precio_unitario": 1000.0}],
+                        [{"metodo": EF, "monto": 1000.0}])
+        cierre = turnos_repo.cerrar_turno(self.empleada_id, ahora_dt=self._a_las(14, 5))
+
+        self.assertEqual(cierre["turno_label"], "Mañana")
+        with conexion_db() as conexion:
+            datos = envio_pwa_repo.datos_del_cierre(conexion, cierre["id"])
+        self.assertEqual((datos["turno"], datos["registradoPor"]), ("mañana", "Lucia"))
+        self.assertEqual((datos["efectivo"], datos["digital"], datos["importe"]), (59_550, 87_500, 147_050))
+
+        # La de la Tarde, que llega después del cierre, abre la Tarde como siempre.
+        gaby_id = usuarios_repo.crear_usuario("Gaby", "1234", dominio.ROL_EMPLEADA)
+        self.assertEqual(relevo_repo.abrir_caja(gaby_id, fondo, self._a_las(14, 10))["turno_label"], "Tarde")
+
+    def test_sin_nada_cargado_la_primera_caja_sigue_con_la_tolerancia(self):
+        # Sin ORDENAR $ antes, nada cambia: la que abre a las 13:20 es la Tarde que
+        # llegó temprano, y la de las 05:55 abre la Mañana.
+        self.assertEqual(relevo_repo.abrir_caja(self.empleada_id, obtener_fondo_cambio(),
+                                                self._a_las(13, 20))["turno_label"], "Tarde")
+
+    def test_la_de_las_cinco_y_cincuenta_y_cinco_abre_la_manana(self):
+        self.assertEqual(relevo_repo.abrir_caja(self.empleada_id, obtener_fondo_cambio(),
+                                                self._a_las(5, 55))["turno_label"], "Mañana")
 
 
 class TestBotonAcomodarCaja(_ConCaja):

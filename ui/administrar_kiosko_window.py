@@ -57,6 +57,9 @@ class AdministrarKioskoWindow(QDialog):
                 ("permiso_articulos", "📦", "Artículos", "Precios, stock, rubros y marcas", self._abrir_articulos),
                 ("permiso_compras", "🚚", "Compras", "La mercadería que entra al kiosko", self._abrir_compras),
                 (None, "📋", "Control de Stock", "Lista para contar los artículos e imprimirla", self._abrir_control_stock),
+                # Era una tecla adentro de Usuarios; el dueño la quiso a la vista acá,
+                # en el hueco al lado de Control de Stock (2026-11-04).
+                (None, "💵", "Cambio Fijo", "La plata para dar cambio en el cajón", self._abrir_cambio_fijo),
             ]),
             ("Ventas", [
                 ("permiso_consulta_ventas", "🔍", "Consulta de Ventas / Anular",
@@ -67,9 +70,6 @@ class AdministrarKioskoWindow(QDialog):
                 ("permiso_control_cierres", "🗂️", "Control de Cierres de Turno", "Cada cierre de caja y su sobre",
                  self._abrir_control_cierres),
                 (None, "👤", "Usuarios", "Quién entra, claves, permisos y copias", self._abrir_usuarios),
-                # Era una tecla adentro de Usuarios; el dueño la quiso a la vista acá
-                # (2026-11-04). Va al final para no correr las tarjetas de siempre.
-                (None, "💵", "Cambio Fijo", "La plata para dar cambio en el cajón", self._abrir_cambio_fijo),
             ]),
         ]
 

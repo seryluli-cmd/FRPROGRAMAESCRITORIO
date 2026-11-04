@@ -42,8 +42,8 @@ from repositories import cajas_repo, turnos_repo, usuarios_repo
 from repositories.config_repo import obtener_fondo_cambio
 from repositories.turnos_ventas_repo import _contar_ventas_entre
 from turnos import (
-    dia_del_turno_que_arranca_tras_un_cierre, etiqueta_turno, inicio_del_aviso_de_cierre,
-    turno_que_arranca_tras_un_cierre, turno_vencimiento,
+    calcular_turno, dia_del_turno_que_arranca_tras_un_cierre, dia_en_que_empezo_el_turno, etiqueta_turno,
+    inicio_del_aviso_de_cierre, turno_que_arranca_tras_un_cierre, turno_vencimiento,
 )
 
 # Qué tiene que pasar cuando alguien entra (ver situacion_al_entrar). Son un
@@ -87,6 +87,46 @@ def _apertura(conexion, usuario_id: int) -> dict:
     return {"cambio_esperado": cajas_repo.cambio_inicial(caja_anterior), "cuenta_cambio": not la_cerro_ella}
 
 
+def _primera_venta_entre(conexion, desde: str, hasta: str):
+    """La fecha (texto ISO) de la primera venta confirmada de la ventana, o None."""
+    return conexion.execute(
+        "SELECT MIN(fecha) AS fecha FROM ventas WHERE fecha > ? AND fecha <= ? AND estado = ?",
+        (desde, hasta, dominio.VENTA_CONFIRMADA),
+    ).fetchone()["fecha"]
+
+
+def _turno_y_dia_de_la_caja_nueva(conexion, ahora: datetime):
+    """Con qué turno y día queda una caja que se abre ahora: el de la hora, con la
+    tolerancia de turnos.turno_que_arranca_tras_un_cierre (la de la Tarde que
+    llega a las 13:00 abre la Tarde).
+
+    Una excepción, la del primer día con el programa: sin ningún cierre todavía y
+    con lo del programa viejo cargado con ORDENAR $ (el artículo
+    dominio.CODIGO_ARTICULO_ACOMODAR_CAJA) esperando una caja, la caja toma el turno
+    de esa carga, sin tolerancia: es la plata del turno que está corriendo. El
+    dueño pasó del programa viejo a este a mitad de la Mañana (2026-11-04): cargó
+    ORDENAR $ a las 13:15, la empleada de la Mañana abría su caja a las 13:20 y
+    salía como Tarde, con el cierre de las 14:05 (y el que va a la app de gastos)
+    con el nombre de la Tarde. Lo pidió así: "debe figurar en el turno mañana".
+    Las otras ventas sin caja no cuentan: lo que el Admin vende a las 02:36 sin
+    nadie en el mostrador pasa a la caja que se abre a las 05:55, y esa es la
+    Mañana (tests/test_cajas.py, TestVentasSinCaja)."""
+    if turnos_repo._obtener_ultimo_cierre(conexion) is None:
+        ventana = turnos_repo._ventana_en_curso(conexion, ahora)
+        carga = conexion.execute(
+            """
+            SELECT MIN(v.fecha) AS fecha
+            FROM ventas v JOIN venta_detalle d ON d.venta_id = v.id
+            WHERE d.articulo_codigo = ? AND v.fecha > ? AND v.fecha <= ? AND v.estado = ?
+            """,
+            (dominio.CODIGO_ARTICULO_ACOMODAR_CAJA, ventana["desde"], ventana["hasta"], dominio.VENTA_CONFIRMADA),
+        ).fetchone()["fecha"]
+        if carga:
+            momento = datetime.fromisoformat(carga)
+            return calcular_turno(momento), dia_en_que_empezo_el_turno(momento)
+    return turno_que_arranca_tras_un_cierre(ahora), dia_del_turno_que_arranca_tras_un_cierre(ahora)
+
+
 def _situacion(conexion, usuario, ahora: datetime) -> dict:
     """situacion_al_entrar() sobre una conexión ya abierta (las acciones de
     abajo la vuelven a pedir en su propia transacción antes de grabar)."""
@@ -109,10 +149,10 @@ def _situacion(conexion, usuario, ahora: datetime) -> dict:
                 "cambio_inicial": resumen["cambio_inicial"], "ventas_efectivo": resumen["ventas_efectivo"]}
 
     apertura = _apertura(conexion, usuario["id"])
+    turno, dia = _turno_y_dia_de_la_caja_nueva(conexion, ahora)
     situacion = {
         "situacion": SITUACION_ABRIR, **apertura,
-        "turno_label": etiqueta_turno(dia_del_turno_que_arranca_tras_un_cierre(ahora),
-                                      turno_que_arranca_tras_un_cierre(ahora)),
+        "turno_label": etiqueta_turno(dia, turno),
         "ventas_sin_caja": 0, "efectivo_sin_caja": 0.0, "desde": None,
         "esperado": apertura["cambio_esperado"],
     }
@@ -123,10 +163,7 @@ def _situacion(conexion, usuario, ahora: datetime) -> dict:
         # abrir_caja): su efectivo está en el cajón junto con el cambio, y se
         # cuenta todo junto aunque quien abre haya cerrado ella la anterior.
         efectivo = round(turnos_repo._resumen_en_curso(conexion, ahora)["ventas_efectivo"], 2)
-        primera = conexion.execute(
-            "SELECT MIN(fecha) AS fecha FROM ventas WHERE fecha > ? AND fecha <= ? AND estado = ?",
-            (ventana["desde"], ventana["hasta"], dominio.VENTA_CONFIRMADA),
-        ).fetchone()["fecha"]
+        primera = _primera_venta_entre(conexion, ventana["desde"], ventana["hasta"])
         situacion.update({
             "cuenta_cambio": True, "ventas_sin_caja": confirmadas, "efectivo_sin_caja": efectivo,
             "desde": primera, "esperado": round(apertura["cambio_esperado"] + efectivo, 2),
@@ -171,7 +208,9 @@ def abrir_caja(usuario_id: int, cambio_contado=None, ahora: datetime = None) -> 
     """
     Abre una caja nueva a cargo de `usuario_id`, con el turno que corresponde a
     esta hora (con la tolerancia de turnos.turno_que_arranca_tras_un_cierre:
-    quien abre a las 05:55 abre la Mañana). `cambio_contado` es lo que contó en
+    quien abre a las 05:55 abre la Mañana; el primer día, con lo de ORDENAR $
+    cargado antes, el turno de esa carga: ver _turno_y_dia_de_la_caja_nueva).
+    `cambio_contado` es lo que contó en
     el cajón (con lo que cobró el Admin sin caja, si hubo: ver
     situacion_al_entrar); None solo si no hace falta contar (ver _apertura): si
     hace falta y no viene, ValueError. Las ventas sin caja pasan a esta caja
@@ -192,8 +231,7 @@ def abrir_caja(usuario_id: int, cambio_contado=None, ahora: datetime = None) -> 
         if cambio_contado is not None:
             cambio_contado = round(cambio_contado - situacion["efectivo_sin_caja"], 2)
         ventana = turnos_repo._ventana_en_curso(conexion, ahora)
-        turno = turno_que_arranca_tras_un_cierre(ahora)
-        dia = dia_del_turno_que_arranca_tras_un_cierre(ahora)
+        turno, dia = _turno_y_dia_de_la_caja_nueva(conexion, ahora)
         cursor = conexion.execute(
             """
             INSERT INTO cajas (fecha, turno, abierta_por, abierta_en, cambio_esperado, cambio_contado, responsable_id)
