@@ -138,7 +138,7 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
 
         barra = ventana.findChild(QFrame, "encabezadoInicio")
         operador = next(b for b in barra.findChildren(QPushButton) if b.text().strip() == "OPERADOR")
-        clave = next(b for b in barra.findChildren(QPushButton) if b.text().endswith("CLAVE"))
+        clave = next(b for b in barra.findChildren(QPushButton) if b.text().endswith("CAMBIAR PASS"))
         self.assertFalse(operador.icon().isNull())
         self.assertNotIn("🔄", operador.text())
         # Los accesos de la pantalla de inicio piden los suyos (2026-11-02): acá cuenta solo la barra.
@@ -359,7 +359,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
         operador = botones["   OPERADOR"]
         hueco = operador.geometry().left() - lista.geometry().right()
         self.assertTrue(0 < hueco < 20, hueco)
-        self.assertEqual(max(b.geometry().right() for b in botones.values()), operador.geometry().right())
+        # Desde el 2026-11-04 a su derecha van Cambiar Pass y Ordenar $ (tests/test_barra_para_todos.py).
+        self.assertEqual(list(botones)[-3:], ["   OPERADOR", "🔑  CAMBIAR PASS", "🧮  ORDENAR $"])
 
     def test_los_botones_de_la_barra_de_arriba_van_en_mayuscula_y_negrita(self):
         # Pedido del dueño (2026-10-22).
