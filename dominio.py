@@ -33,6 +33,13 @@ ORIGENES_VENTA = (ORIGEN_KIOSKO,)
 # Impresiones es un artículo de mercadería, pero se muestra aparte en Caja.
 CODIGO_ARTICULO_IMPRESIONES = "4"
 
+# ACOMODAR CAJA (pedido del dueño, 2026-11-04, para pasar del programa anterior a
+# mitad de turno): lo que el otro programa ya había cobrado entra como una venta
+# de este artículo, que no es mercadería. Lo crea acomodar_caja_repo la primera
+# vez y articulos_repo lo esconde de Artículos, Vender y las listas.
+CODIGO_ARTICULO_ACOMODAR_CAJA = "ACOMODARCAJA"
+DESCRIPCION_ACOMODAR_CAJA = "ACOMODAR CAJA (PROGRAMA ANTERIOR)"
+
 TURNO_MANANA = "MAÑANA"
 TURNO_TARDE = "TARDE"
 TURNO_NOCHE = "NOCHE"

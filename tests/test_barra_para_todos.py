@@ -89,10 +89,11 @@ class TestBarraParaTodos(_ConUsuarios):
     def test_cambiar_pass_va_a_la_derecha_de_operador(self):
         # Pedido del dueño, 2026-11-04: el botón que se llamaba "Clave" iba antes de
         # Lista de Compras; lo quiso a la derecha de Operador y llamado "Cambiar Pass".
+        # Ese mismo día sumó ACOMODAR CAJA a su derecha (tests/test_acomodar_caja.py).
         ventana = self._ventana("TOBY", dominio.ROL_EMPLEADA)
         textos = [texto.strip() for texto in self._botones(ventana)]
 
-        self.assertEqual(textos[-3:], ["📝  LISTA DE COMPRAS", "OPERADOR", "🔑  CAMBIAR PASS"])
+        self.assertEqual(textos[-4:], ["📝  LISTA DE COMPRAS", "OPERADOR", "🔑  CAMBIAR PASS", "🧮  ACOMODAR CAJA"])
         self.assertFalse(any(texto.endswith("CLAVE") for texto in textos), textos)
 
     def test_los_que_no_le_tocan_se_ven_igual_y_dicen_acceso_restringido(self):

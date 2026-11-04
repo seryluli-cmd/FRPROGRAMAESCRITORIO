@@ -193,7 +193,11 @@ _SELECT_ARTICULOS = """
     FROM articulos a
     LEFT JOIN marcas m ON m.id = a.marca_id
     LEFT JOIN rubros r ON r.id = a.rubro_id
+    WHERE a.codigo <> ?
 """
+# El artículo de ACOMODAR CAJA no es mercadería (ver dominio): no sale en
+# Artículos, Vender, ORDENAR Stock ni las listas. Va como primer parámetro.
+_SIN_ACOMODAR = (dominio.CODIGO_ARTICULO_ACOMODAR_CAJA,)
 
 
 def listar_articulos(texto_busqueda: str = ""):
@@ -206,16 +210,16 @@ def listar_articulos(texto_busqueda: str = ""):
         if texto_busqueda:
             patron = f"%{texto_busqueda}%"
             return conexion.execute(
-                _SELECT_ARTICULOS + " WHERE a.codigo LIKE ? OR a.descripcion LIKE ? ORDER BY a.descripcion",
-                (patron, patron),
+                _SELECT_ARTICULOS + " AND (a.codigo LIKE ? OR a.descripcion LIKE ?) ORDER BY a.descripcion",
+                _SIN_ACOMODAR + (patron, patron),
             ).fetchall()
-        return conexion.execute(_SELECT_ARTICULOS + " ORDER BY a.descripcion").fetchall()
+        return conexion.execute(_SELECT_ARTICULOS + " ORDER BY a.descripcion", _SIN_ACOMODAR).fetchall()
 
 
 def buscar_por_codigo(codigo: str):
     """El artículo con ESE código exacto (lo que lee la pistola), o None."""
     with conexion_db() as conexion:
-        return conexion.execute(_SELECT_ARTICULOS + " WHERE a.codigo = ?", (codigo,)).fetchone()
+        return conexion.execute(_SELECT_ARTICULOS + " AND a.codigo = ?", _SIN_ACOMODAR + (codigo,)).fetchone()
 
 
 def buscar_por_descripcion(texto: str):
@@ -223,7 +227,7 @@ def buscar_por_descripcion(texto: str):
     with conexion_db() as conexion:
         patron = f"%{texto}%"
         return conexion.execute(
-            _SELECT_ARTICULOS + " WHERE a.descripcion LIKE ? ORDER BY a.descripcion", (patron,)
+            _SELECT_ARTICULOS + " AND a.descripcion LIKE ? ORDER BY a.descripcion", _SIN_ACOMODAR + (patron,)
         ).fetchall()
 
 
@@ -232,7 +236,7 @@ def buscar_por_marca(texto: str):
     with conexion_db() as conexion:
         patron = f"%{texto}%"
         return conexion.execute(
-            _SELECT_ARTICULOS + " WHERE m.nombre LIKE ? ORDER BY a.descripcion", (patron,)
+            _SELECT_ARTICULOS + " AND m.nombre LIKE ? ORDER BY a.descripcion", _SIN_ACOMODAR + (patron,)
         ).fetchall()
 
 
@@ -458,7 +462,7 @@ def listar_para_control_de_stock(usuario_id: int):
     """
     usuarios_repo.exigir_admin(usuario_id, "ver el Control de Stock")
     with conexion_db() as conexion:
-        articulos = conexion.execute(_SELECT_ARTICULOS + " WHERE a.stock > 0").fetchall()
+        articulos = conexion.execute(_SELECT_ARTICULOS + " AND a.stock > 0", _SIN_ACOMODAR).fetchall()
     return sorted(articulos, key=lambda articulo: (dominio.sin_acentos(articulo["descripcion"]), articulo["codigo"]))
 
 

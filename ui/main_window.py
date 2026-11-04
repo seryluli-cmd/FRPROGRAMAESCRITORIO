@@ -16,6 +16,7 @@ from admin_remoto import modo as modo_remoto
 from errores import registrar_error
 from repositories import impresiones_repo, relevo_repo, usuarios_repo
 from turnos import MINUTOS_PARA_CIERRE_FORZOSO
+from ui.acomodar_caja_window import DialogoAcomodarCaja
 from ui.administrar_kiosko_window import AdministrarKioskoWindow
 from ui.configuracion_admin_window import ConfiguracionAdminWindow
 from ui.gestion_impresiones_window import VentanaGestionImpresiones
@@ -316,6 +317,11 @@ class MainWindow(QMainWindow):
         boton_operador.setIconSize(tamano)
         # A la derecha de Operador, el último (pedido del dueño, 2026-11-04).
         self._agregar_boton_barra(layout_barra, "🔑  Cambiar Pass", self._abrir_cambiar_clave)
+        # Para pasar del programa anterior a mitad de turno (pedido del dueño,
+        # 2026-11-04: "es por esta vez nomás"). Solo el Admin; los demás lo ven igual.
+        self._agregar_boton_barra(
+            layout_barra, "🧮  Acomodar Caja", self._abrir_acomodar_caja, habilitado=self.es_admin,
+        )
         layout_barra.addStretch()
 
     def _agregar_boton_barra(self, layout, texto, funcion, clase=None, habilitado=True):
@@ -581,6 +587,10 @@ class MainWindow(QMainWindow):
 
     def _abrir_cambiar_clave(self):
         DialogoCambiarClave(self.usuario, self).exec()
+
+    @solo_en_el_mostrador
+    def _abrir_acomodar_caja(self):
+        DialogoAcomodarCaja(self.usuario, self).exec()
 
     def _abrir_lista_de_compras(self):
         VentanaListaDeCompras(self).exec()
