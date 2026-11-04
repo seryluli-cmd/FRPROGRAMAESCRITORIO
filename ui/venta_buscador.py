@@ -53,7 +53,7 @@ _CRITERIOS = {
             "Escribí la marca, elegí el producto con las flechas y apretá Enter...", dibujo_de_marca),
 }
 
-_TOPE_DE_RESULTADOS = 100   # se recorre con las flechas o la rueda: más no ayuda a elegir
+_TOPE_DE_RESULTADOS = 100   # se recorre con las flechas o la rueda: más no ayuda a elegir (va como LIMIT a la base)
 _RENGLONES_A_LA_VISTA = 6
 _ALTO_RENGLON = 46          # el mismo renglón de dos pisos del carrito
 _ANCHO_PRECIO = 120
@@ -181,10 +181,10 @@ class BuscadorDeLaVenta(QTableWidget):
             self.hide()
             return
         if self.criterio == DESCRIPCION:
-            encontrados = articulos_repo.buscar_por_descripcion(texto)
+            encontrados = articulos_repo.buscar_por_descripcion(texto, limite=_TOPE_DE_RESULTADOS)
         else:
-            encontrados = articulos_repo.buscar_por_marca(texto)
-        self._resultados = list(encontrados[:_TOPE_DE_RESULTADOS])
+            encontrados = articulos_repo.buscar_por_marca(texto, limite=_TOPE_DE_RESULTADOS)
+        self._resultados = list(encontrados)
         self._llenar(texto)
         self._mostrar()
 

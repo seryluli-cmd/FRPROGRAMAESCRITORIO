@@ -222,22 +222,33 @@ def buscar_por_codigo(codigo: str):
         return conexion.execute(_SELECT_ARTICULOS + " AND a.codigo = ?", _SIN_ACOMODAR + (codigo,)).fetchone()
 
 
-def buscar_por_descripcion(texto: str):
-    """Artículos cuya descripción CONTIENE `texto` (búsqueda parcial)."""
-    with conexion_db() as conexion:
-        patron = f"%{texto}%"
-        return conexion.execute(
-            _SELECT_ARTICULOS + " AND a.descripcion LIKE ? ORDER BY a.descripcion", _SIN_ACOMODAR + (patron,)
-        ).fetchall()
+def _hasta(consulta: str, parametros: tuple, limite: int | None):
+    """La consulta con LIMIT si se pide un tope; sin tope, queda igual que siempre.
+    Vender lo pide porque recorta la lista a 100: así la base no arma las demás
+    con cada letra que se tipea."""
+    if limite is None:
+        return consulta, parametros
+    return consulta + " LIMIT ?", parametros + (int(limite),)
 
 
-def buscar_por_marca(texto: str):
-    """Artículos cuya marca CONTIENE `texto` (búsqueda parcial)."""
+def buscar_por_descripcion(texto: str, limite: int | None = None):
+    """Artículos cuya descripción CONTIENE `texto` (búsqueda parcial). Con
+    `limite`, solo los primeros de ese mismo orden."""
     with conexion_db() as conexion:
         patron = f"%{texto}%"
-        return conexion.execute(
-            _SELECT_ARTICULOS + " AND m.nombre LIKE ? ORDER BY a.descripcion", _SIN_ACOMODAR + (patron,)
-        ).fetchall()
+        return conexion.execute(*_hasta(
+            _SELECT_ARTICULOS + " AND a.descripcion LIKE ? ORDER BY a.descripcion", _SIN_ACOMODAR + (patron,), limite
+        )).fetchall()
+
+
+def buscar_por_marca(texto: str, limite: int | None = None):
+    """Artículos cuya marca CONTIENE `texto` (búsqueda parcial). Con `limite`,
+    solo los primeros de ese mismo orden."""
+    with conexion_db() as conexion:
+        patron = f"%{texto}%"
+        return conexion.execute(*_hasta(
+            _SELECT_ARTICULOS + " AND m.nombre LIKE ? ORDER BY a.descripcion", _SIN_ACOMODAR + (patron,), limite
+        )).fetchall()
 
 
 def _marca_para_guardar(conexion, marca_id, nombre_marca_nueva):

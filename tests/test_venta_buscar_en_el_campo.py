@@ -207,5 +207,81 @@ class TestBuscarEnElMismoCampo(BaseConBaseTemporal):
         self.assertEqual(self._carrito(), [])
 
 
+class TestVenderLePideCienALaBase(BaseConBaseTemporal):
+    """Con más de 100 coincidencias, Vender le pide a la base solo las 100 que muestra
+    (LIMIT en SQL, en vez de traerlas todas y recortar), en el mismo orden de siempre.
+    Las demás llamadas (Compras, otra PC) siguen trayendo todas."""
+
+    CUANTOS = 130
+    TOPE = 100
+
+    def setUp(self):
+        super().setUp()
+        # Los códigos no siguen el orden de las descripciones, y de a dos se repite la
+        # descripción: con tope tienen que salir los mismos primeros, empates incluidos.
+        for numero in range(self.CUANTOS):
+            articulos_repo.crear_articulo(
+                str(9000000000000 + numero * 37 % self.CUANTOS), f"Galletita {self.CUANTOS - numero // 2:03d}",
+                None, None, 1000.0, 500.0, 0, nombre_marca_nueva="Bagley")
+        usuario = usuarios_repo.obtener_usuario(
+            usuarios_repo.crear_usuario("Lucia", "1234", dominio.ROL_EMPLEADA))
+        self.ventas = VentasWindow(usuario)
+        self.addCleanup(self.ventas.deleteLater)
+        self.ventas.show()
+        _app.processEvents()
+        self.campo = self.ventas.campo_codigo
+        self.lista = self.ventas.buscador
+
+    @staticmethod
+    def _codigos(articulos):
+        return [articulo["codigo"] for articulo in articulos]
+
+    def test_con_tope_salen_los_primeros_del_mismo_orden_y_sin_tope_todos(self):
+        for buscar, texto in ((articulos_repo.buscar_por_descripcion, "galletita"),
+                              (articulos_repo.buscar_por_marca, "bagley")):
+            with self.subTest(buscar.__name__):
+                todos = buscar(texto)
+                self.assertEqual(len(todos), self.CUANTOS)
+                self.assertEqual(self._codigos(buscar(texto, limite=self.TOPE)), self._codigos(todos[:self.TOPE]))
+
+    def _buscar_en_vender(self, nombre_funcion, texto):
+        """Tipea `texto` en Vender y devuelve, por cada letra, qué tope pidió y cuántos
+        artículos le dio la base. (Sin assert adentro: `_buscar` atrapa los errores
+        con un cartel.)"""
+        original = getattr(articulos_repo, nombre_funcion)
+        traidos = []
+
+        def contar(*args, **kwargs):
+            filas = original(*args, **kwargs)
+            traidos.append((kwargs.get("limite"), len(filas)))
+            return filas
+
+        with mock.patch.object(articulos_repo, nombre_funcion, side_effect=contar):
+            QTest.keyClicks(self.campo, texto)
+        return traidos
+
+    def test_por_descripcion_la_base_da_cien_y_se_elige_igual(self):
+        esperados = self._codigos(articulos_repo.buscar_por_descripcion("galletita")[:self.TOPE])
+        traidos = self._buscar_en_vender("buscar_por_descripcion", "galletita")
+        self.assertEqual(self.lista.criterio, "descripcion")   # la letra la pasó sola
+        self.assertEqual(set(traidos), {(self.TOPE, self.TOPE)})
+        self.assertEqual(self.lista.rowCount(), self.TOPE)
+        self.assertEqual(self._codigos(self.lista._resultados), esperados)
+        # Con las flechas se llega hasta el último de los 100, y Enter lo agrega.
+        QTest.keyClick(self.campo, Qt.Key_PageDown)
+        for _ in range(self.TOPE):
+            QTest.keyClick(self.campo, Qt.Key_Down)
+        self.assertEqual(self.lista.currentRow(), self.TOPE - 1)
+        QTest.keyClick(self.campo, Qt.Key_Return)
+        self.assertEqual([linea["codigo"] for linea in self.ventas.carrito], [esperados[-1]])
+
+    def test_por_marca_la_base_da_cien(self):
+        esperados = self._codigos(articulos_repo.buscar_por_marca("bagley")[:self.TOPE])
+        next(boton for boton in self.lista.botones if boton.text() == "Marca").click()
+        traidos = self._buscar_en_vender("buscar_por_marca", "bagley")
+        self.assertEqual(set(traidos), {(self.TOPE, self.TOPE)})
+        self.assertEqual(self._codigos(self.lista._resultados), esperados)
+
+
 if __name__ == "__main__":
     unittest.main()
