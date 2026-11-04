@@ -443,7 +443,7 @@ HOJA_DE_ESTILOS = """
         color: #FFFFFF;
     }
     QPushButton#accesoInicio QLabel#nombreAcceso {
-        font-size: 15px;
+        font-size: 12px;
         font-weight: 800;
     }
     /* TAREAS DEL TURNO mientras haya tareas atrasadas (2026-11-03): titila alternando

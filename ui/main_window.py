@@ -61,11 +61,13 @@ SEPARACION_BOTONES_BARRA = 7
 # Turno el 2026-11-03 y Ranking de Rotación el 2026-11-04). Medían 110 de alto con
 # 20 entre uno y otro; con el sexto pasaron a 98 y 14, y con el séptimo a 86 y 10,
 # para que el inicio siga entrando en la pantalla de 1920 x 1080 del mostrador
-# (lo cuida tests/test_estilo_ui.py).
-ANCHO_ACCESO = 240
-ALTO_ACCESO = 86
-SEPARACION_ACCESOS = 10
-TAMANO_DIBUJITO_ACCESO = 34
+# (lo cuida tests/test_estilo_ui.py). El 2026-11-04 el dueño los pidió un 20% más
+# chicos: 240 x 86 pasó a 192 x 69, con el dibujito, la letra y los márgenes en proporción.
+ANCHO_ACCESO = 192
+ALTO_ACCESO = 69
+SEPARACION_ACCESOS = 8
+TAMANO_DIBUJITO_ACCESO = 27
+MARGEN_DENTRO_DEL_ACCESO = 6
 # El numerito amarillo de la esquina de un acceso (cuántas tareas del turno están
 # atrasadas): alto y lo que lo separa del borde.
 ALTO_INSIGNIA = 26
@@ -250,8 +252,8 @@ class MainWindow(QMainWindow):
         boton.setAccessibleName(texto)
         boton.setFixedSize(ANCHO_ACCESO, ALTO_ACCESO)
         capa = QVBoxLayout(boton)
-        capa.setContentsMargins(8, 8, 8, 8)
-        capa.setSpacing(6)
+        capa.setContentsMargins(*(MARGEN_DENTRO_DEL_ACCESO,) * 4)
+        capa.setSpacing(5)
         icono, tamano = icono_de_emoji(dibujito, TAMANO_DIBUJITO_ACCESO)
         dibujo = QLabel()
         dibujo.setPixmap(icono.pixmap(tamano))
