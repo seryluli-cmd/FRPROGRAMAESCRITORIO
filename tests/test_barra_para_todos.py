@@ -76,6 +76,15 @@ class TestBarraParaTodos(_ConUsuarios):
 
         self.assertEqual(list(self._botones(empleada)), list(self._botones(admin)))
 
+    def test_cambiar_contrasena_va_pegado_a_operador_al_final(self):
+        # Pedido del dueño, 2026-11-04: el botón que se llamaba "Clave" iba antes de
+        # Lista de Compras; lo quiso al lado de Operador y con el nombre entero.
+        ventana = self._ventana("TOBY", dominio.ROL_EMPLEADA)
+        textos = [texto.strip() for texto in self._botones(ventana)]
+
+        self.assertEqual(textos[-3:], ["📝  LISTA DE COMPRAS", "🔑  CAMBIAR CONTRASEÑA", "OPERADOR"])
+        self.assertFalse(any(texto.endswith("CLAVE") for texto in textos), textos)
+
     def test_los_que_no_le_tocan_se_ven_igual_pero_no_abren_nada(self):
         empleada = self._ventana("TOBY", dominio.ROL_EMPLEADA)
         botones = self._botones(empleada)
