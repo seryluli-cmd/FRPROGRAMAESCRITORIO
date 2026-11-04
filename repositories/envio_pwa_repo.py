@@ -44,7 +44,10 @@ Reglas:
   estadísticas. No hacen falta contraseñas compartidas: el PIN de la app no
   participa. Van además campos que la app ignora y sirven para distinguirlo:
   origen, cierreId, caja, forzoso y cerradoPor; y, con caja, quién la abrió y a
-  qué hora (abiertaPor, abiertaEn), que la app muestra al tocar el cierre.
+  qué hora (abiertaPor, abiertaEn), que la app muestra al tocar el cierre. Si en
+  la ventana del cierre tocaba alguna TAREA DEL TURNO, van también las tareas
+  (`tareas`), como estaban al cerrar (tareas_del_cierre_repo): la app las muestra
+  abajo del resumen de caja.
 - Desde otra PC (admin_remoto) no hay nada de esto: la cola y el hilo son del
   mostrador.
 """
@@ -62,7 +65,7 @@ import database
 import dominio
 from database import conexion_db
 from errores import registrar_error
-from repositories import config_repo, control_cierres_repo, usuarios_repo
+from repositories import config_repo, control_cierres_repo, tareas_del_cierre_repo, usuarios_repo
 from turnos import etiqueta_turno, turno_para_la_app_de_gastos
 
 # La app de gastos: su proyecto de Firebase y la clave PÚBLICA con que entra cada
@@ -214,6 +217,8 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
     qué hora a qué hora va el turno. Sale de
     control_cierres_repo._resumen_del_cierre, el mismo que usa Control de Cierres
     (el importe es su "ventas_total" y lo que había que retirar, su "monto_a_retirar").
+    Y "tareas": las TAREAS DEL TURNO de la ventana del cierre (pedido del dueño,
+    2026-11-03), como las arma _tareas_para_la_app; vacía si no tocaba ninguna.
     """
     cierre = conexion.execute(
         """
@@ -262,7 +267,31 @@ def datos_del_cierre(conexion, cierre_id: int) -> dict:
             "desde": resumen["desde"],
             "hasta": resumen["hasta"],
         },
+        "tareas": _tareas_para_la_app(
+            tareas_del_cierre_repo.tareas_del_cierre(conexion, desde, cierre["fecha_cierre"])
+        ),
     }
+
+
+def _tareas_para_la_app(tareas: list) -> list:
+    """Las tareas del cierre como las muestra la app abajo del resumen de caja, en el
+    orden del turno: el día del local y la hora en que tocaba, el texto, si se hizo
+    (quién y a qué hora) y quiénes la pospusieron (cada nombre una vez, en el orden en
+    que lo hicieron) y cuántas veces en total."""
+    para_la_app = []
+    for tarea in tareas:
+        hecha = tarea["estado"] == dominio.TAREA_HECHA
+        para_la_app.append({
+            "dia": tarea["dia"],
+            "hora": tarea["hora"],
+            "texto": tarea["texto"],
+            "hecha": hecha,
+            "hechaPor": tarea["hecha_por"] if hecha else None,
+            "hechaA": f"{datetime.fromisoformat(tarea['hecha_en']):%H:%M}" if hecha else None,
+            "vecesPospuesta": tarea["veces_pospuesta"],
+            "pospusieron": list(dict.fromkeys(p["nombre"] for p in tarea["posposiciones"])),
+        })
+    return para_la_app
 
 
 def _valor(valor) -> dict:
@@ -319,6 +348,9 @@ def a_campos_firestore(datos: dict) -> dict:
     if datos["abiertaEn"] is not None:
         campos["abiertaPor"] = {"stringValue": datos["abiertaPor"]}
         campos["abiertaEn"] = {"timestampValue": _momento_utc(datos["abiertaEn"])}
+    # Sin tareas no va el campo: el cierre se ve allá exactamente como antes.
+    if datos["tareas"]:
+        campos["tareas"] = _valor(datos["tareas"])
     return {"fields": campos}
 
 
