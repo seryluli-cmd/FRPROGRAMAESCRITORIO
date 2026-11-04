@@ -301,7 +301,9 @@ ingreso (el Admin se queda). Si hay un cobro a medias, espera.
   dibujo de la izquierda pasa a "ABC" o a una etiqueta, y lo encontrado sale en
   una lista debajo del campo que se elige con las flechas y Enter (o un clic). F5
   Código (o Esc con el campo vacío) vuelve al código de barras; la pistola anda
-  en los tres. Botón `*` "Cant." fija la cantidad para el próximo
+  en los tres. Sin apretar nada, una letra pasa sola a buscar por nombre ("ABC")
+  y solo números vuelven al código (pedido del dueño, 2026-11-04;
+  `venta_buscador.criterio_segun_lo_escrito`). Botón `*` "Cant." fija la cantidad para el próximo
   escaneo. Doble clic en $ Unit. **solo si es Admin**. Avisa (no bloquea) si el
   stock proyectado queda por debajo de `stock_minimo`. Cobra con
   `ui/dialogo_pago.DialogoPago`: Efectivo y Digital siempre a la vista y suman

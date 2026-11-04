@@ -14,6 +14,13 @@ tecla (F5 vuelve al código de barras), y la pistola anda igual en los tres: si 
 hay nada en la lista, Enter busca el código exacto. Esc borra lo escrito y, con el
 campo vacío, vuelve al código de barras (en vez de cerrar la venta).
 
+Además el criterio cambia solo con lo que se escribe (pedido del dueño, 2026-11-04:
+"me parece más práctico y rápido"): una letra pasa del código a la descripción (sale
+el "ABC") y solo números vuelven al código, así la pistola entra siempre como código
+aunque el campo esté en ABC. Por marca, las letras la dejan en marca: F7 se aprieta a
+propósito. F5/F6/F7 siguen andando, y lo que ellas eligen no lo da vuelta lo que ya
+estaba escrito: solo lo que se tipea después (`criterio_segun_lo_escrito`).
+
 Por código de barras no hay lista: lo que se escanea entra con Enter como siempre,
 y un código que no existe se avisa con cuántos dígitos llegaron (ver
 ui/buscar_articulo.avisar_codigo_no_encontrado). Compras sigue con el cuadro
@@ -38,7 +45,7 @@ CODIGO, DESCRIPCION, MARCA = "codigo", "descripcion", "marca"
 # criterio -> (tecla, botón, ayuda del botón, ayuda de adentro del campo, dibujo de adentro del campo)
 _CRITERIOS = {
     CODIGO: ("F5", "Código", "Escanear con la pistola o tipear el código de barras",
-             "Escaneá el código de barras y apretá Enter...", dibujo_codigo_de_barras),
+             "Escaneá el código de barras o escribí el nombre del producto...", dibujo_codigo_de_barras),
     DESCRIPCION: ("F6", "Descripción", "Buscar escribiendo el nombre del producto",
                   "Escribí el nombre del producto, elegilo con las flechas y apretá Enter...", dibujo_abc),
     MARCA: ("F7", "Marca", "Buscar escribiendo la marca del producto",
@@ -50,6 +57,20 @@ _RENGLONES_A_LA_VISTA = 6
 _ALTO_RENGLON = 46          # el mismo renglón de dos pisos del carrito
 _ANCHO_PRECIO = 120
 _X_DIBUJO = 10              # el borde (2 px) y el relleno (8 px) del campo en la hoja de estilos
+
+
+def criterio_segun_lo_escrito(texto: str, criterio: str) -> str:
+    """Qué busca el campo después de tipear `texto` (pedido del dueño, 2026-11-04).
+    Solo números: el código (la pistola entra siempre, aunque estuviera en ABC). Con
+    alguna letra, del código pasa a la descripción; por descripción o por marca, sigue
+    como estaba. Un código con letras ("123A") igual entra por descripción: sin nada en
+    la lista, Enter busca el código exacto (`codigo_elegido`)."""
+    texto = texto.strip()
+    if texto.isdigit():
+        return CODIGO
+    if criterio == CODIGO and any(letra.isalpha() for letra in texto):
+        return DESCRIPCION
+    return criterio
 
 
 class BuscadorDeLaVenta(QTableWidget):
@@ -73,6 +94,9 @@ class BuscadorDeLaVenta(QTableWidget):
         campo.setTextMargins(ANCHO_DIBUJO_CAMPO + 8, 0, 0, 0)
         self.botones = [self._armar_boton(ventana, criterio) for criterio in _CRITERIOS]
         campo.textChanged.connect(self._buscar)
+        # textEdited y no textChanged: solo lo que se tipea cambia el criterio. Si no, F5
+        # con "coca" escrito volvería solo a la descripción, y borrar el campo también lo tocaría.
+        campo.textEdited.connect(self._criterio_por_lo_escrito)
         campo.installEventFilter(self)
         self.poner_criterio(CODIGO)
 
@@ -124,6 +148,11 @@ class BuscadorDeLaVenta(QTableWidget):
             boton.style().polish(boton)
         self.campo.setFocus()
         self._buscar(self.campo.text())
+
+    def _criterio_por_lo_escrito(self, texto):
+        criterio = criterio_segun_lo_escrito(texto, self.criterio)
+        if criterio != self.criterio:
+            self.poner_criterio(criterio)
 
     def codigo_elegido(self, texto):
         """El código que agrega un Enter con `texto` escrito en el campo. Por código de

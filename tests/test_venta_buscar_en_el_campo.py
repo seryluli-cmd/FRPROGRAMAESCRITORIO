@@ -75,7 +75,7 @@ class TestBuscarEnElMismoCampo(BaseConBaseTemporal):
     def test_arranca_con_el_codigo_de_barras(self):
         self.assertEqual(self.lista.criterio, "codigo")
         self.assertEqual(self._elegida(), ["Código"])
-        self.assertEqual(self.campo.placeholderText(), "Escaneá el código de barras y apretá Enter...")
+        self.assertEqual(self.campo.placeholderText(), "Escaneá el código de barras o escribí el nombre del producto...")
         self.assertEqual(self._dibujo_del_campo()[0], "dibujo_codigo_de_barras")
         self.assertFalse(self.lista.isVisible())
 
@@ -172,6 +172,25 @@ class TestBuscarEnElMismoCampo(BaseConBaseTemporal):
         self.assertEqual(self.lista.criterio, "codigo")
         self.assertEqual(self._elegida(), ["Código"])
         self.assertTrue(self.ventas.isVisible())
+
+    def test_una_letra_pasa_sola_a_la_descripcion_y_los_numeros_al_codigo(self):
+        # Pedido del dueño, 2026-11-04: sin apretar F6 ni F5.
+        QTest.keyClicks(self.campo, "jorg")
+        self.assertEqual(self.lista.criterio, "descripcion")
+        self.assertEqual(self._dibujo_del_campo()[0], "dibujo_abc")
+        self.assertEqual(self._en_la_lista(), ["Alfajor Jorgito"])
+        QTest.keyClick(self.campo, Qt.Key_Return)
+        # Con el campo en ABC, la pistola entra como código.
+        QTest.keyClicks(self.campo, COCA)
+        self.assertEqual(self.lista.criterio, "codigo")
+        self.assertFalse(self.lista.isVisible())
+        QTest.keyClick(self.campo, Qt.Key_Return)
+        self.assertEqual(self._carrito(), [(JORGITO, 1), (COCA, 1)])
+
+    def test_por_marca_las_letras_la_dejan_en_marca(self):
+        self._apretar("Marca")
+        QTest.keyClicks(self.campo, "jorgito")
+        self.assertEqual(self.lista.criterio, "marca")
 
     def test_f5_vuelve_al_codigo_de_barras_y_cierra_la_lista(self):
         self._apretar("Descripción")
