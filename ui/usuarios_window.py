@@ -56,7 +56,7 @@ class UsuariosWindow(QDialog):
         cabecera = cabecera_oscura("👤", "Usuarios", "Quién entra, claves, permisos y copias")
         self.indicador_activos = agregar_indicador(cabecera, "Activos")
         self.indicador_admins = agregar_indicador(cabecera, "Administradores")
-        self.indicador_empleadas = agregar_indicador(cabecera, "Empleadas")
+        self.indicador_empleadas = agregar_indicador(cabecera, "Operadores")
 
         barra_botones = QHBoxLayout()
         barra_botones.setSpacing(8)
@@ -92,7 +92,7 @@ class UsuariosWindow(QDialog):
         self.tabla = crear_tabla(["Usuario Nº", "Nombre", "Rol", "Estado"], estirar=1, por_filas=True)
         self.tabla.doubleClicked.connect(self._modificar_usuario)
         etiqueta_rol = DelegadoEtiqueta(self.tabla)
-        etiqueta_rol.colores_en_orden(dominio.ROLES)
+        etiqueta_rol.colores_en_orden([dominio.nombre_del_rol(rol) for rol in dominio.ROLES])
         self.tabla.setItemDelegateForColumn(COLUMNA_ROL, etiqueta_rol)
         self.tabla.setColumnWidth(0, 130)
         self.tabla.setColumnWidth(COLUMNA_ROL, 170)
@@ -120,7 +120,7 @@ class UsuariosWindow(QDialog):
         for usuario in usuarios:
             fila = self.tabla.rowCount()
             self.tabla.insertRow(fila)
-            celdas = [str(usuario["id"]), usuario["nombre"], usuario["rol"],
+            celdas = [str(usuario["id"]), usuario["nombre"], dominio.nombre_del_rol(usuario["rol"]),
                       "Activo" if usuario["activo"] else "Inactivo"]
             for columna, texto in enumerate(celdas):
                 item = QTableWidgetItem(texto)
@@ -211,7 +211,7 @@ class DialogoUsuario(QDialog):
         if self.usuario_id:
             self.campo_clave.setPlaceholderText("(dejar vacío para no cambiarla)")
         self.combo_rol = QComboBox()
-        self.combo_rol.addItem("Empleada — según los permisos de abajo", dominio.ROL_EMPLEADA)
+        self.combo_rol.addItem("Operador — según los permisos de abajo", dominio.ROL_EMPLEADA)
         self.combo_rol.addItem("Admin — acceso completo", dominio.ROL_ADMIN)
         self.combo_rol.currentIndexChanged.connect(self._actualizar_visibilidad_permisos)
 
@@ -231,7 +231,7 @@ class DialogoUsuario(QDialog):
         # _actualizar_visibilidad_permisos).
         self.checks_permisos = {}
         self.grupo_permisos, layout_permisos = panel_blanco()
-        layout_permisos.addWidget(titulo_de_seccion("Permisos extra (Empleada)"))
+        layout_permisos.addWidget(titulo_de_seccion("Permisos extra (Operador)"))
         for columna, etiqueta in usuarios_repo.PERMISOS_EMPLEADA:
             check = QCheckBox(etiqueta)
             layout_permisos.addWidget(check)

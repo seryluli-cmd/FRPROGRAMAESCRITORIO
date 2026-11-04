@@ -58,7 +58,7 @@ class DialogoEnvioPwa(QDialog):
 
         panel, capa = panel_blanco()
         explicacion = QLabel(
-            "Con esto prendido, cada <b>Cierre de Turno</b> (el que confirma la empleada, el que se hace en "
+            "Con esto prendido, cada <b>Cierre de Turno</b> (el que confirma el operador, el que se hace en "
             "ausencia y el forzoso) se manda solo a la app de gastos como el cierre de caja de ese turno, a "
             "nombre de la <b>responsable de la caja</b>. Si no hay internet queda pendiente y se manda solo "
             "cuando vuelve: el cierre de acá nunca espera.<br>"

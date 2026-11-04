@@ -1005,6 +1005,19 @@ HOJA_DE_ESTILOS = """
         font-size: 14px;
         padding: 0 0 2px 0;
     }
+    /* TOTAL CON EL CAMBIO, al final de la tabla: la letra de "Cobrado", en naranja
+       (pedido del dueño, 2026-11-04). */
+    QLabel#nombreConElCambio, QLabel#montoConElCambio {
+        color: #E65100;
+        font-weight: 700;
+        padding: 8px 0;
+    }
+    QLabel#nombreConElCambio {
+        font-size: 13px;
+    }
+    QLabel#montoConElCambio {
+        font-size: 15px;
+    }
     QLabel#notaCierre {
         background-color: #F6F8FB;
         border: 1px solid #E1E5EC;

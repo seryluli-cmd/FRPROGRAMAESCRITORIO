@@ -10,6 +10,13 @@ ROL_EMPLEADA = "EMPLEADA"
 ROLES = (ROL_ADMIN, ROL_EMPLEADA)
 
 
+def nombre_del_rol(rol: str) -> str:
+    """Cómo se ve el rol en pantalla. El de EMPLEADA se ve "OPERADOR" (pedido del
+    dueño, 2026-11-04: "Operador" en vez de empleado/empleada en todo el programa);
+    en la base sigue guardado como EMPLEADA, así no hay que migrar nada."""
+    return "OPERADOR" if rol == ROL_EMPLEADA else rol
+
+
 def es_admin(usuario) -> bool:
     return usuario is not None and usuario["rol"] == ROL_ADMIN
 
@@ -112,6 +119,14 @@ def monto_a_retirar(efectivo_cobrado: float) -> float:
     queda en el cajón para la siguiente (cajas_repo.cambio_inicial). Es lo que
     graba el cierre y lo que se espera encontrar al contar el sobre."""
     return round(efectivo_cobrado, 2)
+
+
+def efectivo_con_el_cambio(efectivo_cobrado: float, cambio: float) -> float:
+    """Lo que tiene que haber en el cajón: el efectivo cobrado más el cambio con
+    que arrancó la caja. Es lo que cuenta quien recibe una caja en un relevo
+    (turnos_repo, "caja_actual") y el TOTAL CON EL CAMBIO del final de la tabla de
+    Caja y del Cierre de Turno (pedido del dueño, 2026-11-04)."""
+    return round(cambio + efectivo_cobrado, 2)
 
 
 def diferencia_de_plata(contado: float, esperado: float) -> float:

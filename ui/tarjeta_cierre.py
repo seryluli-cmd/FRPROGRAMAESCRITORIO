@@ -167,6 +167,18 @@ class TablaDeNegocios(QFrame):
         grilla.addWidget(cambio, fila + 1, 1)
         grilla.addWidget(self.valor_cambio, fila + 1, 2)
         grilla.addWidget(nota, fila + 2, 1, 1, 3)
+        fila += 3
+
+        # Al final de todo, el efectivo cobrado más el cambio: lo que tiene que haber
+        # en el cajón (pedido del dueño, 2026-11-04: "respetá el modelo, solo agregá
+        # el texto al final"). Con la letra de "Cobrado", que también es un total, y en
+        # naranja (#nombreConElCambio en ui/hoja_de_estilos.py).
+        grilla.addWidget(_linea("lineaRenglon"), fila, 0, 1, 4)
+        con_el_cambio = QLabel("TOTAL CON EL CAMBIO")
+        con_el_cambio.setObjectName("nombreConElCambio")
+        self.valor_con_el_cambio = _monto("montoConElCambio")
+        grilla.addWidget(con_el_cambio, fila + 1, 1)
+        grilla.addWidget(self.valor_con_el_cambio, fila + 1, 2)
 
     def renglon(self, clave: str) -> RenglonDeNegocio:
         return self.renglones[clave]
@@ -178,6 +190,8 @@ class TablaDeNegocios(QFrame):
         self.valor_efectivo.setText(formato_pesos(resumen["ventas_efectivo"]))
         self.valor_digital.setText(formato_pesos(resumen["ventas_digital"]))
         self.valor_cambio.setText(formato_pesos(resumen["cambio_inicial"]))
+        self.valor_con_el_cambio.setText(formato_pesos(
+            dominio.efectivo_con_el_cambio(resumen["ventas_efectivo"], resumen["cambio_inicial"])))
 
 
 class TarjetaCierreDeTurno(QWidget):

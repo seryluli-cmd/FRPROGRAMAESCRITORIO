@@ -208,7 +208,7 @@ class ControlCierresWindow(QDialog):
             "Turno\" ahora, todo lo vendido desde el último cierre se agrupa junto, "
             "sin importar cuántos turnos nominales pasaron en el medio. El nombre al "
             "final de cada línea es quién vendió algo o inició sesión en ese horario "
-            "(no hay horarios asignados por empleada, así que es una pista de a quién "
+            "(no hay horarios asignados por operador, así que es una pista de a quién "
             "preguntarle, no una certeza)."
         )
         nota_faltantes.setWordWrap(True)

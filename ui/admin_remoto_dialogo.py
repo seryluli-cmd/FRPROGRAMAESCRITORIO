@@ -58,7 +58,7 @@ class DialogoEntrarDesdeOtraPC(QDialog):
             f"<b>\\\\{nombre}\\FRKiosko\\FRKiosko.exe</b></li>"
             "<li>Entrá con el usuario Administrador y su clave.</li></ol>"
             f"Esta PC es <b>{nombre}</b> (IP {ips_texto}). Este programa tiene que estar abierto acá.<br><br>"
-            "Las empleadas no pueden entrar desde otra PC. Vender, cobrar y cerrar el turno "
+            "Los operadores no pueden entrar desde otra PC. Vender, cobrar y cerrar el turno "
             "se sigue haciendo solo acá."
         )
         explicacion.setWordWrap(True)

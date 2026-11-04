@@ -124,10 +124,10 @@ LA CAJA (cada persona con su caja)
 - Si quien estaba antes se fue sin cerrar y su turno ya terminó, el que
   llega cierra esa caja (queda anotado "cerrada por ... en ausencia de ..."),
   arma el sobre de la otra persona y después abre la suya.
-- El Administrador no abre caja. Si cobra algo con la caja de una empleada
-  abierta, la venta queda a nombre de ella, en su caja, y se anota que la
+- El Administrador no abre caja. Si cobra algo mientras un operador
+  tiene su caja abierta, la venta queda a nombre del operador, en su caja, y se anota que la
   cargó el Administrador. Si entra para algo rápido y se olvida de salir, a
-  los 10 minutos el programa vuelve solo a la empleada que estaba antes.
+  los 10 minutos el programa vuelve solo al operador que estaba antes.
 - Si el Administrador cobra algo cuando no hay ninguna caja abierta, esa
   plata pasa a la caja de la próxima que entra: al abrir, el programa le pide
   contar TODA la plata del cajón (el cambio más lo que cobró él) y esas
@@ -227,7 +227,7 @@ corte de la red: el mostrador puede haberlo guardado igual, fijate antes
 de repetirlo.
 Al terminar, cerrá sesión o cerrá el programa en la otra PC: mientras
 quede abierto, la sesión sigue abierta.
-Las empleadas no pueden entrar desde otra PC. Cada vez que entrás queda
+Los operadores no pueden entrar desde otra PC. Cada vez que entrás queda
 anotado en Accesos de Admin, con la PC desde donde entraste. Si alguien
 pone 5 claves mal seguidas desde una PC, esa PC no puede probar más por
 5 minutos; y si hay 20 claves mal en 15 minutos (sumando todas las PCs),
@@ -243,8 +243,8 @@ El Admin puede delegar por separado Artículos, Compras, Consulta de
 Ventas, Reportes y Control de Cierres. Anular ventas, Usuarios, Control de
 Stock y Configuración ADMIN quedan para el Admin.
 Una persona sin esos permisos puede vender, cobrar impresiones, ver Caja,
-cerrar turno y cambiar su clave. Con el permiso de Control de Cierres una
-empleada ve los cierres, pero cargar lo contado del sobre es solo del Admin.
+cerrar turno y cambiar su clave. Con el permiso de Control de Cierres un
+operador ve los cierres, pero cargar lo contado del sobre es solo del Admin.
 
 SI ALGO FALLA
 -------------

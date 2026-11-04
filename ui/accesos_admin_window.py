@@ -98,7 +98,7 @@ class PestañaLoginsAdmin(QWidget):
 
         self.tabla = crear_tabla(["Fecha", "Hora", "Usuario", "Rol", "Desde"], estirar=2)
         etiqueta_rol = DelegadoEtiqueta(self.tabla)
-        etiqueta_rol.colores_en_orden(dominio.ROLES)
+        etiqueta_rol.colores_en_orden([dominio.nombre_del_rol(rol) for rol in dominio.ROLES])
         self.tabla.setItemDelegateForColumn(COLUMNA_ROL, etiqueta_rol)
         self.tabla.setColumnWidth(0, 130)
         self.tabla.setColumnWidth(1, 110)
@@ -128,7 +128,7 @@ class PestañaLoginsAdmin(QWidget):
             # ahí queda anotada la IP de esa PC.
             desde = f"Otra PC ({login['desde_ip']})" if login["desde_ip"] else "Mostrador"
             for columna, valor in enumerate([
-                momento.strftime("%d/%m/%Y"), momento.strftime("%H:%M:%S"), login["nombre"], login["rol"], desde,
+                momento.strftime("%d/%m/%Y"), momento.strftime("%H:%M:%S"), login["nombre"], dominio.nombre_del_rol(login["rol"]), desde,
             ]):
                 self.tabla.setItem(fila, columna, QTableWidgetItem(valor))
         mostrar_columna_entera(self.tabla, COLUMNA_DESDE)  # "Otra PC (192.168.0.25)" no entra en el ancho de siempre

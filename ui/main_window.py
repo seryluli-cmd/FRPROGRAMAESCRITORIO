@@ -149,7 +149,7 @@ class MainWindow(QMainWindow):
                 f"FRKiosko - {self.usuario['nombre']} - desde otra PC (mostrador: {modo_remoto.mostrador_en_uso()})"
             )
         else:
-            self.setWindowTitle(f"FRKiosko - {self.usuario['nombre']} ({self.usuario['rol']})")
+            self.setWindowTitle(f"FRKiosko - {self.usuario['nombre']} ({dominio.nombre_del_rol(self.usuario['rol'])})")
         self.resize(980, 680)
 
         # Barra oscura "#encabezadoInicio" (estilo en la hoja de estilos

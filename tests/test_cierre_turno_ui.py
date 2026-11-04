@@ -80,6 +80,23 @@ class TestCierreDeTurnoEnPantalla(BaseConBaseTemporal):
         self.assertEqual(ventana.tarjeta.valor_total.text(), "$ 460")
         self.assertTrue({"Efectivo", "Digital", "TOTAL (EFECTIVO + DIGITAL)"} <= set(textos), textos)
 
+    def test_al_final_el_total_con_el_cambio_es_el_efectivo_mas_el_cambio(self):
+        # Pedido del dueño, 2026-11-04: "respetá el modelo, solo agregá el texto al
+        # final". Es lo que tiene que haber en el cajón; lo digital no se suma.
+        self._vender("COD9", "Producto", 1, 10.0)
+        ventas_repo.confirmar_venta(
+            self.usuario_id,
+            [{"codigo": "COD9", "descripcion": "Producto", "cantidad": 3, "precio_unitario": 10.0}],
+            [{"metodo": dominio.PAGO_DIGITAL, "monto": 30.0}],
+        )
+        from repositories.config_repo import obtener_fondo_cambio
+
+        ventana = self._abrir()   # sin caja abierta, el cambio es el Cambio Fijo
+
+        self.assertIn("TOTAL CON EL CAMBIO", [e.text() for e in ventana.findChildren(QLabel)])
+        self.assertEqual(ventana.tarjeta.tabla.valor_con_el_cambio.text(), formato_pesos(obtener_fondo_cambio() + 10.0))
+        self.assertEqual(dominio.efectivo_con_el_cambio(104_250, 35_000), 139_250)
+
     def test_sin_impresiones_muestra_cero(self):
         self._vender("COD9", "Producto", 1, 10.0)
 

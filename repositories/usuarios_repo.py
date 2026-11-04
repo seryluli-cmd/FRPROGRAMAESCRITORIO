@@ -380,7 +380,7 @@ def modificar_usuario(usuario_id: int, nombre: str, rol: str, clave: str = None,
         conexion.execute("BEGIN IMMEDIATE")
         _exigir_nombre_libre(conexion, nombre, excluir_id=usuario_id)
         if rol != dominio.ROL_ADMIN:
-            _exigir_que_quede_otro_admin(conexion, usuario_id, "pasar a Empleada")
+            _exigir_que_quede_otro_admin(conexion, usuario_id, "pasar a Operador")
         columnas_permiso, valores_permiso = _columnas_y_valores_de_permisos(permisos)
         asignaciones = ["nombre = ?", "rol = ?"]
         valores = [nombre, rol]

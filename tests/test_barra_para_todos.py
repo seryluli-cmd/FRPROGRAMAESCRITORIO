@@ -243,6 +243,28 @@ class TestAdministrarKiosko(_ConUsuarios):
         textos = [boton.text() for boton in usuarios.findChildren(QPushButton)]
         self.assertFalse([texto for texto in textos if "CAMBIO" in texto.upper()], textos)
 
+    def test_en_pantalla_dice_operador_y_no_empleada(self):
+        """Pedido del dueño, 2026-11-04: "Operador" en vez de empleado/empleada en todo
+        el programa. En la base el rol sigue guardado como EMPLEADA."""
+        from PySide6.QtWidgets import QComboBox, QLabel
+        from ui.usuarios_window import DialogoUsuario, UsuariosWindow
+
+        self._usuario("Zaira", dominio.ROL_EMPLEADA)
+        usuarios = UsuariosWindow(self._usuario("Admin", dominio.ROL_ADMIN))
+        dialogo = DialogoUsuario(usuarios)
+        for ventana in (usuarios, dialogo):
+            self.addCleanup(ventana.deleteLater)
+
+        roles = [usuarios.tabla.item(fila, 2).text() for fila in range(usuarios.tabla.rowCount())]
+        textos = [e.text() for v in (usuarios, dialogo) for e in v.findChildren(QLabel)]
+        textos += [c.itemText(i) for c in dialogo.findChildren(QComboBox) for i in range(c.count())]
+
+        self.assertEqual(set(roles), {"ADMIN", "OPERADOR"})
+        self.assertIn("Operador — según los permisos de abajo", textos)
+        self.assertFalse([t for t in textos + roles if "emplead" in t.lower()], textos)
+        self.assertEqual(dominio.nombre_del_rol(dominio.ROL_EMPLEADA), "OPERADOR")
+        self.assertEqual(dominio.nombre_del_rol(dominio.ROL_ADMIN), "ADMIN")
+
     def test_cada_tarjeta_abre_su_pantalla(self):
         tarjetas = self._tarjetas(self._ventana(self._usuario("Admin", dominio.ROL_ADMIN)))
 

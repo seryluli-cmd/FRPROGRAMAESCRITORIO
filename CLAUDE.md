@@ -585,6 +585,10 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   `ui/cambio_fijo_dialogo.py`; hasta el 2026-11-04 estaba adentro de Usuarios). Por dentro sigue siendo
   `fondo_cambio` (columnas, repos, claves): no se renombra, solo el texto que se
   ve.
+- **En pantalla, quien atiende se llama "Operador", nunca empleado/empleada**
+  (pedido del dueño, 2026-11-04). El rol se muestra con `dominio.nombre_del_rol`
+  ("OPERADOR"); por dentro sigue siendo `ROL_EMPLEADA` / `'EMPLEADA'` en la base
+  (con su CHECK), y los comentarios no se renombraron: no lo migres sin pedido.
 - **El esquema de color se fija en CLARO a propósito (`main.aplicar_estilo`).**
   Fusion toma los colores de Windows: con el modo oscuro puesto, los widgets que
   la hoja de estilos no pinta salían negros con la letra oscura encima. Si se

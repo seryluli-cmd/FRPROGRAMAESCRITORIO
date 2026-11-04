@@ -216,7 +216,7 @@ def _resumen_en_curso(conexion, ahora_dt=None) -> dict:
         "ventas_total": dominio.total_cobrado(desglose["ventas_efectivo"], desglose["ventas_digital"]),
         "monto_a_retirar": dominio.monto_a_retirar(desglose["ventas_efectivo"]),
         "cambio_inicial": cambio_inicial,
-        "caja_actual": round(cambio_inicial + desglose["ventas_efectivo"], 2),
+        "caja_actual": dominio.efectivo_con_el_cambio(desglose["ventas_efectivo"], cambio_inicial),
         "caja_numero": caja["id"] if caja is not None else None,
         "responsable": caja["responsable"] if caja is not None else None,
         "desde": ventana["desde"],
