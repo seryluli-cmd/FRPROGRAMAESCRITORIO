@@ -3,6 +3,11 @@
 La referencia vigente del proyecto es [CLAUDE.md](CLAUDE.md). Leela antes de
 modificar código: contiene las 15 reglas, los puntos únicos de verdad, las
 trampas del negocio y lo que el dueño pidió no cambiar sin hablarlo.
+Desde el 2026-11-04 el detalle largo está aparte y se lee cuando la tarea lo
+toca: [docs/PUNTOS_DE_VERDAD.md](docs/PUNTOS_DE_VERDAD.md) (qué hace cada punto
+único de verdad), [docs/TRAMPAS.md](docs/TRAMPAS.md) (las trampas que en
+CLAUDE.md quedan con su título) y [docs/ESTADO.md](docs/ESTADO.md) (qué tiene
+hoy el programa).
 [README.md](README.md) describe los módulos actuales y
 [LEEME.txt](LEEME.txt) explica el uso para el mostrador.
 
