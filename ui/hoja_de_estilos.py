@@ -997,12 +997,12 @@ HOJA_DE_ESTILOS = """
     }
     QLabel#nombreCambio, QLabel#montoCambio {
         color: #3C4350;
-        font-size: 13px;
+        font-size: 16px;
         padding: 7px 0 0 0;
     }
     QLabel#notaCambio {
         color: #8A93A3;
-        font-size: 11px;
+        font-size: 14px;
         padding: 0 0 2px 0;
     }
     QLabel#notaCierre {
