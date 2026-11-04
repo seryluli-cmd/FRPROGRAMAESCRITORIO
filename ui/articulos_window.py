@@ -24,7 +24,7 @@ from ui.dibujos_tabla import DelegadoEtiqueta, DelegadoStock
 from ui.ordenar_stock_window import OrdenarStockWindow
 from ui.piezas_ventana import (
     TONO_AZUL, agregar_indicador, agregar_pastilla, buscador, cabecera_oscura, fila_de_filtros,
-    marcar_solo_admin, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
+    solo_para_el_admin, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
 )
 from ui.utils import (
     mostrar_error, mostrar_aviso, confirmar, manejar_errores,
@@ -75,13 +75,12 @@ class ArticulosWindow(QDialog):
             barra_botones.addWidget(boton)
         barra_botones.addStretch()
         barra_botones.addWidget(self.boton_salir)
-        # Solo lo ve un Admin (pedido del dueño, 2026-10-20); una empleada con
-        # permiso de Artículos no. El repo lo vuelve a exigir en cada cambio.
-        self.boton_ordenar_stock.setVisible(dominio.es_admin(self.usuario))
+        # Solo lo usa un Admin (pedido del dueño, 2026-10-20); una empleada con
+        # permiso de Artículos lo ve igual y le dice "Acceso Restringido" (2026-11-04).
+        # El repo lo vuelve a exigir en cada cambio.
+        solo_para_el_admin(self.boton_ordenar_stock, dominio.es_admin(self.usuario))
         # Corregir las marcas, también solo el Admin (pedido del dueño, 2026-10-23).
-        self.boton_marcas.setVisible(dominio.es_admin(self.usuario))
-        marcar_solo_admin(self.boton_ordenar_stock)
-        marcar_solo_admin(self.boton_marcas)
+        solo_para_el_admin(self.boton_marcas, dominio.es_admin(self.usuario))
 
         self.campo_buscar = buscador("Buscar por código o descripción...")
         self.campo_buscar.setMinimumWidth(380)

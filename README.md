@@ -262,8 +262,8 @@ LAS LUCES DE AFUERA" a las 19:30:
   TODAS LAS TAREAS (las cargadas, con cuándo se repite). En la grilla, cada
   una con su estado (HECHA · quién y a qué hora, tachada; ATRASADA · 1 h 12 min;
   EN 18 MIN; MÁS TARDE) y la tecla HECHA, que pregunta antes. + NUEVA TAREA,
-  MODIFICAR y BORRAR son solo del Administrador (con el borde punteado): a los
-  demás no les aparecen, como en Pedidos de Clientes. El formulario
+  MODIFICAR y BORRAR son solo del Administrador (con el borde punteado): los
+  demás las ven igual y les dicen "Acceso Restringido", como en Pedidos de Clientes. El formulario
   (`ui/tareas_turno_dialogos.py`) pide TAREA, HORA (como la escriban: "1930",
   "19.30"), muestra el turno que le toca y SE REPITE: TODOS LOS DÍAS, ELEGIR DÍAS o
   SOLO HOY. HISTORIAL muestra los días que ya terminaron, con quién hizo cada

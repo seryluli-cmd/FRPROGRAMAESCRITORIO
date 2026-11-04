@@ -33,7 +33,7 @@ from ui.dibujos_tabla import DelegadoEtiqueta
 from ui.envio_pwa_progreso import DialogoEnviandoCierre
 from ui.ingreso_caja import texto_de_la_diferencia
 from ui.piezas_ventana import (
-    agregar_indicador, cabecera_oscura, fila_de_filtros, marcar_solo_admin, panel_blanco, panel_de_tabla,
+    agregar_indicador, cabecera_oscura, fila_de_filtros, solo_para_el_admin, panel_blanco, panel_de_tabla,
     pie_de_ventana, poner_indicador, tecla, titulo_de_seccion,
 )
 from ui.tarjeta_cierre import TarjetaCierreDeTurno
@@ -245,15 +245,14 @@ class ControlCierresWindow(QDialog):
         self.boton_detalle = tecla("☰  VER DETALLE", self._ver_detalle, "teclaAzul")
         self.boton_verificar = tecla("✎  CARGAR LO CONTADO", self._verificar)
         # Lo contado en el sobre lo carga solo el dueño (pedido 2026-10-18; el repo
-        # también lo exige): una empleada con el permiso ve los cierres, nada más.
-        self.boton_verificar.setVisible(es_admin)
+        # también lo exige): una empleada con el permiso ve los cierres; la tecla la ve
+        # igual y le dice "Acceso Restringido" (pedido del dueño, 2026-11-04).
+        solo_para_el_admin(self.boton_verificar, es_admin)
         # Mandar (o volver a mandar) un cierre a la app de gastos del dueño (pedido
         # suyo, 2026-10-26): para uno hecho con el envío apagado o borrado por error
         # allá. Solo el Admin, como el sobre.
         self.boton_mandar = tecla("↗  MANDAR A LA APP DE GASTOS", self._mandar_a_la_app)
-        self.boton_mandar.setVisible(es_admin)
-        marcar_solo_admin(self.boton_verificar)
-        marcar_solo_admin(self.boton_mandar)
+        solo_para_el_admin(self.boton_mandar, es_admin)
         self.boton_salir = tecla("SALIR", self.close)
 
         botones = QHBoxLayout()
@@ -271,8 +270,7 @@ class ControlCierresWindow(QDialog):
         )
 
         ayuda = "Doble clic en un cierre para ver su detalle  ·  En rojo: cerrado solo o en ausencia, y el sobre que no coincide"
-        if es_admin:
-            ayuda += "  ·  Las teclas con borde punteado las ve solo el Administrador"
+        ayuda += "  ·  Las teclas con borde punteado son solo del Administrador"
 
         layout = QVBoxLayout()
         layout.setContentsMargins(16, 16, 16, 12)

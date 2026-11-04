@@ -3,9 +3,10 @@ tests/test_barra_para_todos.py
 ================================
 La barra de arriba de la ventana principal muestra los mismos botones a todos
 (pedido del dueño, 2026-10-19: con solo los suyos, la barra de una empleada quedaba
-muy vacía). Los que no le tocan a alguien se ven igual que los demás pero no abren
-nada al apretarlos. Configuración ADMIN es solo del Administrador (acá adentro no
-quedó nada que use un Operador): una empleada ve el botón igual, pero no abre. Las
+muy vacía). Los que no le tocan a alguien se ven igual que los demás y al apretarlos
+dicen "Acceso Restringido" (pedido del dueño, 2026-11-04; antes no hacían nada, y las
+tarjetas iban en gris con candado). Configuración ADMIN es solo del Administrador (acá
+adentro no quedó nada que use un Operador): una empleada ve el botón igual, pero no abre. Las
 tarjetas de Configuración ADMIN y Administrar Kiosko (diseño del 2026-10-26) llevan el
 título en `accessibleName()`: su texto lo dibujan etiquetas de adentro (ver
 ui/piezas_ventana.tarjeta_de_menu). Se prueba sin abrir ninguna ventana (plataforma
@@ -25,17 +26,23 @@ from PySide6.QtWidgets import QApplication, QFrame, QPushButton  # noqa: E402
 
 import dominio  # noqa: E402
 from repositories import usuarios_repo  # noqa: E402
-from ui.administrar_kiosko_window import TEXTO_SIN_PERMISO, AdministrarKioskoWindow  # noqa: E402
+from ui.administrar_kiosko_window import AdministrarKioskoWindow  # noqa: E402
 from ui.main_window import ConfiguracionAdminWindow, MainWindow  # noqa: E402
-from ui.piezas_ventana import TEXTO_SOLO_ADMIN  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
+
+# El cartel de ui.piezas_ventana.restringir: en las pruebas no se abre (es modal).
+_AVISO = "ui.piezas_ventana.avisar_acceso_restringido"
 
 
 def _nombre(boton):
     """Cómo se llama un botón: el título de una tarjeta o el texto de una tecla."""
     return boton.accessibleName() or boton.text()
+
+
+def _restringido(boton):
+    return bool(boton.property("restringido"))
 
 # Botón de la barra -> la ventana que abre (el nombre en ui.main_window).
 _CON_PERMISO = {
@@ -59,15 +66,18 @@ class TestBarraParaTodos(_ConUsuarios):
         barra = ventana.findChild(QFrame, "encabezadoInicio")
         return {boton.text(): boton for boton in barra.findChildren(QPushButton)}
 
-    def _que_abre(self, ventana):
-        """Aprieta cada botón con permiso y devuelve cuáles abrieron su ventana."""
+    def _que_abre(self, ventana, avisados=None):
+        """Aprieta cada botón con permiso y devuelve cuáles abrieron su ventana; los
+        que dijeron "Acceso Restringido" van a `avisados`."""
         botones = self._botones(ventana)
         abiertos = set()
         for texto, ventana_que_abre in _CON_PERMISO.items():
-            with mock.patch(f"ui.main_window.{ventana_que_abre}") as clase:
+            with mock.patch(f"ui.main_window.{ventana_que_abre}") as clase, mock.patch(_AVISO) as aviso:
                 botones[texto].click()
             if clase.called:
                 abiertos.add(texto)
+            if aviso.called and avisados is not None:
+                avisados.add(texto)
         return abiertos
 
     def test_una_empleada_ve_los_mismos_botones_que_el_admin(self):
@@ -85,7 +95,7 @@ class TestBarraParaTodos(_ConUsuarios):
         self.assertEqual(textos[-3:], ["📝  LISTA DE COMPRAS", "OPERADOR", "🔑  CAMBIAR PASS"])
         self.assertFalse(any(texto.endswith("CLAVE") for texto in textos), textos)
 
-    def test_los_que_no_le_tocan_se_ven_igual_pero_no_abren_nada(self):
+    def test_los_que_no_le_tocan_se_ven_igual_y_dicen_acceso_restringido(self):
         empleada = self._ventana("TOBY", dominio.ROL_EMPLEADA)
         botones = self._botones(empleada)
 
@@ -93,7 +103,9 @@ class TestBarraParaTodos(_ConUsuarios):
             # Ni gris ni de otro color: la misma tecla que el resto de la barra.
             self.assertTrue(botones[texto].isEnabled(), texto)
             self.assertEqual(botones[texto].property("clase"), "barra", texto)
-        self.assertEqual(self._que_abre(empleada), set())
+        avisados = set()
+        self.assertEqual(self._que_abre(empleada, avisados), set())
+        self.assertEqual(avisados, set(_CON_PERMISO))
 
     def test_el_admin_abre_todo(self):
         admin = self._ventana("Admin", dominio.ROL_ADMIN)
@@ -113,42 +125,49 @@ class TestBarraParaTodos(_ConUsuarios):
 
 
 class TestConfiguracionAdminParaUnOperador(_ConUsuarios):
-    def _habilitados(self, usuario):
-        """Botón -> si se puede apretar (sin el Cerrar del final)."""
+    def _tarjetas(self, usuario):
+        """Las tarjetas (sin el Cerrar del final)."""
         ventana = ConfiguracionAdminWindow(usuario)
         self.addCleanup(ventana.deleteLater)
-        return {_nombre(b): b.isEnabled() for b in ventana.findChildren(QPushButton) if b.text() != "CERRAR"}
+        return [b for b in ventana.findChildren(QPushButton) if b.accessibleName()]
 
-    def test_un_operador_lo_ve_todo_en_gris(self):
-        habilitados = self._habilitados(self._usuario("TOBY", dominio.ROL_EMPLEADA))
+    def test_un_operador_lo_ve_todo_igual_pero_restringido(self):
+        tarjetas = self._tarjetas(self._usuario("TOBY", dominio.ROL_EMPLEADA))
 
-        self.assertEqual([texto for texto, si in habilitados.items() if si], [])
-        self.assertGreater(len(habilitados), 1)  # sigue a la vista, en gris
+        self.assertGreater(len(tarjetas), 1)
+        for tarjeta in tarjetas:
+            # Ni gris ni con candado: igual que las ve el Admin.
+            self.assertTrue(tarjeta.isEnabled(), _nombre(tarjeta))
+            self.assertNotEqual(tarjeta.icono.text(), "🔒", _nombre(tarjeta))
+            self.assertTrue(_restringido(tarjeta), _nombre(tarjeta))
 
-    def test_lo_que_no_usa_el_operador_dice_que_es_del_admin(self):
-        ventana = ConfiguracionAdminWindow(self._usuario("TOBY", dominio.ROL_EMPLEADA))
-        self.addCleanup(ventana.deleteLater)
-
-        for tarjeta in ventana.findChildren(QPushButton):
-            if tarjeta.accessibleName() and not tarjeta.isEnabled():
-                self.assertEqual((tarjeta.icono.text(), tarjeta.detalle.text()), ("🔒", TEXTO_SOLO_ADMIN))
+    def test_al_apretarla_dice_acceso_restringido_y_no_abre_nada(self):
+        for tarjeta in self._tarjetas(self._usuario("TOBY", dominio.ROL_EMPLEADA)):
+            with mock.patch(_AVISO) as aviso, \
+                    mock.patch("ui.configuracion_admin_window.AccesosAdminWindow") as accesos, \
+                    mock.patch("ui.configuracion_admin_window.DialogoEntrarDesdeOtraPC") as remota, \
+                    mock.patch("ui.configuracion_admin_window.DialogoEnvioPwa") as envio:
+                tarjeta.click()
+            aviso.assert_called_once()
+            self.assertFalse(accesos.called or remota.called or envio.called, _nombre(tarjeta))
 
     def test_ni_con_todos_los_permisos_usa_nada(self):
         todos = {clave: True for clave, _ in usuarios_repo.PERMISOS_EMPLEADA}
-        habilitados = self._habilitados(self._usuario("TOBY", dominio.ROL_EMPLEADA, todos))
+        tarjetas = self._tarjetas(self._usuario("TOBY", dominio.ROL_EMPLEADA, todos))
 
-        self.assertEqual([texto for texto, si in habilitados.items() if si], [])
+        self.assertTrue(all(_restringido(tarjeta) for tarjeta in tarjetas))
 
     def test_el_admin_usa_todo(self):
-        habilitados = self._habilitados(self._usuario("Admin", dominio.ROL_ADMIN))
+        tarjetas = self._tarjetas(self._usuario("Admin", dominio.ROL_ADMIN))
 
-        self.assertTrue(all(habilitados.values()), habilitados)
+        self.assertFalse(any(_restringido(tarjeta) for tarjeta in tarjetas))
 
 
 class TestAdministrarKiosko(_ConUsuarios):
     """Administrar Kiosko con el diseño de Configuración ADMIN (pedido del dueño,
     2026-10-26): una encargada usa solo las pantallas que tiene habilitadas y ve las
-    demás en gris, con candado y el porqué (antes no aparecían)."""
+    demás igual, pero dicen "Acceso Restringido" (2026-11-04; antes iban en gris con
+    candado, y antes de eso no aparecían)."""
 
     def _ventana(self, usuario):
         ventana = AdministrarKioskoWindow(usuario, dominio.es_admin(usuario))
@@ -164,21 +183,23 @@ class TestAdministrarKiosko(_ConUsuarios):
         self.assertEqual(sorted(tarjetas), ["Artículos", "Compras", "Consulta de Ventas / Anular",
                                             "Control de Cierres de Turno", "Control de Stock", "Reportes",
                                             "Usuarios"])
-        self.assertTrue(all(tarjeta.isEnabled() for tarjeta in tarjetas.values()))
+        self.assertFalse(any(_restringido(tarjeta) for tarjeta in tarjetas.values()))
 
     def test_una_encargada_usa_solo_lo_que_tiene_habilitado(self):
         encargada = self._usuario("TOBY", dominio.ROL_EMPLEADA, {"permiso_reportes": True})
 
         tarjetas = self._tarjetas(self._ventana(encargada))
 
-        self.assertEqual([nombre for nombre, tarjeta in tarjetas.items() if tarjeta.isEnabled()], ["Reportes"])
-        self.assertIn("Consulta de Ventas", tarjetas)  # sin "/ Anular": anular es del Admin
+        # Las mismas tarjetas que el Admin, ninguna en gris ni con candado.
+        self.assertIn("Consulta de Ventas / Anular", tarjetas)
+        self.assertTrue(all(tarjeta.isEnabled() for tarjeta in tarjetas.values()))
+        self.assertNotIn("🔒", [tarjeta.icono.text() for tarjeta in tarjetas.values()])
         # Usuarios y Control de Stock son solo del Admin: ningún permiso los habilita.
-        self.assertEqual(tarjetas["Usuarios"].detalle.text(), TEXTO_SOLO_ADMIN)
-        self.assertEqual(tarjetas["Control de Stock"].detalle.text(), TEXTO_SOLO_ADMIN)
-        for nombre in ("Artículos", "Compras", "Consulta de Ventas", "Control de Cierres de Turno"):
-            self.assertEqual((tarjetas[nombre].icono.text(), tarjetas[nombre].detalle.text()),
-                             ("🔒", TEXTO_SIN_PERMISO), nombre)
+        self.assertEqual([nombre for nombre, tarjeta in tarjetas.items() if not _restringido(tarjeta)], ["Reportes"])
+        with mock.patch(_AVISO) as aviso, mock.patch("ui.administrar_kiosko_window.UsuariosWindow") as usuarios:
+            tarjetas["Usuarios"].click()
+        aviso.assert_called_once()
+        usuarios.assert_not_called()
 
     def test_cada_tarjeta_abre_su_pantalla(self):
         tarjetas = self._tarjetas(self._ventana(self._usuario("Admin", dominio.ROL_ADMIN)))

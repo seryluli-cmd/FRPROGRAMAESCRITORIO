@@ -323,19 +323,21 @@ class TestPantallas(_ConPedidos):
         self.assertEqual(llamados, [10000.0])
         self.assertEqual(self._pedido(pedido_id)["estado"], dominio.PEDIDO_RETIRADO)
 
-    def test_la_lista_abre_en_pendientes_y_solo_el_admin_ve_sena_perdida_y_anular(self):
+    def test_la_lista_abre_en_pendientes_y_sena_perdida_y_anular_son_del_admin(self):
         self._tomar()
         otro = self._tomar(sena=15000.0)
         pedidos_impresion_repo.entregar_pedido(self.gaby_id, otro, [])
 
-        for usuario_id, ve_los_del_admin in ((self.lucia_id, False), (self.admin_id, True)):
+        for usuario_id, es_admin in ((self.lucia_id, False), (self.admin_id, True)):
             ventana = VentanaGestionImpresiones(usuarios_repo.obtener_usuario(usuario_id))
             self.addCleanup(ventana.deleteLater)
             self.assertEqual(ventana.tabla.rowCount(), 1)
             self.assertEqual(ventana.indicador_pendientes.valor.text(), "1")
             self.assertEqual(ventana.indicador_falta.valor.text(), "$ 10.000")
-            textos = {boton.text() for boton in ventana.findChildren(QPushButton)}
-            self.assertEqual({"SEÑA PERDIDA", "ANULAR"} <= textos, ve_los_del_admin)
+            # Las ven todos igual; a los demás les dicen "Acceso Restringido" (2026-11-04).
+            for boton in (ventana.boton_perdida, ventana.boton_anular):
+                self.assertFalse(boton.isHidden())
+                self.assertEqual(bool(boton.property("restringido")), not es_admin)
             ventana.filtros.pastillas[0].click()
             self.assertEqual(ventana.tabla.rowCount(), 2)
 

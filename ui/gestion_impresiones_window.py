@@ -32,7 +32,7 @@ from ui.dialogo_pago import DialogoPago
 from ui.dibujos_tabla import DelegadoEtiqueta
 from ui.piezas_ventana import (
     TONO_AZUL, TONO_VERDE, agregar_indicador, buscador, cabecera_oscura, cifra_destacada, fila_de_filtros,
-    marcar_solo_admin, panel_blanco, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
+    solo_para_el_admin, panel_blanco, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
 )
 from ui.utils import (
     CampoPesos, confirmar, crear_tabla, encadenar_enter, fila_guardar_cancelar, formato_fecha_hora, formato_pesos,
@@ -102,13 +102,15 @@ class VentanaGestionImpresiones(QDialog):
         barra_botones.setSpacing(8)
         for boton in (self.boton_nuevo, self.boton_entregar, self.boton_avisar):
             barra_botones.addWidget(boton)
-        if self.es_admin:
-            self.boton_perdida = tecla("SEÑA PERDIDA", self._sena_perdida)
-            self.boton_perdida.setToolTip("El cliente no vino: la seña queda para el local.")
-            self.boton_anular = tecla("ANULAR", self._anular, "teclaRoja")
-            for boton in (self.boton_perdida, self.boton_anular):
-                marcar_solo_admin(boton)
-                barra_botones.addWidget(boton)
+        # Solo del Admin; los demás las ven igual y les dicen "Acceso Restringido"
+        # (pedido del dueño, 2026-11-04).
+        self.boton_perdida = tecla("SEÑA PERDIDA", self._sena_perdida)
+        self.boton_anular = tecla("ANULAR", self._anular, "teclaRoja")
+        for boton in (self.boton_perdida, self.boton_anular):
+            solo_para_el_admin(boton, self.es_admin)
+            barra_botones.addWidget(boton)
+        # Después de marcarla: marcar_solo_admin le pone "Solo el Administrador".
+        self.boton_perdida.setToolTip("El cliente no vino: la seña queda para el local.")
         barra_botones.addStretch()
         barra_botones.addWidget(tecla("CERRAR", self.close, "teclaRoja"))
 

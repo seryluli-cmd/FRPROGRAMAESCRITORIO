@@ -19,12 +19,14 @@ ui/hoja_de_estilos.py. Ninguna regla de esas va por tipo de widget, así que las
 ventanas que se abren desde estas (avisos, confirmaciones) no heredan nada.
 """
 
+import warnings
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QVBoxLayout, QWidget,
 )
 
-from ui.utils import aplicar_clase
+from ui.utils import aplicar_clase, avisar_acceso_restringido
 
 # Colores de las pastillas de la cabecera (QLabel#pastillaCabecera[tono=...]) y de las
 # cifras destacadas (QFrame#cifraDestacada[tono=...], solo azul y verde).
@@ -162,12 +164,23 @@ def tarjeta_de_menu(icono: str, titulo: str, detalle: str, al_apretar, alto: int
     return boton
 
 
-def bloquear_tarjeta(tarjeta: QPushButton, motivo: str = TEXTO_SOLO_ADMIN):
-    """Una tarjeta que quien la mira no puede usar: en gris y con candado, y en vez de
-    para qué es, el `motivo`, para que se entienda por qué no se puede apretar."""
-    tarjeta.setEnabled(False)
-    tarjeta.icono.setText("🔒")
-    tarjeta.detalle.setText(motivo)
+def restringir(boton: QPushButton):
+    """Un botón (una tecla, una tarjeta o uno de la barra) que quien está adentro no
+    puede usar. Pedido del dueño, 2026-11-04: "tienen que aparecer igual, solo que
+    cuando se hace click, dirá Acceso Restringido". Así que se ve igual que para quien
+    sí puede: ni escondido, ni en gris, ni con candado. Al apretarlo, en vez de lo
+    suyo, sale el cartel. Antes se escondían (Pedidos de Clientes, Tareas del Turno) o
+    iban en gris con "Solo el Administrador": no lo vuelvas a hacer así. El repo igual
+    vuelve a exigir el permiso en cada cambio: esto es solo lo que se ve."""
+    # Sin nada conectado, PySide avisa con un RuntimeWarning (la barra conecta recién después).
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        try:
+            boton.clicked.disconnect()
+        except (RuntimeError, TypeError):
+            pass
+    boton.clicked.connect(lambda: avisar_acceso_restringido(boton.window()))
+    boton.setProperty("restringido", True)
 
 
 def tecla(texto: str, al_apretar=None, clase: str = "teclaBlanca") -> QPushButton:
@@ -302,8 +315,16 @@ def pie_de_ventana(texto: str) -> QLabel:
 
 
 def marcar_solo_admin(boton: QPushButton):
-    """Un botón que solo ve el Administrador: con el borde punteado, para que se
-    sepa que una empleada no lo tiene."""
+    """Un botón que usa solo el Administrador: con el borde punteado, para que se
+    sepa que una empleada no lo tiene (lo ven todos igual, ver `solo_para_el_admin`)."""
     boton.setProperty("soloAdmin", True)
     boton.setToolTip(TEXTO_SOLO_ADMIN)
     _repintar(boton)
+
+
+def solo_para_el_admin(boton: QPushButton, es_admin: bool):
+    """Una tecla que usa solo el Administrador: con el borde punteado para todos y,
+    para quien no es Admin, "Acceso Restringido" al apretarla (ver `restringir`)."""
+    marcar_solo_admin(boton)
+    if not es_admin:
+        restringir(boton)

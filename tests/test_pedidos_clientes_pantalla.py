@@ -224,12 +224,16 @@ class TestTrajimosDesdeLaPantalla(_ConLaVentana):
 
 
 class TestCorreccionesDesdeLaPantalla(_ConLaVentana):
-    def test_solo_el_admin_ve_renombrar_juntar_y_borrar(self):
-        empleada = {boton.text() for boton in self._ventana(self.lucia_id).findChildren(QPushButton)}
-        admin = {boton.text() for boton in self._ventana(self.admin_id).findChildren(QPushButton)}
-        self.assertFalse(LOS_DEL_ADMIN & empleada)
-        self.assertTrue(LOS_DEL_ADMIN <= admin)
-        self.assertTrue({"CERRAR", "GUARDAR"} <= empleada & admin)
+    def test_renombrar_juntar_y_borrar_los_ven_todos_pero_son_del_admin(self):
+        # Hasta el 2026-11-04 a la empleada ni le aparecían; ahora las ve igual y le
+        # dicen "Acceso Restringido" (pedido del dueño).
+        def restringidas(usuario_id):
+            botones = self._ventana(usuario_id).findChildren(QPushButton)
+            self.assertTrue(LOS_DEL_ADMIN <= {boton.text() for boton in botones})
+            return {boton.text() for boton in botones if boton.property("restringido")}
+
+        self.assertEqual(restringidas(self.lucia_id), LOS_DEL_ADMIN)
+        self.assertEqual(restringidas(self.admin_id), set())
 
     def test_sin_elegir_un_renglon_avisa(self):
         pedidos_clientes_repo.anotar(self.lucia_id, "Mantecol")

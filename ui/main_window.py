@@ -33,8 +33,9 @@ from ui.vuelta_del_admin import VueltaDelAdmin
 from ui.en_segundo_plano import MILISEGUNDOS_ENTRE_VISTAS, Respuesta, _correr
 # La foto de fondo vive en su archivo desde el 2026-11-03; se sigue pidiendo de acá.
 from ui.fondo_del_inicio import COLOR_SIN_FONDO, RUTA_FONDO_INICIO, FondoDelInicio  # noqa: F401
+from ui.piezas_ventana import restringir
 from ui.utils import (
-    aplicar_clase, icono_de_emoji, mostrar_error, mostrar_info, solo_en_el_mostrador,
+    aplicar_clase, avisar_acceso_restringido, icono_de_emoji, mostrar_error, mostrar_info, solo_en_el_mostrador,
 )
 
 # Cada cuánto se mira cómo está la caja (si tiene que titilar el botón, o si ya
@@ -323,8 +324,9 @@ class MainWindow(QMainWindow):
 
         Todos ven todos los botones (pedido del dueño, 2026-10-19: con solo los
         suyos la barra de una empleada quedaba muy vacía). Uno sin `habilitado`
-        se ve igual que los demás pero no hace nada al apretarlo: no se lo
-        apaga con setEnabled(False) porque se vería gris, distinto del resto.
+        se ve igual que los demás y al apretarlo dice "Acceso Restringido"
+        (`restringir`, pedido del dueño, 2026-11-04; antes no hacía nada): no se
+        lo apaga con setEnabled(False) porque se vería gris, distinto del resto.
 
         El texto va en mayúscula (y en negrita, por ui/hoja_de_estilos.py),
         pedido del dueño 2026-10-22; acá y no en la hoja porque Qt no tiene
@@ -336,6 +338,8 @@ class MainWindow(QMainWindow):
         aplicar_clase(boton, clase or "barra")
         if habilitado:
             boton.clicked.connect(funcion)
+        else:
+            restringir(boton)
         layout.addWidget(boton)
         return boton
 
@@ -554,14 +558,11 @@ class MainWindow(QMainWindow):
     def _abrir_ranking_rotacion(self):
         """RANKING DE ROTACIÓN (2026-11-04). Es un reporte: lo abre quien tiene el
         permiso de Reportes (el Admin siempre). El acceso lo ven todos, como los
-        demás; a quien no tiene el permiso le dice por qué no se abre. Desde otra PC
+        demás; a quien no tiene el permiso le dice "Acceso Restringido", como todo
+        botón que no puede usar (pedido del dueño, 2026-11-04). Desde otra PC
         también se abre: solo mira."""
         if not usuarios_repo.tiene_permiso(self.usuario, "permiso_reportes"):
-            mostrar_info(
-                self, "Sin permiso",
-                "El Ranking de Rotación lo puede ver quien tiene el permiso de Reportes.\n\n"
-                "Lo habilita el Administrador en Administrar Kiosko > Usuarios.",
-            )
+            avisar_acceso_restringido(self)
             return
         VentanaRankingRotacion(self).exec()
 

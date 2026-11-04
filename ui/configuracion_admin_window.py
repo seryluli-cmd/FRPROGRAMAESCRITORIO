@@ -8,7 +8,7 @@ from ui.accesos_admin_window import AccesosAdminWindow
 from ui.admin_remoto_dialogo import DialogoEntrarDesdeOtraPC
 from ui.envio_pwa_dialogo import DialogoEnvioPwa
 from ui.piezas_ventana import (
-    TONO_AZUL, TONO_GRIS, agregar_pastilla, bloquear_tarjeta,
+    TONO_AZUL, TONO_GRIS, agregar_pastilla, restringir,
     cabecera_oscura, tarjeta_de_menu, tecla, titulo_de_seccion,
 )
 from ui.utils import sin_boton_por_defecto
@@ -60,7 +60,7 @@ class ConfiguracionAdminWindow(QDialog):
             for numero, (icono, nombre, detalle, funcion) in enumerate(tarjetas):
                 tarjeta = tarjeta_de_menu(icono, nombre, detalle, funcion)
                 if not es_admin:
-                    bloquear_tarjeta(tarjeta)
+                    restringir(tarjeta)
                 ancho = 2 if numero == len(tarjetas) - 1 and numero % 2 == 0 else 1
                 grilla.addWidget(tarjeta, numero // 2, numero % 2, 1, ancho)
             grilla.setColumnStretch(0, 1)

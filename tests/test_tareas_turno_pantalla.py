@@ -204,13 +204,18 @@ class TestLoDelAdministrador(_ConLaVentana):
     def _textos_de_las_teclas(self, ventana) -> set:
         return {boton.text() for boton in ventana.findChildren(QPushButton) if not boton.isHidden()}
 
-    def test_a_una_empleada_no_le_aparecen_las_teclas_del_admin(self):
-        # Como en Pedidos de Clientes (pedido del dueño, 2026-11-03): ni las ve.
+    def test_a_una_empleada_las_teclas_del_admin_le_dicen_acceso_restringido(self):
+        # Hasta el 2026-11-04 ni las veía; ahora las ve igual (pedido del dueño).
         ventana = self._ventana(self.carla)
         textos = self._textos_de_las_teclas(ventana)
-        for texto in ("+  NUEVA TAREA", "✎  MODIFICAR", "BORRAR"):
-            self.assertNotIn(texto, textos)
-        self.assertFalse(hasattr(ventana, "boton_nueva"))
+        for boton in (ventana.boton_nueva, ventana.boton_modificar, ventana.boton_borrar):
+            self.assertIn(boton.text(), textos)
+            self.assertTrue(boton.property("restringido"))
+        antes = tareas_turno_repo.listar_tareas(self.reloj[0])
+        with mock.patch("ui.piezas_ventana.avisar_acceso_restringido") as aviso:
+            ventana.boton_nueva.click()
+        aviso.assert_called_once()
+        self.assertEqual(tareas_turno_repo.listar_tareas(self.reloj[0]), antes)
         # HISTORIAL y CERRAR son para todos.
         self.assertIn("📋  HISTORIAL", textos)
         self.assertIn("CERRAR", textos)

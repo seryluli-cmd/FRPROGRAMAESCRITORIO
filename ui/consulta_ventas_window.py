@@ -17,7 +17,7 @@ from repositories import ventas_repo
 from ui.detalle_venta import VentanaConDetalleDeVenta, crear_tabla_detalle_venta, etiqueta_de_estado
 from ui.dibujos_tabla import DelegadoEtiqueta
 from ui.piezas_ventana import (
-    agregar_indicador, buscador, cabecera_oscura, fila_de_filtros, marcar_solo_admin, panel_de_tabla,
+    agregar_indicador, buscador, cabecera_oscura, fila_de_filtros, solo_para_el_admin, panel_de_tabla,
     pie_de_ventana, poner_indicador, tecla, titulo_de_seccion,
 )
 from ui.utils import (
@@ -68,10 +68,11 @@ class ConsultaVentasWindow(VentanaConDetalleDeVenta):
         barra_botones.setSpacing(8)
         self.boton_refrescar = tecla("⟳  REFRESCAR", self._cargar)
         barra_botones.addWidget(self.boton_refrescar)
-        if self.es_admin:
-            self.boton_anular = tecla("✕  ANULAR VENTA", self._anular, "teclaRoja")
-            marcar_solo_admin(self.boton_anular)
-            barra_botones.addWidget(self.boton_anular)
+        # Anula solo el Admin; los demás la ven igual y les dice "Acceso Restringido"
+        # (pedido del dueño, 2026-11-04).
+        self.boton_anular = tecla("✕  ANULAR VENTA", self._anular, "teclaRoja")
+        solo_para_el_admin(self.boton_anular, self.es_admin)
+        barra_botones.addWidget(self.boton_anular)
         barra_botones.addStretch()
         self.boton_salir = tecla("SALIR", self.close)
         barra_botones.addWidget(self.boton_salir)

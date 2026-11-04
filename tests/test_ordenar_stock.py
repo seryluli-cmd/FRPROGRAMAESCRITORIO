@@ -291,13 +291,15 @@ class BasePantallas(BaseOrdenarStock):
 
 
 class TestBotonEnArticulos(BasePantallas):
-    def test_solo_lo_ve_un_admin(self):
+    def test_lo_ven_todos_pero_solo_lo_usa_un_admin(self):
+        # A los demás les dice "Acceso Restringido" (pedido del dueño, 2026-11-04).
         admin = usuarios_repo.obtener_usuario(self.admin_id)
         empleada = usuarios_repo.obtener_usuario(self.empleada_id)
-        for usuario, lo_ve in ((admin, True), (empleada, False), (None, False)):
+        for usuario, lo_usa in ((admin, True), (empleada, False), (None, False)):
             with self.subTest(usuario=usuario and usuario["nombre"]):
                 ventana = self._abrir(ArticulosWindow(None, usuario))
-                self.assertEqual(ventana.boton_ordenar_stock.isVisible(), lo_ve)
+                self.assertTrue(ventana.boton_ordenar_stock.isVisible())
+                self.assertEqual(bool(ventana.boton_ordenar_stock.property("restringido")), not lo_usa)
                 self.assertTrue(ventana.boton_ordenar_stock.text().endswith("ORDENAR STOCK"))
 
     def _apretar_con(self, respuesta):

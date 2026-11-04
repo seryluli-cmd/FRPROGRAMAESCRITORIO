@@ -15,15 +15,12 @@ from ui.compras_window import ComprasWindow
 from ui.consulta_ventas_window import ConsultaVentasWindow
 from ui.control_stock_window import VentanaControlStock
 from ui.piezas_ventana import (
-    TONO_AZUL, TONO_GRIS, agregar_pastilla, bloquear_tarjeta, cabecera_oscura, tarjeta_de_menu, tecla,
+    TONO_AZUL, TONO_GRIS, agregar_pastilla, cabecera_oscura, restringir, tarjeta_de_menu, tecla,
     titulo_de_seccion,
 )
 from ui.reportes_window import ReportesWindow
 from ui.usuarios_window import UsuariosWindow
 from ui.utils import sin_boton_por_defecto
-
-# Lo que dice una tarjeta que la encargada no tiene habilitada.
-TEXTO_SIN_PERMISO = "Sin permiso: lo habilita el Admin en Usuarios"
 
 
 class AdministrarKioskoWindow(QDialog):
@@ -61,11 +58,8 @@ class AdministrarKioskoWindow(QDialog):
                 (None, "📋", "Control de Stock", "Lista para contar los artículos e imprimirla", self._abrir_control_stock),
             ]),
             ("Ventas", [
-                ("permiso_consulta_ventas", "🔍",
-                 "Consulta de Ventas / Anular" if self.es_admin else "Consulta de Ventas",
-                 "Buscar una venta, ver qué se vendió y anularla" if self.es_admin
-                 else "Buscar una venta y ver qué se vendió",
-                 self._abrir_consulta_ventas),
+                ("permiso_consulta_ventas", "🔍", "Consulta de Ventas / Anular",
+                 "Buscar una venta, ver qué se vendió y anularla", self._abrir_consulta_ventas),
                 ("permiso_reportes", "📊", "Reportes", "Resumen del día, totales y por operador", self._abrir_reportes),
             ]),
             ("Caja y personal", [
@@ -86,10 +80,11 @@ class AdministrarKioskoWindow(QDialog):
             grilla.setSpacing(10)
             for numero, (permiso, icono, nombre, detalle, funcion) in enumerate(tarjetas):
                 tarjeta = tarjeta_de_menu(icono, nombre, detalle, funcion)
+                # Las que no puede usar se ven igual y dicen "Acceso Restringido" (pedido del dueño, 2026-11-04).
                 if permiso is None and not self.es_admin:
-                    bloquear_tarjeta(tarjeta)
+                    restringir(tarjeta)
                 elif permiso and not (self.es_admin or usuarios_repo.tiene_permiso(self.usuario, permiso)):
-                    bloquear_tarjeta(tarjeta, TEXTO_SIN_PERMISO)
+                    restringir(tarjeta)
                 grilla.addWidget(tarjeta, numero // 2, numero % 2)
             grilla.setColumnStretch(0, 1)
             grilla.setColumnStretch(1, 1)

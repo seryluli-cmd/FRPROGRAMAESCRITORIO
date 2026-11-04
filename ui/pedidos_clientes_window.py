@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 import dominio
 from repositories import pedidos_clientes_repo
 from ui.piezas_ventana import (
-    agregar_indicador, cabecera_oscura, marcar_solo_admin, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
+    agregar_indicador, cabecera_oscura, solo_para_el_admin, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
     tecla_de_renglon,
 )
 from ui.utils import (
@@ -165,14 +165,16 @@ class VentanaPedidosClientes(QDialog):
         barra_botones = QHBoxLayout()
         barra_botones.setSpacing(8)
         barra_botones.addWidget(self.boton_historial)
-        if self.es_admin:
-            self.boton_renombrar = tecla("RENOMBRAR", self._renombrar)
-            self.boton_juntar = tecla("JUNTAR", self._juntar)
-            self.boton_juntar.setToolTip("Dos renglones que son lo mismo escrito distinto: se suman los clientes.")
-            self.boton_borrar = tecla("BORRAR", self._borrar, "teclaRoja")
-            for boton in (self.boton_renombrar, self.boton_juntar, self.boton_borrar):
-                marcar_solo_admin(boton)
-                barra_botones.addWidget(boton)
+        # Solo del Admin. Hasta el 2026-11-04 a los demás ni les aparecían; ahora las ven
+        # igual y les dicen "Acceso Restringido" (pedido del dueño).
+        self.boton_renombrar = tecla("RENOMBRAR", self._renombrar)
+        self.boton_juntar = tecla("JUNTAR", self._juntar)
+        self.boton_borrar = tecla("BORRAR", self._borrar, "teclaRoja")
+        for boton in (self.boton_renombrar, self.boton_juntar, self.boton_borrar):
+            solo_para_el_admin(boton, self.es_admin)
+            barra_botones.addWidget(boton)
+        # Después de marcarla: marcar_solo_admin le pone "Solo el Administrador".
+        self.boton_juntar.setToolTip("Dos renglones que son lo mismo escrito distinto: se suman los clientes.")
         barra_botones.addStretch()
         barra_botones.addWidget(tecla("CERRAR", self.close, "teclaRoja"))
 

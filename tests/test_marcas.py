@@ -117,9 +117,12 @@ class TestPantalla(BaseMarcas):
         self.addCleanup(ventana.deleteLater)
         return ventana
 
-    def test_el_boton_solo_lo_ve_el_admin(self):
-        self.assertFalse(self.ventana(self.admin_id).boton_marcas.isHidden())
-        self.assertTrue(self.ventana(self.empleada_id).boton_marcas.isHidden())
+    def test_el_boton_lo_ven_todos_pero_solo_lo_usa_el_admin(self):
+        # A la empleada le dice "Acceso Restringido" (pedido del dueño, 2026-11-04).
+        for usuario_id, restringido in ((self.admin_id, False), (self.empleada_id, True)):
+            boton = self.ventana(usuario_id).boton_marcas
+            self.assertFalse(boton.isHidden())
+            self.assertEqual(bool(boton.property("restringido")), restringido)
 
     def dialogo(self):
         dialogo = DialogoGestionMarcas(None, self.admin_id)

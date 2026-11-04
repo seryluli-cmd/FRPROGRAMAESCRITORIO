@@ -34,7 +34,7 @@ import turnos
 from errores import registrar_error
 from repositories import tareas_turno_repo
 from ui.piezas_ventana import (
-    agregar_indicador, cabecera_oscura, fila_de_filtros, marcar_solo_admin, panel_de_tabla, pie_de_ventana,
+    agregar_indicador, cabecera_oscura, fila_de_filtros, solo_para_el_admin, panel_de_tabla, pie_de_ventana,
     poner_indicador, tecla, tecla_de_renglon,
 )
 from ui.tareas_turno_dialogos import (
@@ -128,15 +128,14 @@ class VentanaTareasTurno(QDialog):
         self.boton_historial.setToolTip("Los días anteriores: quién hizo cada tarea y a qué hora.")
         barra_botones = QHBoxLayout()
         barra_botones.setSpacing(8)
-        # Las del Admin, solo para el Admin: como en Pedidos de Clientes, a los demás
-        # ni les aparecen.
-        if self.es_admin:
-            self.boton_nueva = tecla("+  NUEVA TAREA", self._nueva, "teclaAzul")
-            self.boton_modificar = tecla("✎  MODIFICAR", self._modificar)
-            self.boton_borrar = tecla("BORRAR", self._borrar, "teclaRoja")
-            for boton in (self.boton_nueva, self.boton_modificar, self.boton_borrar):
-                marcar_solo_admin(boton)
-                barra_botones.addWidget(boton)
+        # Las del Admin, solo para el Admin. Hasta el 2026-11-04 a los demás ni les
+        # aparecían; ahora las ven igual y les dicen "Acceso Restringido" (pedido del dueño).
+        self.boton_nueva = tecla("+  NUEVA TAREA", self._nueva, "teclaAzul")
+        self.boton_modificar = tecla("✎  MODIFICAR", self._modificar)
+        self.boton_borrar = tecla("BORRAR", self._borrar, "teclaRoja")
+        for boton in (self.boton_nueva, self.boton_modificar, self.boton_borrar):
+            solo_para_el_admin(boton, self.es_admin)
+            barra_botones.addWidget(boton)
         barra_botones.addWidget(self.boton_historial)
         barra_botones.addStretch()
         barra_botones.addWidget(tecla("CERRAR", self.close, "teclaRoja"))

@@ -917,12 +917,14 @@ class TestMandarCierreAMano(_BaseDeEnvios):
         self.addCleanup(ventana.deleteLater)
         return ventana
 
-    def test_el_boton_lo_ve_solo_el_admin_y_en_el_mostrador_abre_la_barra(self):
+    def test_el_boton_lo_usa_solo_el_admin_y_en_el_mostrador_abre_la_barra(self):
         envio_pwa_repo.activar(self.admin_id, True)
         self._turno_de_toby()
         cierre = turnos_repo.cerrar_turno(self.toby_id, ahora_dt=_a_las(14, 0))
-        self.assertFalse(self._control_de_cierres(self.toby_id).boton_mandar.isVisibleTo(
-            self._control_de_cierres(self.toby_id)))
+        # Toby lo ve igual, pero le dice "Acceso Restringido" (pedido del dueño, 2026-11-04).
+        de_toby = self._control_de_cierres(self.toby_id)
+        self.assertTrue(de_toby.boton_mandar.isVisibleTo(de_toby))
+        self.assertTrue(de_toby.boton_mandar.property("restringido"))
         ventana = self._control_de_cierres(self.admin_id)
         self.assertTrue(ventana.boton_mandar.isVisibleTo(ventana))
         ventana.tabla.selectRow(0)
