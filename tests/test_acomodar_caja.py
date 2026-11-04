@@ -117,8 +117,8 @@ class TestBotonAcomodarCaja(_ConCaja):
         barra = ventana.findChild(QFrame, "encabezadoInicio")
         textos = [b.text() for b in barra.findChildren(QPushButton)]
         # A la derecha de Cambiar Pass, el último.
-        self.assertEqual(textos[-2:], ["🔑  CAMBIAR PASS", "🧮  ACOMODAR CAJA"])
-        return next(b for b in barra.findChildren(QPushButton) if b.text() == "🧮  ACOMODAR CAJA")
+        self.assertEqual(textos[-2:], ["🔑  CAMBIAR PASS", "🧮  ORDENAR $"])
+        return next(b for b in barra.findChildren(QPushButton) if b.text() == "🧮  ORDENAR $")
 
     def test_el_admin_lo_abre(self):
         boton = self._boton(self.admin_id)

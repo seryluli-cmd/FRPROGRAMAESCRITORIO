@@ -318,9 +318,10 @@ class MainWindow(QMainWindow):
         # A la derecha de Operador, el último (pedido del dueño, 2026-11-04).
         self._agregar_boton_barra(layout_barra, "🔑  Cambiar Pass", self._abrir_cambiar_clave)
         # Para pasar del programa anterior a mitad de turno (pedido del dueño,
-        # 2026-11-04: "es por esta vez nomás"). Solo el Admin; los demás lo ven igual.
+        # 2026-11-04: "es por esta vez nomás"; pidió que se llame "Ordenar $"). Solo el
+        # Admin; los demás lo ven igual.
         self._agregar_boton_barra(
-            layout_barra, "🧮  Acomodar Caja", self._abrir_acomodar_caja, habilitado=self.es_admin,
+            layout_barra, "🧮  Ordenar $", self._abrir_acomodar_caja, habilitado=self.es_admin,
         )
         layout_barra.addStretch()
 

@@ -1,7 +1,7 @@
 """
 acomodar_caja_window.py
 =========================
-El botón "ACOMODAR CAJA" de la barra, a la derecha de Cambiar Pass (pedido del
+El botón "ORDENAR $" de la barra (primero se llamó "Acomodar Caja"), a la derecha de Cambiar Pass (pedido del
 dueño, 2026-11-04: "voy a cambiar el programa a mitad de turno"). El Admin
 escribe cuánto cobró el programa anterior en efectivo y en digital, y entra en
 la caja abierta para que el cierre dé bien. Las reglas están en
@@ -34,14 +34,14 @@ class DialogoAcomodarCaja(QDialog):
         super().__init__(parent)
         self.usuario = usuario
         self.caja = cajas_repo.caja_abierta()
-        self.setWindowTitle("Acomodar Caja")
+        self.setWindowTitle("Ordenar $")
         self.resize(480, 380)
         self._armar_interfaz()
         self._actualizar_total()
 
     def _armar_interfaz(self):
         cabecera = cabecera_oscura(
-            "🧮", "Acomodar Caja", "Lo que ya cobró el programa anterior en este turno")
+            "🧮", "Ordenar $", "Lo que ya cobró el programa anterior en este turno")
 
         self.campo_efectivo = CampoPesos()
         self.campo_digital = CampoPesos()
@@ -94,7 +94,7 @@ class DialogoAcomodarCaja(QDialog):
     def _guardar(self):
         efectivo, digital = self.campo_efectivo.value(), self.campo_digital.value()
         if not confirmar(
-            self, "Acomodar Caja",
+            self, "Ordenar $",
             f"Se suman a la caja {formato_pesos(efectivo)} en efectivo y "
             f"{formato_pesos(digital)} en digital del programa anterior.\n\n"
             f"{a_donde_va(self.caja)}\n\n¿Está bien?",
