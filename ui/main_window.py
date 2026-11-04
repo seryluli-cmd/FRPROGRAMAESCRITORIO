@@ -21,6 +21,7 @@ from ui.configuracion_admin_window import ConfiguracionAdminWindow
 from ui.gestion_impresiones_window import VentanaGestionImpresiones
 from ui.impresiones_window import DialogoImpresiones
 from ui.pedidos_clientes_window import VentanaPedidosClientes
+from ui.ranking_rotacion_window import VentanaRankingRotacion
 from ui.aviso_tarea import RevisorDeTareas
 from ui.tareas_turno_window import VentanaTareasTurno
 from ui.ventas_window import VentasWindow
@@ -51,16 +52,17 @@ AGRANDAR_DIBUJITO_OPERADOR = 1.25
 ALTO_BOTON_BARRA = 42
 SEPARACION_BOTONES_BARRA = 7
 # Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja,
-# Gestión Impresiones, Pedidos de Clientes y Tareas del Turno): todos del mismo
-# tamaño, uno debajo del otro a la izquierda (pedido del dueño, 2026-11-02, con un
-# dibujo: antes eran tres botones que ocupaban toda la fila; Gestión Impresiones se
-# sumó el mismo día, Pedidos de Clientes y Tareas del Turno el 2026-11-03). Medían
-# 110 de alto con 20 entre uno y otro; con el sexto, cada uno quedó un poco más
-# bajito para que el inicio siga entrando en la pantalla de 1920 x 1080 del
-# mostrador (~960 px con la letra de Windows; lo cuida tests/test_estilo_ui.py).
+# Gestión Impresiones, Pedidos de Clientes, Tareas del Turno y Ranking de
+# Rotación): todos del mismo tamaño, uno debajo del otro a la izquierda (pedido del
+# dueño, 2026-11-02, con un dibujo: antes eran tres botones que ocupaban toda la
+# fila; Gestión Impresiones se sumó el mismo día, Pedidos de Clientes y Tareas del
+# Turno el 2026-11-03 y Ranking de Rotación el 2026-11-04). Medían 110 de alto con
+# 20 entre uno y otro; con el sexto pasaron a 98 y 14, y con el séptimo a 86 y 10,
+# para que el inicio siga entrando en la pantalla de 1920 x 1080 del mostrador
+# (lo cuida tests/test_estilo_ui.py).
 ANCHO_ACCESO = 240
-ALTO_ACCESO = 98
-SEPARACION_ACCESOS = 14
+ALTO_ACCESO = 86
+SEPARACION_ACCESOS = 10
 TAMANO_DIBUJITO_ACCESO = 34
 # El numerito amarillo de la esquina de un acceso (cuántas tareas del turno están
 # atrasadas): alto y lo que lo separa del borde.
@@ -214,6 +216,7 @@ class MainWindow(QMainWindow):
         columna_inicio.addSpacing(16)
         accesos = QVBoxLayout()
         accesos.setSpacing(SEPARACION_ACCESOS)
+        por_nombre = {}
         for dibujito, texto, accion in (
             ("🛒", "VENTA DE MERCADERÍA", self._abrir_ventas),
             ("🖨️", "IMPRESIONES", self._abrir_impresiones),
@@ -221,12 +224,14 @@ class MainWindow(QMainWindow):
             ("📑", "GESTIÓN IMPRESIONES", self._abrir_gestion_impresiones),
             ("🙋", "PEDIDOS DE CLIENTES", self._abrir_pedidos_clientes),
             ("⏰", "TAREAS DEL TURNO", self._abrir_tareas_turno),
+            ("📈", "RANKING DE ROTACIÓN", self._abrir_ranking_rotacion),
         ):
-            acceso = self._acceso_de_inicio(dibujito, texto, accion)
+            por_nombre[texto] = self._acceso_de_inicio(dibujito, texto, accion)
             # Sin AlignLeft, un botón de tamaño fijo queda centrado en la fila.
-            accesos.addWidget(acceso, 0, Qt.AlignLeft)
-        # El último: titila y lleva el numerito de las atrasadas.
-        self.acceso_tareas = acceso
+            accesos.addWidget(por_nombre[texto], 0, Qt.AlignLeft)
+        # Titila y lleva el numerito de las atrasadas. Se busca por el nombre: hasta
+        # el 2026-11-04 era el último de la lista, y ya no lo es.
+        self.acceso_tareas = por_nombre["TAREAS DEL TURNO"]
         columna_inicio.addLayout(accesos)
         layout.addWidget(inicio, 1)
         contenedor.setLayout(layout)
@@ -543,6 +548,20 @@ class MainWindow(QMainWindow):
             self._tareas.contestaron.disconnect(al_contestar)
         # Lo que se marcó o se cargó adentro se ve ya en el numerito del acceso.
         self._tareas.contar()
+
+    def _abrir_ranking_rotacion(self):
+        """RANKING DE ROTACIÓN (2026-11-04). Es un reporte: lo abre quien tiene el
+        permiso de Reportes (el Admin siempre). El acceso lo ven todos, como los
+        demás; a quien no tiene el permiso le dice por qué no se abre. Desde otra PC
+        también se abre: solo mira."""
+        if not usuarios_repo.tiene_permiso(self.usuario, "permiso_reportes"):
+            mostrar_info(
+                self, "Sin permiso",
+                "El Ranking de Rotación lo puede ver quien tiene el permiso de Reportes.\n\n"
+                "Lo habilita el Administrador en Administrar Kiosko > Usuarios.",
+            )
+            return
+        VentanaRankingRotacion(self).exec()
 
     @solo_en_el_mostrador
     def _abrir_cierre_turno(self):

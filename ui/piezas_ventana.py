@@ -251,6 +251,8 @@ def fila_de_filtros(opciones, al_elegir, todos: str = "Todos") -> QWidget:
     cada una de `opciones` ((texto, valor), o solo el texto, que es también el valor)
     se queda con lo suyo. Se elige una sola a la vez; al cambiar se llama a
     `al_elegir(valor)`, con None para `todos`. `fila.elegido()` dice cuál está.
+    Con `todos=None` no hay pastilla para todo (RANKING DE ROTACIÓN: siempre hay
+    un período elegido) y arranca elegida la primera de `opciones`.
     """
     fila = QWidget()
     capa = QHBoxLayout(fila)
@@ -259,7 +261,8 @@ def fila_de_filtros(opciones, al_elegir, todos: str = "Todos") -> QWidget:
     grupo = QButtonGroup(fila)
     grupo.setExclusive(True)
     valores = {}
-    for texto, valor in [(todos, None)] + [o if isinstance(o, tuple) else (o, o) for o in opciones]:
+    primera = [] if todos is None else [(todos, None)]
+    for texto, valor in primera + [o if isinstance(o, tuple) else (o, o) for o in opciones]:
         pastilla = QPushButton(texto.upper())
         aplicar_clase(pastilla, "filtro")
         pastilla.setCheckable(True)

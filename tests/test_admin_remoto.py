@@ -688,6 +688,7 @@ _PANTALLAS_DE_OTRA_PC = [
     ("ui/login_window.py", None),
     ("ui/control_stock_window.py", None),
     ("ui/lista_compras_window.py", None),
+    ("ui/ranking_rotacion_window.py", None),
 ]
 
 # Lo que las pantallas usan de un repo sin ir a la base (se queda en esta PC), y
@@ -704,6 +705,7 @@ _PANTALLA_PRINCIPAL = [
     ("ui/main_window.py", {"MainWindow"}),
     ("ui/control_stock_window.py", None),
     ("ui/lista_compras_window.py", None),
+    ("ui/ranking_rotacion_window.py", None),
 ]
 # Cuentas con lo que ya llegó del mostrador: se hacen en esta PC, sin base.
 _NO_VAN_A_LA_BASE = {
@@ -1029,6 +1031,7 @@ class TestCopiaRemota(unittest.TestCase):
         from ui.lista_compras_window import VentanaListaDeCompras
         from ui.login_window import LoginWindow
         from ui.ordenar_stock_window import OrdenarStockWindow
+        from ui.ranking_rotacion_window import VentanaRankingRotacion
         from ui.reportes_window import ReportesWindow
         from ui.usuarios_window import DialogoCambiarClave, UsuariosWindow
         errores = []
@@ -1047,6 +1050,7 @@ class TestCopiaRemota(unittest.TestCase):
                 OrdenarStockWindow(ventana, self.usuario["id"], mostrador_de_prueba.CLAVE_ORDENAR_STOCK),
                 VentanaControlStock(self.usuario["id"], ventana),
                 VentanaListaDeCompras(ventana),
+                VentanaRankingRotacion(ventana),
             ]
             for pantalla in pantallas:
                 self.addCleanup(pantalla.deleteLater)

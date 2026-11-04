@@ -7,7 +7,7 @@ oscuro (si no, los cuadros que la hoja de estilos no pinta salen negros con la l
 oscura encima), que las tablas no muestren la numeración de filas, que la barra
 oscura de arriba use sus teclas (y que Cierre de Turno no cambie de tamaño al
 titilar), que el inicio tenga la foto de fondo sin deformarla, con el título y los
-seis accesos en un panel oscuro (Tareas del Turno tampoco cambia de tamaño al
+siete accesos en un panel oscuro (Tareas del Turno tampoco cambia de tamaño al
 titilar), y que los avisos que abren las ventanas del diseño nuevo no hereden su
 estilo.
 
@@ -43,7 +43,7 @@ from base import BaseConBaseTemporal  # noqa: E402
 _app = QApplication.instance() or QApplication([])
 
 ACCESOS_DEL_INICIO = ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES",
-                      "TAREAS DEL TURNO"]
+                      "TAREAS DEL TURNO", "RANKING DE ROTACIÓN"]
 
 
 def _regla(selector: str) -> dict:
@@ -149,8 +149,8 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
     def test_los_accesos_del_inicio_van_uno_debajo_del_otro_y_miden_igual(self):
         # Pedido del dueño (2026-11-02, con un dibujo): Venta de Mercadería, Impresiones y Caja
         # como botones iguales, apilados a la izquierda y a la misma distancia; ese mismo día
-        # se sumó Gestión Impresiones abajo, y el 2026-11-03 Pedidos de Clientes y Tareas
-        # del Turno.
+        # se sumó Gestión Impresiones abajo, el 2026-11-03 Pedidos de Clientes y Tareas
+        # del Turno, y el 2026-11-04 Ranking de Rotación.
         # Con la hoja de estilos: la letra del título y de la frase de arriba está ahí.
         self._con_la_hoja_de_estilos()
         admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
@@ -163,11 +163,12 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
 
         accesos = [b for b in ventana.findChildren(QPushButton) if b.objectName() == "accesoInicio"]
         self.assertEqual([b.accessibleName() for b in accesos], ACCESOS_DEL_INICIO)
-        # Que los seis entren en la pantalla del mostrador: abre maximizada en 1920 x 1080, y
+        # Que los siete entren en la pantalla del mostrador: abre maximizada en 1920 x 1080, y
         # sin la barra de Windows (~40) ni la de título (~31) quedan ~1009 px. Con la letra de
         # Windows el inicio mide ~20 px más que acá (offscreen): 933 contra 914 el 2026-11-03,
         # con el panel sobre la foto de fondo y cinco accesos. Con el sexto, cada acceso pasó
-        # de 110 a 98 de alto y de 20 a 14 entre uno y otro: 942 acá (~962 en Windows).
+        # de 110 a 98 de alto y de 20 a 14 entre uno y otro: 942 acá (~962 en Windows). Con
+        # el séptimo (2026-11-04), a 86 de alto y 10 entre uno y otro.
         self.assertLessEqual(ventana.minimumSizeHint().height(), 1009 - 25)
         self.assertEqual(len({(b.width(), b.height()) for b in accesos}), 1)
         self.assertEqual(len({b.x() for b in accesos}), 1)

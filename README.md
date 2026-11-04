@@ -209,13 +209,34 @@ pisa la lista de carpetas.
 `MainWindow` (`ui/main_window.py`) tiene arriba la barra oscura con los mismos
 botones para todos (Vender, Impresiones, Admin Kiosko, Config ADMIN, Caja, Cierre
 de Turno, Clave y Operador; los que no le tocan a alguien se ven igual y no
-hacen nada) y, debajo, un panel de inicio con seis accesos grandes, uno debajo
+hacen nada) y, debajo, un panel de inicio con siete accesos grandes, uno debajo
 del otro (Venta de Mercadería, Impresiones, Caja, Gestión Impresiones, Pedidos de
-Clientes y Tareas del Turno). Todo va sobre una foto del kiosko de noche que tapa
+Clientes, Tareas del Turno y Ranking de Rotación). Todo va sobre una foto del kiosko de noche que tapa
 la ventana entera (sin deformarse: se recorta lo que sobra; `ui/fondo_del_inicio.py`);
 el título y los accesos van en un panel oscuro medio transparente arriba a la
 izquierda, para que se lean sobre la foto. Cada módulo se abre como un diálogo
 modal.
+
+**Ranking de Rotación** (pedido del dueño, 2026-11-04; `ui/ranking_rotacion_window.py`,
+consultas en `repositories/rotacion_repo.py` y cuentas en `dominio.py`). El séptimo
+acceso del inicio, debajo de Tareas del Turno, con dos pestañas:
+- **Por compra** (la idea del dueño; abre en esta): cuánto tarda en venderse cada
+  compra, desde que entra la mercadería hasta que sale su última unidad, en promedio
+  de las últimas 3 compras que ya se vendieron enteras, del más rápido al más lento.
+  Lo que ya estaba en el estante sale antes que lo que llega; lo que se vendió sin
+  stock lo tapa la compra siguiente (esa se cuenta como vendida en el momento); una
+  compra que terminó con una corrección de ORDENAR Stock no se mide. Muestra también
+  la última compra y cuánto queda de ella. Al final, de la A a la Z, los que nunca se
+  compraron o no tienen ninguna compra vendida entera.
+- **Por período**: qué tan rápido sale cada artículo en los últimos 7, 30 o 90 días
+  (arranca en 30). Las unidades vendidas, cuántas por día, el stock de hoy y para
+  cuántos días alcanza a ese ritmo, del que más se vende al que menos; al final los
+  que no se vendieron ("Sin ventas"). Arriba, cuántos se acaban en menos de 7 días
+  (en rojo) y cuántos están quietos. Días de 06:00 a 06:00.
+
+Las dos cuentan solo ventas confirmadas y sin las impresiones, y se imprimen como
+Control de Stock (la pestaña a la vista). Lo abre quien tiene el permiso de Reportes
+(el Admin siempre); a los demás les avisa por qué no. También se abre desde otra PC.
 
 **Tareas del Turno** (pedido del dueño, 2026-11-03; reglas en
 `repositories/tareas_turno_repo.py`). Cosas para hacer a una hora, como "PRENDER
@@ -571,8 +592,9 @@ python -m unittest discover tests
 ```
 
 Corren contra una base SQLite temporal (nunca tocan `data_fr/kiosko.db`).
-985 tests al 2026-11-03. Cubren turnos, caja y cajas con número
-(`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock,
+1025 tests al 2026-11-04. Cubren turnos, caja y cajas con número
+(`tests/test_cajas.py`, `tests/test_cajas_ui.py`), el detalle del día, stock, el
+Ranking de Rotación (`tests/test_ranking_rotacion.py`),
 ORDENAR Stock, marcas, rubros (`tests/test_rubros.py`), ventas y anulaciones, el
 cobro con Enter, impresiones, reportes, administrar desde otra PC
 (`tests/test_admin_remoto.py`, con un mostrador de prueba en otro proceso:

@@ -325,6 +325,8 @@ cambio de esquema la deja vieja, se vuelve a armar.
 | `ui.detalle_venta.VentanaConDetalleDeVenta` | lista de ventas + artículos de la elegida (Consulta de Ventas y Detalle de un cierre) |
 | `ui.tarjeta_cierre.TarjetaCierreDeTurno` · `.TablaDeNegocios` | se dibuja el resumen de un Cierre de Turno (A RETIRAR, que es `resumen["monto_a_retirar"]`, y TOTAL en grande; en la tabla, cada negocio con su efectivo y digital en columnas, lo cobrado y el Cambio Fijo). La tabla es también la de Caja; la tarjeta la usan la pantalla Cierre de Turno (turno en curso) y "Ver Detalle" de Control de Cierres (cualquier cierre ya hecho, también el forzoso). Un cambio de diseño del Cierre de Turno se hace ahí y se ve en las dos |
 | `dominio.articulos_para_comprar(articulos)` · `dominio.STOCK_PARA_LISTA_DE_COMPRAS` | se arma la LISTA DE COMPRAS (botón de la barra antes de Operador, para cualquiera; `ui/lista_compras_window.py`): los artículos con 4 unidades o menos, también los de 0 o negativo, sin Impresiones, de la A a la Z. Sale de `articulos_repo.listar_articulos`, así también se abre desde otra PC |
+| `rotacion_repo.ranking_por_compras()` · `._lotes_de_compra(eventos)` · `dominio.COMPRAS_PARA_PROMEDIAR` · `.texto_tiempo_de_venta` | se decide cuánto tardó en venderse cada compra (RANKING DE ROTACIÓN > POR COMPRA, la idea del dueño del 2026-11-04): se rearma la historia del stock de cada artículo desde su primera compra con las compras (su `stock_antes`), las ventas confirmadas y los ajustes de ORDENAR Stock; la mercadería sale en el orden en que entró (lo del estante, sin fecha, antes que lo que llega), una compra se vendió entera cuando sale su última unidad, lo vendido sin stock lo tapa la compra siguiente (vendida en el momento, 0 días) y una compra que terminó con un ajuste (faltaba mercadería) no se mide. Antes de cada compra la cuenta se empareja con el `stock_antes` que guardó. El ranking promedia las últimas 3 vendidas enteras (lo eligió el dueño: con una sola, una semana rara da vuelta todo) y va del más rápido al más lento; sin ninguna, al final sin puesto. Ojo: depende de cuánto se compra cada vez (una compra grande tarda más aunque el artículo se venda mucho): para el ritmo de venta está POR PERÍODO. Ver `TestRankingPorCompras` y `TestLotesDeCompra` |
+| `rotacion_repo.ranking_de_rotacion(desde, hasta)` · `dominio.unidades_por_dia` · `.dias_que_alcanza` · `.se_acaba_pronto` | se arma el RANKING DE ROTACIÓN > POR PERÍODO (pedido del dueño, 2026-11-04; séptimo acceso del inicio, `ui/ranking_rotacion_window.py`, con permiso de Reportes): todos los artículos menos Impresiones, del que más se vendió en el período al que menos (ventas confirmadas, días de 06:00 a 06:00), con los quietos al final sin puesto. Para cuántos días alcanza se cuenta con lo vendido, no con el por día redondeado; None sin ventas, 0 sin stock. Las dos funciones del ranking están en la lista blanca (se abre desde otra PC). Ver `tests/test_ranking_rotacion.py` |
 | `ui.imprimir.html_del_listado(...)` · `.vista_previa(parent, html, nombre)` | se imprime un listado: HTML en hojas A4 con los títulos repetidos en cada hoja y vista previa (desde ahí se imprime o se guarda en PDF). Lo usan el "Renglón por renglón" del Detalle del Día y Control de Stock |
 
 Si necesitás uno de esos datos, **llamá a la función existente**.
@@ -678,8 +680,21 @@ atrasadas. Para que entraran seis accesos en la pantalla del mostrador, cada uno
 bajó de 110 a 98 de alto y de 20 a 14 de separación. Reglas en
 `repositories/tareas_turno_repo.py`.
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 998 pruebas
-al 2026-11-03 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
+Ranking de Rotación (qué tan rápido sale cada artículo, 2026-11-04): séptimo acceso
+del inicio, debajo de Tareas del Turno (`ui/ranking_rotacion_window.py`), con dos
+pestañas. POR COMPRA (la idea del dueño, abre en esta): cuánto tarda en venderse cada
+compra, desde que entra hasta que sale su última unidad, promedio de las últimas
+`dominio.COMPRAS_PARA_PROMEDIAR` (3) vendidas enteras, del más rápido al más lento
+(`rotacion_repo.ranking_por_compras`). POR PERÍODO: últimos 7, 30 o 90 días; vendidas,
+por día, stock y para cuántos días alcanza, con los quietos al final y en rojo lo que
+se acaba en menos de `dominio.DIAS_PARA_AVISAR_ROTACION`
+(`rotacion_repo.ranking_de_rotacion(desde, hasta)`). Las dos consultas están en la
+lista blanca de otra PC. Lo abre quien tiene `permiso_reportes`. Con el séptimo, cada
+acceso bajó a 86 de alto y 10 de separación. `MainWindow.acceso_tareas` se busca por
+nombre: ya no es el último.
+
+La suite se ejecuta con `python -m unittest discover tests` y tiene 1025 pruebas
+al 2026-11-04 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
 

@@ -588,3 +588,81 @@ def numeros_de_las_tareas(tareas) -> dict:
         "atrasadas": estados.count(TAREA_ATRASADA),
         "hechas": estados.count(TAREA_HECHA),
     }
+
+
+# ---------------------------------------------------------------------
+# RANKING DE ROTACIÓN (pedido del dueño, 2026-11-04)
+# ---------------------------------------------------------------------
+# Qué tan rápido sale cada artículo y para cuántos días alcanza lo que hay. La
+# consulta está en repositories/rotacion_repo.py; acá, las cuentas y los textos,
+# sin base, para que la copia de otra PC los haga igual que el mostrador.
+
+# Lo que se acaba en menos de una semana pide atención: sale en rojo y se cuenta
+# arriba. Una semana es lo que tarda, más o menos, en llegar un pedido nuevo.
+DIAS_PARA_AVISAR_ROTACION = 7
+
+# POR COMPRA: cuántas compras (de las que ya se vendieron enteras) se promedian
+# para decir cuánto tarda en venderse un artículo. Lo eligió el dueño el
+# 2026-11-04: con una sola, una semana rara (un feriado, la lluvia) da vuelta todo.
+COMPRAS_PARA_PROMEDIAR = 3
+
+
+def texto_tiempo_de_venta(dias, compras=1) -> str:
+    """Lo que tardó en venderse una compra (`dias`, con decimales) como se lee:
+    "Menos de 1 hora", "18 horas", "1 día", "2,5 días". Sin medida (None): "Sin
+    compras" si el artículo nunca se compró (`compras` 0) o "Sin vender entera" si
+    ninguna de sus compras terminó de venderse todavía."""
+    if dias is None:
+        return "Sin compras" if not compras else "Sin vender entera"
+    if dias < 1:
+        horas = round(dias * 24)
+        if horas < 1:
+            return "Menos de 1 hora"
+        if horas < 24:
+            return "1 hora" if horas == 1 else f"{horas} horas"
+    dias = round(dias, 1)
+    return "1 día" if dias == 1 else f"{texto_por_dia(dias)} días"
+
+
+def unidades_por_dia(vendidas, dias: int) -> float:
+    """Lo vendido en el período repartido en sus días, con dos decimales: 3
+    unidades en 30 días son 0,1 por día, no 0."""
+    if dias <= 0:
+        raise ValueError("El período tiene que tener al menos un día.")
+    return round(vendidas / dias, 2)
+
+
+def dias_que_alcanza(stock, vendidas, dias: int):
+    """Para cuántos días alcanza `stock` si se sigue vendiendo como en el período
+    (`vendidas` en `dias`). En días enteros y para abajo: con dos días y medio de
+    mercadería, el tercero ya falta. None si no se vendió nada (a ese ritmo no se
+    acaba nunca) y 0 sin stock (0 o negativo). Se cuenta con lo vendido y no con
+    unidades_por_dia, que viene redondeado."""
+    if vendidas <= 0:
+        return None
+    if stock <= 0:
+        return 0
+    return int(stock * dias // vendidas)
+
+
+def se_acaba_pronto(alcanza) -> bool:
+    """Si un artículo se queda sin mercadería antes de DIAS_PARA_AVISAR_ROTACION
+    (`alcanza`, de dias_que_alcanza). Sin stock también: ya se acabó."""
+    return alcanza is not None and alcanza < DIAS_PARA_AVISAR_ROTACION
+
+
+def texto_por_dia(valor) -> str:
+    """Las unidades por día como se leen: "12", "1,5", "0,03" (coma decimal y sin
+    ceros de más)."""
+    texto = f"{float(valor):.2f}".rstrip("0").rstrip(".")
+    return texto.replace(".", ",")
+
+
+def texto_alcanza(alcanza) -> str:
+    """La columna "Alcanza para": "12 días", "1 día", "Sin stock" o, si no se vendió
+    nada en el período, "Sin ventas"."""
+    if alcanza is None:
+        return "Sin ventas"
+    if alcanza <= 0:
+        return "Sin stock"
+    return "1 día" if alcanza == 1 else f"{alcanza} días"

@@ -7,7 +7,7 @@ Administrador: nada de "cualquier cosa por la red".
 
 Son las que usan las pantallas de administración del kiosko: Artículos,
 Compras, Consulta de Ventas con anulación, Reportes, Control de Cierres con la
-carga del sobre, Usuarios, CONTROL DE STOCK y Caja para mirar.
+carga del sobre, Usuarios, CONTROL DE STOCK, RANKING DE ROTACIÓN y Caja para mirar.
 
 Vender y cobrar, abrir/cerrar cajas y turnos siguen solo en el mostrador.
 En la otra PC esos botones avisan (ui.utils.solo_en_el_mostrador).
@@ -28,7 +28,7 @@ import inspect
 
 from repositories import (
     articulos_repo, compras_repo, config_repo, detalle_dia_repo, envio_pwa_repo, relevo_repo, reportes_repo,
-    turnos_repo, usuarios_repo, ventas_repo,
+    rotacion_repo, turnos_repo, usuarios_repo, ventas_repo,
 )
 
 # Sube si cambia CÓMO se hablan las dos copias (no la lista): las dos tienen que
@@ -46,6 +46,7 @@ _MODULOS = {
     "envio_pwa_repo": envio_pwa_repo,
     "relevo_repo": relevo_repo,
     "reportes_repo": reportes_repo,
+    "rotacion_repo": rotacion_repo,
     "turnos_repo": turnos_repo,
     "usuarios_repo": usuarios_repo,
     "ventas_repo": ventas_repo,
@@ -73,6 +74,9 @@ FUNCIONES = {
         "resumen_ventas", "ranking_ventas", "resumen_por_origen", "resumen_por_turno",
         "resumen_por_operador", "ventas_de_operador",
     ),
+    # RANKING DE ROTACIÓN, el séptimo acceso del inicio (solo mira): POR COMPRA y
+    # POR PERÍODO.
+    "rotacion_repo": ("ranking_por_compras", "ranking_de_rotacion"),
     # Reportes > Resumen del Día (con el detalle venta por venta), Control de
     # Cierres y Caja (solo mirar)
     "detalle_dia_repo": ("detalle_del_dia",),
