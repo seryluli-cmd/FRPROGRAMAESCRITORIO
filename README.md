@@ -208,7 +208,7 @@ pisa la lista de carpetas.
 
 `MainWindow` (`ui/main_window.py`) tiene arriba la barra oscura con los mismos
 botones para todos (Vender, Impresiones, Admin Kiosko, Config ADMIN, Caja, Cierre
-de Turno, Lista de Compras, Cambiar Contraseña y Operador; los que no le tocan a alguien se ven igual y no
+de Turno, Lista de Compras, Operador y Cambiar Pass; los que no le tocan a alguien se ven igual y no
 hacen nada) y, debajo, un panel de inicio con siete accesos grandes, uno debajo
 del otro (Venta de Mercadería, Impresiones, Caja, Gestión Impresiones, Pedidos de
 Clientes, Tareas del Turno y Ranking de Rotación). Todo va sobre una foto del kiosko de noche que tapa

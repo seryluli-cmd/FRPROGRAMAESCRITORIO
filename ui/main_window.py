@@ -277,11 +277,11 @@ class MainWindow(QMainWindow):
 
     def _armar_botones_de_la_barra(self, layout_barra):
         """El renglón de botones, de izquierda a derecha empezando por Vender y
-        terminando en "🔄 Operador", pegado a la derecha de "Cambiar Contraseña"
-        (pedido del dueño, 2026-11-04: ese botón se llamaba "Clave" e iba antes de
-        Lista de Compras; lo quiso al lado de Operador y con el nombre entero). Va
-        a la derecha de todo desde el 2026-10-23: hasta ese día iba solo en la punta
-        derecha y, con la pantalla de 1920 del mostrador, quedaba lejos de todo. Se llamaba
+        terminando en "🔑 Cambiar Pass", a la derecha de "🔄 Operador" (pedido del
+        dueño, 2026-11-04: se llamaba "Clave" e iba antes de Lista de Compras).
+        Operador va pegado a Lista de Compras desde el 2026-10-23: hasta ese día iba
+        solo en la punta derecha y, con la pantalla de 1920 del mostrador, quedaba
+        lejos de todo. Se llamaba
         "Cerrar sesión": el dueño pidió que diga lo que hace de verdad, volver
         al ingreso para que entre otro operador. Primero fue "Camb Operador"; el
         2026-10-24 pasó a las flechas en círculo + "Operador" (el dueño eligió
@@ -305,8 +305,6 @@ class MainWindow(QMainWindow):
         self.boton_cierre_turno = self._agregar_boton_barra(layout_barra, "🧾  Cierre de Turno", self._abrir_cierre_turno)
         # Para cualquiera (pedido del dueño, 2026-10-31).
         self._agregar_boton_barra(layout_barra, "📝  Lista de Compras", self._abrir_lista_de_compras)
-        # Pegado a Operador: los dos son de quien está adentro (pedido del dueño, 2026-11-04).
-        self._agregar_boton_barra(layout_barra, "🔑  Cambiar Contraseña", self._abrir_cambiar_clave)
         # Tres espacios entre el dibujito y el texto: uno más que en los otros botones (pedido del dueño).
         boton_operador = self._agregar_boton_barra(layout_barra, "   Operador", self._cambiar_operador, clase="peligro")
         # Su dibujito va un 25% más grande que los de los otros botones (pedido del dueño,
@@ -315,6 +313,8 @@ class MainWindow(QMainWindow):
         icono, tamano = icono_de_emoji(DIBUJITO_OPERADOR, boton_operador.fontInfo().pixelSize() * AGRANDAR_DIBUJITO_OPERADOR)
         boton_operador.setIcon(icono)
         boton_operador.setIconSize(tamano)
+        # A la derecha de Operador, el último (pedido del dueño, 2026-11-04).
+        self._agregar_boton_barra(layout_barra, "🔑  Cambiar Pass", self._abrir_cambiar_clave)
         layout_barra.addStretch()
 
     def _agregar_boton_barra(self, layout, texto, funcion, clase=None, habilitado=True):

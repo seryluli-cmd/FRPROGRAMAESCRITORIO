@@ -1004,7 +1004,7 @@ class TestCopiaRemota(unittest.TestCase):
         self.assertFalse(hasattr(ventana, "panel_pcs"))
         botones = [boton.text() for boton in ventana.findChildren(QPushButton)]
         for texto in ("VENDER", "IMPRESIONES", "ADMIN KIOSKO", "CONFIG ADMIN",
-                      "CAJA", "CIERRE DE TURNO", "LISTA DE COMPRAS", "CAMBIAR CONTRASEÑA", "OPERADOR"):
+                      "CAJA", "CIERRE DE TURNO", "LISTA DE COMPRAS", "OPERADOR", "CAMBIAR PASS"):
             self.assertTrue(any(texto in boton for boton in botones), texto)
         for texto in ("MIEMBROS", "RESERVAS", "TRÁMITES", "DESCONGELAR",
                       "REINICIAR", "APAGAR"):
