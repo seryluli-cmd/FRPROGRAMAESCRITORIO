@@ -76,7 +76,8 @@ class TestBuscarEnElMismoCampo(BaseConBaseTemporal):
         self.assertEqual(self.lista.criterio, "codigo")
         self.assertEqual(self._elegida(), ["Código"])
         self.assertEqual(self.campo.placeholderText(), "Escaneá el código de barras o escribí el nombre del producto...")
-        self.assertEqual(self._dibujo_del_campo()[0], "dibujo_codigo_de_barras")
+        # El código de barras con "Abc" al lado: da lo mismo escanear que escribir (2026-11-04).
+        self.assertEqual(self._dibujo_del_campo()[0], "dibujo_codigo_o_abc")
         self.assertFalse(self.lista.isVisible())
 
     def test_f6_cambia_el_criterio_y_el_dibujo_sin_abrir_otra_ventana(self):

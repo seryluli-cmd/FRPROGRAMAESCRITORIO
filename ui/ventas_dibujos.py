@@ -4,8 +4,8 @@ ventas_dibujos.py
 Los dibujos del diseño de Venta de Mercadería que eligió el dueño (2026-10-26,
 la maqueta "B": el total y COBRAR siempre grandes a la derecha): las teclas con
 la tecla marcada aparte ("F5" en un recuadro azul y "Código" al lado), el dibujo
-de adentro del campo de escaneo (el código de barras, o "ABC" y la etiqueta cuando
-busca por descripción o por marca) y el renglón del carrito con el código y el
+de adentro del campo de escaneo (el código de barras con "Abc" al lado, o "ABC" y la
+etiqueta cuando busca por descripción o por marca) y el renglón del carrito con el código y el
 precio por unidad chiquitos debajo del producto.
 
 Se dibujan con QPainter: un emoji puede salir como un rectángulo en el Windows
@@ -87,16 +87,45 @@ def _terminado(pincel, dibujo) -> QPixmap:
     return dibujo
 
 
-def dibujo_codigo_de_barras() -> QPixmap:
-    """Un código de barras azul (rayas de distinto grueso): el campo espera la pistola."""
-    dibujo = _lienzo()
-    pincel = QPainter(dibujo)
+def _pintar_barras(pincel):
+    """Las rayas azules de un código de barras (de distinto grueso), de x = 3 a x = 27
+    en píxeles de pantalla: el campo espera la pistola."""
     pincel.setPen(Qt.NoPen)
     pincel.setBrush(QColor(COLOR_BARRAS))
     x = 3 * _ESCALA
     for grueso, espacio in ((2, 1), (1, 1), (2, 1), (1, 2), (3, 1), (1, 1), (2, 1), (1, 1), (2, 0)):
         pincel.drawRect(QRectF(x, 2 * _ESCALA, grueso * _ESCALA, 18 * _ESCALA))
         x += (grueso + espacio) * _ESCALA
+
+
+def _pintar_letras(pincel, texto, x, ancho, alineado):
+    """`texto` en azul y en negrita, achicado hasta que entre en `ancho` con la letra
+    que tenga la PC."""
+    fuente = QFont()
+    fuente.setBold(True)
+    fuente.setPixelSize(15 * _ESCALA)
+    while QFontMetrics(fuente).horizontalAdvance(texto) > ancho * _ESCALA and fuente.pixelSize() > 8 * _ESCALA:
+        fuente.setPixelSize(fuente.pixelSize() - 1)
+    pincel.setRenderHint(QPainter.TextAntialiasing)
+    pincel.setFont(fuente)
+    pincel.setPen(QColor(COLOR_BARRAS))
+    pincel.drawText(QRectF(x * _ESCALA, 0, ancho * _ESCALA, ALTO_DIBUJO_CAMPO * _ESCALA),
+                    alineado | Qt.AlignVCenter, texto)
+
+
+# El código de barras con "Abc" al lado: es el dibujo más ancho, y el campo le deja
+# siempre ese lugar (si no, el texto saltaría al pasar solo del código a la descripción).
+ANCHO_DIBUJO_CODIGO_O_ABC = 64
+
+
+def dibujo_codigo_o_abc() -> QPixmap:
+    """El código de barras y "Abc" al lado: en el campo da lo mismo escanear que
+    escribir el nombre del producto (pedido del dueño, 2026-11-04)."""
+    dibujo = QPixmap(ANCHO_DIBUJO_CODIGO_O_ABC * _ESCALA, ALTO_DIBUJO_CAMPO * _ESCALA)
+    dibujo.fill(Qt.transparent)
+    pincel = QPainter(dibujo)
+    _pintar_barras(pincel)
+    _pintar_letras(pincel, "Abc", 33, ANCHO_DIBUJO_CODIGO_O_ABC - 33, Qt.AlignLeft)
     return _terminado(pincel, dibujo)
 
 
@@ -104,18 +133,8 @@ def dibujo_abc() -> QPixmap:
     """"ABC" en azul: el campo busca por descripción, se escribe el nombre del producto
     (pedido del dueño, 2026-11-02)."""
     dibujo = _lienzo()
-    fuente = QFont()
-    fuente.setBold(True)
-    fuente.setPixelSize(15 * _ESCALA)
-    # Que entre a lo ancho con la letra que tenga la PC.
-    ancho_maximo = ANCHO_DIBUJO_CAMPO * _ESCALA
-    while QFontMetrics(fuente).horizontalAdvance("ABC") > ancho_maximo and fuente.pixelSize() > 8 * _ESCALA:
-        fuente.setPixelSize(fuente.pixelSize() - 1)
     pincel = QPainter(dibujo)
-    pincel.setRenderHint(QPainter.TextAntialiasing)
-    pincel.setFont(fuente)
-    pincel.setPen(QColor(COLOR_BARRAS))
-    pincel.drawText(QRectF(0, 0, dibujo.width(), dibujo.height()), Qt.AlignCenter, "ABC")
+    _pintar_letras(pincel, "ABC", 0, ANCHO_DIBUJO_CAMPO, Qt.AlignHCenter)
     return _terminado(pincel, dibujo)
 
 

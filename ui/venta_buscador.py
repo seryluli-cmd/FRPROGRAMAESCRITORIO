@@ -5,7 +5,8 @@ El campo de arriba de Venta de Mercadería busca por código de barras, por
 descripción o por marca SIN abrir otra ventana (pedido del dueño, 2026-11-02: el
 cuadro chico aparte de F6 "no es estético, ni lógico, ni práctico"). F5, F6 y F7
 cambian solo el criterio de ese mismo campo: el dibujo de la izquierda (el código
-de barras, "ABC" o la etiqueta de la marca), el texto de ayuda y la tecla marcada.
+de barras con "Abc" al lado, porque ahí da lo mismo escanear que escribir el nombre;
+"ABC" o la etiqueta de la marca), el texto de ayuda y la tecla marcada.
 
 Por descripción o por marca, lo que se escribe abre una lista debajo del campo,
 encima del carrito: las flechas eligen (arranca marcado el primero), Enter o un
@@ -36,8 +37,8 @@ from PySide6.QtWidgets import (
 from repositories import articulos_repo
 from ui.utils import formato_pesos, manejar_errores
 from ui.ventas_dibujos import (
-    ALTO_DIBUJO_CAMPO, ANCHO_DIBUJO_CAMPO, ROL_DETALLE, DelegadoProducto, boton_con_tecla, dibujo_abc,
-    dibujo_codigo_de_barras, dibujo_de_marca,
+    ALTO_DIBUJO_CAMPO, ANCHO_DIBUJO_CODIGO_O_ABC, ROL_DETALLE, DelegadoProducto, boton_con_tecla, dibujo_abc,
+    dibujo_codigo_o_abc, dibujo_de_marca,
 )
 
 CODIGO, DESCRIPCION, MARCA = "codigo", "descripcion", "marca"
@@ -45,7 +46,7 @@ CODIGO, DESCRIPCION, MARCA = "codigo", "descripcion", "marca"
 # criterio -> (tecla, botón, ayuda del botón, ayuda de adentro del campo, dibujo de adentro del campo)
 _CRITERIOS = {
     CODIGO: ("F5", "Código", "Escanear con la pistola o tipear el código de barras",
-             "Escaneá el código de barras o escribí el nombre del producto...", dibujo_codigo_de_barras),
+             "Escaneá el código de barras o escribí el nombre del producto...", dibujo_codigo_o_abc),
     DESCRIPCION: ("F6", "Descripción", "Buscar escribiendo el nombre del producto",
                   "Escribí el nombre del producto, elegilo con las flechas y apretá Enter...", dibujo_abc),
     MARCA: ("F7", "Marca", "Buscar escribiendo la marca del producto",
@@ -87,11 +88,14 @@ class BuscadorDeLaVenta(QTableWidget):
         self._resultados = []
         self._armar_lista()
         # El dibujo va en una etiqueta encima del campo, con lugar reservado a la
-        # izquierda del texto: como ícono del campo (addAction) Qt lo achica a 16 px.
+        # izquierda del texto: como ícono del campo (addAction) Qt lo achica a 16 px. El
+        # lugar es el del más ancho (el código con "Abc"), en los tres criterios: así lo
+        # escrito no salta cuando una letra pasa sola del código a la descripción.
         self.dibujo_del_campo = QLabel(campo)
-        self.dibujo_del_campo.setFixedSize(ANCHO_DIBUJO_CAMPO, ALTO_DIBUJO_CAMPO)
+        self.dibujo_del_campo.setFixedSize(ANCHO_DIBUJO_CODIGO_O_ABC, ALTO_DIBUJO_CAMPO)
+        self.dibujo_del_campo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.dibujo_del_campo.setAttribute(Qt.WA_TransparentForMouseEvents)   # un clic ahí es en el campo
-        campo.setTextMargins(ANCHO_DIBUJO_CAMPO + 8, 0, 0, 0)
+        campo.setTextMargins(ANCHO_DIBUJO_CODIGO_O_ABC + 8, 0, 0, 0)
         self.botones = [self._armar_boton(ventana, criterio) for criterio in _CRITERIOS]
         campo.textChanged.connect(self._buscar)
         # textEdited y no textChanged: solo lo que se tipea cambia el criterio. Si no, F5
