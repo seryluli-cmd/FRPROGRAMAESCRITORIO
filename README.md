@@ -422,9 +422,12 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   del mes vencidos sin cerrar.
 - **Usuarios** (`usuarios_window.py`, `UsuariosWindow`) — alta/edición de
   usuarios con sus permisos, "Borrar" (real si nunca vendió/compró/cerró un
-  turno; si tiene historial, ofrece desactivarlo), "Mostrar inactivos",
-  "Configurar Cambio Fijo" (`config_repo`) y "Copias de Seguridad"
-  (`ui/copias_dialogo.py`).
+  turno; si tiene historial, ofrece desactivarlo), "Mostrar inactivos" y
+  "Copias de Seguridad" (`ui/copias_dialogo.py`).
+- **Cambio Fijo** (`ui/cambio_fijo_dialogo.py`, solo Admin) — el monto que queda
+  en el cajón para dar cambio en cada turno (`config_repo`). Hasta el 2026-11-04
+  era una tecla adentro de Usuarios; el dueño la pidió como tarjeta propia de
+  Administrar Kiosko.
 
 **Configuración ADMIN** (`ui/configuracion_admin_window.py`; la abre solo el
 Admin): **Accesos de Admin** (`ui/accesos_admin_window.py`: cada login con

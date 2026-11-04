@@ -8,9 +8,10 @@ ui/piezas_ventana.py (las mismas que Configuración ADMIN).
 
 from PySide6.QtWidgets import QDialog, QGridLayout, QHBoxLayout, QVBoxLayout
 
-from repositories import usuarios_repo
+from repositories import config_repo, usuarios_repo
 from ui.articulos_window import ArticulosWindow
 from ui.caja_window import ControlCierresWindow
+from ui.cambio_fijo_dialogo import DialogoFondoCambio
 from ui.compras_window import ComprasWindow
 from ui.consulta_ventas_window import ConsultaVentasWindow
 from ui.control_stock_window import VentanaControlStock
@@ -20,7 +21,7 @@ from ui.piezas_ventana import (
 )
 from ui.reportes_window import ReportesWindow
 from ui.usuarios_window import UsuariosWindow
-from ui.utils import sin_boton_por_defecto
+from ui.utils import manejar_errores, mostrar_info, sin_boton_por_defecto
 
 
 class AdministrarKioskoWindow(QDialog):
@@ -29,8 +30,8 @@ class AdministrarKioskoWindow(QDialog):
     ("Administrar Kiosko"), que solo abren los encargados (ver
     MainWindow._es_encargado). Un Admin las usa todas; una Empleada solo las
     que tenga habilitadas en usuarios_repo.PERMISOS_EMPLEADA. Las demás las ve en
-    gris y con candado. "Usuarios" y "Control de Stock" son solo del Admin: no
-    se delegan con ningún permiso.
+    gris y con candado. "Usuarios", "Control de Stock" y "Cambio Fijo" son solo
+    del Admin: no se delegan con ningún permiso.
     """
 
     def __init__(self, usuario, es_admin, parent=None):
@@ -50,7 +51,7 @@ class AdministrarKioskoWindow(QDialog):
         agregar_pastilla(cabecera, "ADMIN" if self.es_admin else "ENCARGADO", TONO_AZUL if self.es_admin else TONO_GRIS)
 
         # (permiso que la habilita, dibujito, título, para qué es, qué abre). Las que
-        # no tienen permiso (Control de Stock y Usuarios) son solo del Admin.
+        # no tienen permiso (Control de Stock, Usuarios y Cambio Fijo) son solo del Admin.
         grupos = [
             ("Mercadería", [
                 ("permiso_articulos", "📦", "Artículos", "Precios, stock, rubros y marcas", self._abrir_articulos),
@@ -66,6 +67,9 @@ class AdministrarKioskoWindow(QDialog):
                 ("permiso_control_cierres", "🗂️", "Control de Cierres de Turno", "Cada cierre de caja y su sobre",
                  self._abrir_control_cierres),
                 (None, "👤", "Usuarios", "Quién entra, claves, permisos y copias", self._abrir_usuarios),
+                # Era una tecla adentro de Usuarios; el dueño la quiso a la vista acá
+                # (2026-11-04). Va al final para no correr las tarjetas de siempre.
+                (None, "💵", "Cambio Fijo", "La plata para dar cambio en el cajón", self._abrir_cambio_fijo),
             ]),
         ]
 
@@ -117,3 +121,10 @@ class AdministrarKioskoWindow(QDialog):
 
     def _abrir_usuarios(self):
         UsuariosWindow(self.usuario, self).exec()
+
+    @manejar_errores
+    def _abrir_cambio_fijo(self):
+        dialogo = DialogoFondoCambio(self, config_repo.obtener_fondo_cambio())
+        if dialogo.exec():
+            config_repo.actualizar_fondo_cambio(dialogo.spin_monto.value())
+            mostrar_info(self, "Guardado", "Se actualizó el cambio fijo.")

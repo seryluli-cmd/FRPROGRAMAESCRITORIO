@@ -181,7 +181,7 @@ class TestAdministrarKiosko(_ConUsuarios):
     def test_el_admin_usa_todo_y_puede_anular(self):
         tarjetas = self._tarjetas(self._ventana(self._usuario("Admin", dominio.ROL_ADMIN)))
 
-        self.assertEqual(sorted(tarjetas), ["Artículos", "Compras", "Consulta de Ventas / Anular",
+        self.assertEqual(sorted(tarjetas), ["Artículos", "Cambio Fijo", "Compras", "Consulta de Ventas / Anular",
                                             "Control de Cierres de Turno", "Control de Stock", "Reportes",
                                             "Usuarios"])
         self.assertFalse(any(_restringido(tarjeta) for tarjeta in tarjetas.values()))
@@ -195,12 +195,53 @@ class TestAdministrarKiosko(_ConUsuarios):
         self.assertIn("Consulta de Ventas / Anular", tarjetas)
         self.assertTrue(all(tarjeta.isEnabled() for tarjeta in tarjetas.values()))
         self.assertNotIn("🔒", [tarjeta.icono.text() for tarjeta in tarjetas.values()])
-        # Usuarios y Control de Stock son solo del Admin: ningún permiso los habilita.
+        # Usuarios, Control de Stock y Cambio Fijo son solo del Admin: ningún permiso los habilita.
         self.assertEqual([nombre for nombre, tarjeta in tarjetas.items() if not _restringido(tarjeta)], ["Reportes"])
         with mock.patch(_AVISO) as aviso, mock.patch("ui.administrar_kiosko_window.UsuariosWindow") as usuarios:
             tarjetas["Usuarios"].click()
         aviso.assert_called_once()
         usuarios.assert_not_called()
+        with mock.patch(_AVISO) as aviso, mock.patch("ui.administrar_kiosko_window.DialogoFondoCambio") as cambio:
+            tarjetas["Cambio Fijo"].click()
+        aviso.assert_called_once()
+        cambio.assert_not_called()
+
+    def test_el_cambio_fijo_se_cambia_desde_su_tarjeta(self):
+        # Pedido del dueño, 2026-11-04: la tecla estaba adentro de Usuarios y la quiso
+        # afuera, a la vista con solo entrar a ADMIN KIOSKO.
+        from repositories import config_repo
+
+        ventana = self._ventana(self._usuario("Admin", dominio.ROL_ADMIN))
+        with mock.patch("ui.administrar_kiosko_window.DialogoFondoCambio") as clase, \
+                mock.patch("ui.administrar_kiosko_window.mostrar_info") as aviso:
+            clase.return_value.exec.return_value = True
+            clase.return_value.spin_monto.value.return_value = 42000.0
+            self._tarjetas(ventana)["Cambio Fijo"].click()
+
+        # Abre con el que está guardado y graba el nuevo.
+        self.assertEqual(clase.call_args.args[1], 50000.0)
+        self.assertEqual(config_repo.obtener_fondo_cambio(), 42000.0)
+        aviso.assert_called_once()
+
+    def test_cancelar_no_cambia_el_cambio_fijo(self):
+        from repositories import config_repo
+
+        ventana = self._ventana(self._usuario("Admin", dominio.ROL_ADMIN))
+        with mock.patch("ui.administrar_kiosko_window.DialogoFondoCambio") as clase:
+            clase.return_value.exec.return_value = False
+            clase.return_value.spin_monto.value.return_value = 1.0
+            self._tarjetas(ventana)["Cambio Fijo"].click()
+
+        self.assertEqual(config_repo.obtener_fondo_cambio(), 50000.0)
+
+    def test_usuarios_ya_no_tiene_la_tecla_del_cambio_fijo(self):
+        from ui.usuarios_window import UsuariosWindow
+
+        usuarios = UsuariosWindow(self._usuario("Admin", dominio.ROL_ADMIN))
+        self.addCleanup(usuarios.deleteLater)
+
+        textos = [boton.text() for boton in usuarios.findChildren(QPushButton)]
+        self.assertFalse([texto for texto in textos if "CAMBIO" in texto.upper()], textos)
 
     def test_cada_tarjeta_abre_su_pantalla(self):
         tarjetas = self._tarjetas(self._ventana(self._usuario("Admin", dominio.ROL_ADMIN)))

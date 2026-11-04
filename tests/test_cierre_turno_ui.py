@@ -93,19 +93,22 @@ class TestCierreDeTurnoEnPantalla(BaseConBaseTemporal):
 
     def test_ninguna_otra_pantalla_llama_fondo_al_cambio_fijo(self):
         from PySide6.QtWidgets import QPushButton
+        from ui.administrar_kiosko_window import AdministrarKioskoWindow
         from ui.caja_window import CajaWindow, ControlCierresWindow
-        from ui.usuarios_window import DialogoFondoCambio, UsuariosWindow
+        from ui.cambio_fijo_dialogo import DialogoFondoCambio
+        from ui.usuarios_window import UsuariosWindow
 
         admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
         caja = CajaWindow()
         control = ControlCierresWindow(admin)
         usuarios = UsuariosWindow(admin)
+        administrar = AdministrarKioskoWindow(admin, True)
         dialogo = DialogoFondoCambio(None, 50000.0)
-        for ventana in (caja, control, usuarios, dialogo):
+        for ventana in (caja, control, usuarios, administrar, dialogo):
             self.addCleanup(ventana.deleteLater)
 
         textos = []
-        for ventana in (caja, usuarios, dialogo):
+        for ventana in (caja, usuarios, administrar, dialogo):
             textos += [e.text() for e in ventana.findChildren(QLabel)]
             textos += [b.text() for b in ventana.findChildren(QPushButton)]
         textos.append(dialogo.windowTitle())
@@ -113,8 +116,8 @@ class TestCierreDeTurnoEnPantalla(BaseConBaseTemporal):
 
         self.assertFalse([t for t in textos if "fondo" in t.lower()], textos)
         self.assertIn("Caja inicial (Cambio Fijo)", textos)
-        # La tecla de Usuarios, con la maqueta B: "＄  CAMBIO FIJO".
-        self.assertTrue(any(t.endswith("CAMBIO FIJO") for t in textos), textos)
+        # Su tarjeta de Administrar Kiosko (hasta el 2026-11-04, una tecla de Usuarios).
+        self.assertIn("Cambio Fijo", [b.accessibleName() for b in administrar.findChildren(QPushButton)])
         self.assertIn("Cambio Fijo", [control.tabla.horizontalHeaderItem(c).text() for c in range(control.tabla.columnCount())])
 
     def _cifra(self, ventana, titulo):

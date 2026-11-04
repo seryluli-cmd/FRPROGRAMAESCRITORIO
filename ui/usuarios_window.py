@@ -2,21 +2,22 @@
 usuarios_window.py
 =====================
 Administración de Usuarios: alta, edición y baja de usuarios (Admin o
-Empleada), la configuración del Cambio Fijo (fondo de cambio) que se usa en los
-cierres de turno y las copias de seguridad (ui/copias_dialogo.py). Es exclusivo del rol ADMIN
+Empleada) y las copias de seguridad (ui/copias_dialogo.py). El Cambio Fijo estaba
+acá hasta el 2026-11-04: ahora tiene su tarjeta en Administrar Kiosko
+(ui/cambio_fijo_dialogo.py). Es exclusivo del rol ADMIN
 (no se delega con ningún permiso), con una excepción: DialogoCambiarClave,
 que vive acá pero la usa cualquier usuario para su propia clave.
 """
 
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidgetItem, QLineEdit, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout, QTableWidgetItem, QLineEdit,
     QComboBox, QFormLayout, QCheckBox,
 )
 
 import dominio
 from admin_remoto import modo as modo_remoto
-from repositories import usuarios_repo, config_repo
+from repositories import usuarios_repo
 from ui.copias_dialogo import DialogoCopiasDeSeguridad
 from ui.dibujos_tabla import DelegadoEtiqueta
 from ui.piezas_ventana import (
@@ -24,7 +25,7 @@ from ui.piezas_ventana import (
     titulo_de_seccion,
 )
 from ui.utils import (
-    CampoPesos, mostrar_error, confirmar, mostrar_info, manejar_errores,
+    mostrar_error, confirmar, mostrar_info, manejar_errores,
     encadenar_enter, sin_boton_por_defecto, fila_guardar_cancelar, crear_tabla,
 )
 
@@ -35,8 +36,8 @@ _COLOR_INACTIVO = QColor("#A7ADB8")
 
 
 class UsuariosWindow(QDialog):
-    """Grilla de usuarios con alta/modificación/baja, Cambio Fijo y
-    copias de seguridad. `usuario_actual` es quien está logueado (no puede borrarse a
+    """Grilla de usuarios con alta/modificación/baja y copias de
+    seguridad. `usuario_actual` es quien está logueado (no puede borrarse a
     sí mismo).
 
     Con la maqueta B que eligió el dueño el 2026-10-30 (como Artículos): la cabecera
@@ -61,7 +62,6 @@ class UsuariosWindow(QDialog):
         barra_botones.setSpacing(8)
         self.boton_nuevo = tecla("＋  NUEVO", self._nuevo_usuario, "teclaAzul")
         self.boton_modificar = tecla("✎  MODIFICAR", self._modificar_usuario)
-        self.boton_cambio_fijo = tecla("＄  CAMBIO FIJO", self._configurar_fondo)
         self.boton_copias = tecla("⎘  COPIAS DE SEGURIDAD", self._abrir_copias)
         self.boton_copias.setToolTip(
             "Cuándo se hacen solas las copias de la base, cuál es la última, las "
@@ -69,8 +69,7 @@ class UsuariosWindow(QDialog):
         )
         self.boton_borrar = tecla("✕  BORRAR", self._borrar_usuario, "teclaRoja")
         self.boton_salir = tecla("SALIR", self.close)
-        botones = [self.boton_nuevo, self.boton_modificar, self.boton_cambio_fijo, self.boton_copias,
-                   self.boton_borrar]
+        botones = [self.boton_nuevo, self.boton_modificar, self.boton_copias, self.boton_borrar]
         # Las copias son del archivo de la base de ESTA PC: desde otra PC
         # (admin_remoto/) no hay ninguno, se hacen en el mostrador.
         if modo_remoto.es_copia_remota():
@@ -183,14 +182,6 @@ class UsuariosWindow(QDialog):
                 usuarios_repo.desactivar_usuario(usuario_id)
                 self._cargar_grilla()
 
-    @manejar_errores
-    def _configurar_fondo(self):
-        actual = config_repo.obtener_fondo_cambio()
-        dialogo = DialogoFondoCambio(self, actual)
-        if dialogo.exec():
-            config_repo.actualizar_fondo_cambio(dialogo.spin_monto.value())
-            mostrar_info(self, "Guardado", "Se actualizó el cambio fijo.")
-
     def _abrir_copias(self):
         DialogoCopiasDeSeguridad(self.usuario_actual, self).exec()
 
@@ -296,40 +287,6 @@ class DialogoUsuario(QDialog):
                 return
             usuarios_repo.crear_usuario(nombre, clave, rol, permisos)
         self.accept()
-
-
-class DialogoFondoCambio(QDialog):
-    """Pide el monto del Cambio Fijo (fondo de cambio); quien lo abre lo lee de
-    `spin_monto` si se aceptó (ver UsuariosWindow._configurar_fondo). Con la
-    cabecera oscura y el monto en un panel blanco (maqueta B, 2026-10-30)."""
-
-    def __init__(self, parent, valor_actual: float):
-        super().__init__(parent)
-        self.setWindowTitle("Cambio Fijo")
-        self.resize(440, 270)
-
-        cabecera = cabecera_oscura("💵", "Cambio Fijo", "La plata para dar cambio en el cajón")
-
-        self.spin_monto = CampoPesos()
-        self.spin_monto.setValue(valor_actual)
-        self.spin_monto.setMinimumHeight(36)
-        encadenar_enter(self.spin_monto, accion_final=self.accept)
-
-        panel, capa = panel_blanco()
-        capa.addWidget(QLabel("Cambio Fijo que arranca cada turno:"))
-        capa.addWidget(self.spin_monto)
-
-        botones = fila_guardar_cancelar(self)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 12)
-        layout.setSpacing(12)
-        layout.addWidget(cabecera)
-        layout.addWidget(panel)
-        layout.addStretch()
-        layout.addLayout(botones)
-        self.setLayout(layout)
-        sin_boton_por_defecto(self)
 
 
 class DialogoCambiarClave(QDialog):

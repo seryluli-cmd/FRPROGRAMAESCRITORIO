@@ -581,7 +581,8 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   con las impresiones recalculadas de las ventas de esa ventana contadas como
   estaban al cerrar.
 - **En pantalla, el fondo de cambio se llama "Cambio Fijo" en TODOS lados**
-  (Caja, Cierre de Turno, Control de Cierres, Usuarios). Por dentro sigue siendo
+  (Caja, Cierre de Turno, Control de Cierres y su tarjeta de Administrar Kiosko,
+  `ui/cambio_fijo_dialogo.py`; hasta el 2026-11-04 estaba adentro de Usuarios). Por dentro sigue siendo
   `fondo_cambio` (columnas, repos, claves): no se renombra, solo el texto que se
   ve.
 - **El esquema de color se fija en CLARO a propósito (`main.aplicar_estilo`).**
