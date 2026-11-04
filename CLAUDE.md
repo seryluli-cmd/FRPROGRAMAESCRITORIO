@@ -229,108 +229,126 @@ cambio de esquema la deja vieja, se vuelve a armar.
 
 ---
 
+## Detalle aparte, en `docs/`
+
+Para que este archivo se cargue rápido en cada sesión, el detalle largo vive
+aparte (movido tal cual el 2026-11-04). Leé el que toque tu tarea ANTES de
+empezar:
+
+- `docs/PUNTOS_DE_VERDAD.md` — qué hace cada punto único de verdad, sus reglas
+  y sus pruebas (acá abajo queda una línea por cada uno).
+- `docs/TRAMPAS.md` — las trampas que no tocan plata, caja, base real ni repo
+  público (acá abajo queda su título; las otras siguen enteras acá).
+- `docs/ESTADO.md` — qué tiene hoy el programa, pantalla por pantalla.
+
+Algo nuevo va al doc que le toca, con su línea acá si es un punto único o una
+trampa. No vuelvas a copiar el detalle en este archivo.
+
+---
+
 ## Puntos únicos de verdad ya establecidos (usalos, no los repitas)
 
-| Función | Es el único lugar donde... |
-|---|---|
-| `turnos.calcular_turno(fecha_hora)` | se decide a qué turno pertenece una hora |
-| `turnos.es_domingo(fecha)` | se pregunta si un día es domingo (acepta date, datetime o string) |
-| `turnos.turnos_del_dia(fecha)` | se decide qué turnos existen en un día (siempre 3, también el domingo) |
-| `turnos.etiqueta_turno(fecha, turno)` | se arma el nombre legible de un turno |
-| `turnos.dia_en_que_empezo_el_turno(fecha_hora)` | se decide a qué día pertenece el turno de un momento (antes de las 06:00 es la Noche del día anterior): pasarle eso a `etiqueta_turno`, nunca el día calendario de una venta de madrugada |
-| `turnos.limites_de_los_dias(desde, hasta)` · `turnos.sql_dia_del_local(columna)` | se filtra y se agrupa por día en un reporte de ventas: días de 06:00 a 06:00, con la Noche entera en el día en que empezó |
-| `reportes_repo._CON_SU_CAJA` · `._TURNO_DE_LA_CAJA` · `._filtro_por_caja(desde, hasta)` | se reparte un reporte POR TURNO (Por Turno y Totales por turno): cada venta en el turno y el día de su caja, no los de su hora (pedido del dueño, 2026-10-29: el turno cambia con la persona, hasta una hora antes o después). Así suma lo mismo que los cierres de cada turno; una venta sin caja va por su hora. El filtro acota primero por la hora (con el índice) y después mira el día de la caja |
-| `turnos.dia_del_turno_que_arranca_tras_un_cierre(momento)` | se decide con qué DÍA queda anotado lo que sigue a un cierre (misma tolerancia que el turno) |
-| `ui.utils.hoy_del_local()` | se decide qué es "hoy" en los reportes de ventas (hasta las 06:00, el día anterior) |
-| `turnos.turno_vencimiento(dia, turno)` | se decide si un turno ya debería estar cerrado: su fin + `MINUTOS_PARA_CIERRE_FORZOSO` (60 min). Es también la hora del cierre forzoso de la caja. Los carteles que nombran esos minutos leen la constante |
-| `turnos.fin_del_turno(dia, turno)` · `.inicio_del_aviso_de_cierre(dia, turno)` | se decide a qué hora termina un turno (Mañana 14, Tarde 22, Noche 06, todos los días) y desde cuándo titila el botón Cierre de Turno (`MINUTOS_AVISO_ANTES_DEL_FIN`, 5 min antes) |
-| `turnos.turno_que_arranca_tras_un_cierre(momento)` | se decide con qué turno queda anotado lo que sigue a un cierre (la hora del cierre + `TURNO_GRACIA_MIN`); la usa `turnos_repo._desde_y_turno_en_curso`, que es lo que ven Caja y Cierre de Turno y lo que graba `cerrar_turno`. Con la misma regla `relevo_repo.abrir_caja` decide el turno de una caja que se abre |
-| `turnos.turno_para_la_app_de_gastos(fecha, turno)` | se traduce un turno al nombre que usa la app de gastos ("mañana", "tarde", "noche", también los domingos) |
-| `relevo_repo.situacion_al_entrar(usuario_id)` · `.abrir_caja` · `.recibir_caja` · `.cerrar_para_entrar` | se decide qué pasa con la caja cuando alguien entra (abrirla contando, recibirla contando todo el cajón, cerrar la de quien se fue, pasar a la caja que se abre lo que el Admin cobró sin caja; el Admin entra sin caja). La pantalla es `ui/ingreso_caja.py` |
-| `relevo_repo.estado_de_la_caja()` · `.cierre_forzoso_si_corresponde()` | se decide si el botón Cierre de Turno titila y si toca el cierre forzoso (lo dispara `MainWindow._revisar_la_caja`, que espera si hay un cobro a medias) |
-| `cajas_repo._quien_vende(conexion, usuario_id)` | se decide a nombre de quién y en qué caja queda una venta (lo que cobra el Admin va a nombre de la responsable de la caja abierta, con `ventas_caja.cargada_por`); lo usa `ventas_repo._insertar_cabecera_venta` |
-| `cajas_repo.cambio_inicial(caja)` | se decide con cuánto cambio arrancó una caja (lo contado, o lo esperado si no se contó): es lo que queda en el cajón al cerrarla y lo que se espera en la siguiente |
-| `cajas_repo.cerrada_en_ausencia(caja, quien_cierra_id)` | se decide si una caja se cerró en ausencia de su responsable: por número de usuario, nunca por nombre (el nombre se puede cambiar con la sesión abierta, y una usuaria dada de baja puede llamarse igual que una activa). Lo usan `control_cierres_repo._datos_de_la_caja` (Control de Cierres, la tarjeta y la app de gastos) y `turnos_repo.cerrar_turno`, que lo devuelve como `"cerrada_en_ausencia"` para el cartel del Cierre de Turno |
-| `control_cierres_repo.listar_cierres()` · `.detalle_cierre(id)` · `.verificar_cierre(...)` | se arma lo que muestra Control de Cierres (cada cierre con su caja, responsables, relevos, si se cerró sola o en ausencia; y en `detalle_cierre(id)["resumen"]` el cierre con las mismas claves que `resumen_turno_actual`) y se carga lo contado del sobre (solo Admin, cada conteo en `verificaciones_cierre`). `turnos_repo` los reexporta con el mismo nombre |
-| `turnos_repo._cerrado_pasado_su_vencimiento(dia, turno, cerrado_a)` | se decide si un turno se cerró "tarde": lo usan el aviso y el "Cerrado el dd/mm" del Resumen del Día |
-| `turnos_repo._desglose_de_totales(...)` · `turnos_ventas_repo._PREFIJO_COLUMNAS_POR_ORIGEN` | se reparte lo cobrado de un turno por origen y método de pago y se suma el efectivo del cajón sobre TODOS los `ORIGENES_VENTA` |
-| `turnos_ventas_repo._vendido_aparte_entre(...)` · `._aparte_por_metodo(...)` · `._separar_de_kiosko(...)` | se calcula cuánto del Kiosko de un turno fue impresiones (para la columna propia del Resumen del Día) y se lo reparte entre efectivo y digital, venta por venta con sus pagos, para armar Kiosko sin impresiones en Caja, Cierre de Turno y el detalle de un cierre (`resumen_turno_actual()["kiosko_solo_*"]`, `["impresiones_*"]`); con `cierre_grabado=True` es la ventana de un cierre ya guardado |
-| `turnos_ventas_repo._efectivo_y_digital_de_cada_venta()` | se arma lo cobrado por cada medio en UNA venta (sus pagos sumados por método, 0 si no tiene) como pedazo de SQL con sus parámetros, para una consulta que lee de `ventas` sin alias: lo usan el detalle del día (`detalle_dia_repo._ventas_entre`), `reportes_repo.ventas_de_operador` y `._aparte_por_metodo`, así una venta cobrada en los dos medios dice lo mismo en los tres. No lo copies en una consulta nueva (`tests/test_config_repo.py` lo vigila) |
-| `turnos_repo._ventanas_del_dia(conexion, dia, ahora)` | se decide qué ventas son de qué turno de un día: la usan las filas del Resumen del Día y su detalle |
-| `detalle_dia_repo.detalle_del_dia(dia)` | se arma el detalle venta por venta de un día, con los renglones de cada venta tal cual se cobraron (`lineas`), lo vendido por producto y por operador |
-| `reportes_repo.resumen_por_operador(...)` · `.ventas_de_operador(...)` | se calcula cuánto vendió cada usuario y se listan sus ventas con fecha y hora (Reportes > Por Operador) |
-| `dominio.es_admin(usuario)` | se pregunta si alguien es Administrador |
-| `ventas_repo.subtotal_linea(linea)` | se calcula lo que se cobra por un renglón |
-| `ventas_repo.total_carrito(lineas)` | se suma el total de una venta en curso |
-| `ventas_repo._grabar_venta_kiosko(...)` | se graba una venta de kiosko sobre una conexión abierta (`confirmar_venta` e `impresiones_repo.cobrar_impresiones`): el único INSERT en `venta_detalle`, el único descuento de stock por una venta y el único lugar que revisa que los pagos (netos de vuelto, ninguno negativo) sumen el total, con un centavo de tolerancia (`DIFERENCIA_MAXIMA_DE_PAGOS`); si no, no graba nada |
-| `impresiones_repo.cobrar_impresiones(...)` · `.articulo_impresiones()` | se cobran impresiones desde el botón de la barra: venta de kiosko común del artículo, con el precio leído en la misma transacción |
-| `acomodar_caja_repo.acomodar_caja(usuario_id, efectivo, digital)` | se suma a la caja lo que ya había cobrado el programa anterior (pedido del dueño, 2026-11-04, para cambiar de programa a mitad de turno: "es por esta vez nomás"; botón "ORDENAR $" (así lo nombró el dueño; primero fue "Acomodar Caja") a la derecha de Cambiar Pass, solo Admin y solo en el mostrador, `ui/acomodar_caja_window.py`). Es una venta de kiosko común (por `ventas_repo._grabar_venta_kiosko`) de 1 x el total del artículo `dominio.CODIGO_ARTICULO_ACOMODAR_CAJA`, con un pago real por medio: Caja, Cierre de Turno, A RETIRAR y la app de gastos la suman solas, sin origen nuevo ni tabla nueva. El artículo se crea la primera vez (precio 0, stock que queda en 0) y `articulos_repo` lo esconde de todas sus listas y búsquedas (`_SIN_ACOMODAR`, primer parámetro de `_SELECT_ARTICULOS`). Mal cargado: se anula desde Consulta de Ventas. Ver `tests/test_acomodar_caja.py` |
-| `pedidos_impresion_repo.tomar_pedido(...)` · `.entregar_pedido(...)` · `.dar_por_perdida(...)` · `.anular_pedido(...)` · `.anotar_aviso(...)` | se manejan los pedidos de GESTIÓN IMPRESIONES (pedido del dueño, 2026-11-02; cuarto acceso del inicio, `ui/gestion_impresiones_window.py`, solo en el mostrador): sin seña no se toma, pagarlo entero sí. La plata va por `ventas_repo._grabar_venta_kiosko`: la seña es una venta del artículo Impresiones ("SEÑA DE IMPRESIONES", 1 x la seña) en la caja de quien toma el pedido; al retirar, otra venta con las hojas a su precio y la seña descontada (misma descripción, **-1** x la seña), en la caja de quien entrega ($ 0 si lo había pagado entero). Así Caja lo cuenta como Impresiones y las hojas cuentan una sola vez, al retirar. El precio queda fijo al tomarlo. Seña perdida (no vino) y anular (anula sus ventas, con motivo): solo el Admin. Esas ventas no se anulan sueltas desde Consulta de Ventas (`ventas_repo.anular_venta` lo rechaza). La tabla es `pedidos_impresion` (`database_esquema_pedidos.py`, sin paso de migración: es nueva). Ver `tests/test_pedidos_impresion.py` |
-| `pedidos_clientes_repo.anotar(...)` · `.sumar_uno(...)` · `.parecidos(...)` · `.ya_lo_trajimos(...)` · `.listar_pendientes()` · `.listar_historial()` · `.renombrar` · `.juntar` · `.borrar` | se manejan los PEDIDOS DE CLIENTES (pedido del dueño, 2026-11-03): mercadería que no tenemos y que vienen a buscar. Escribirlo de nuevo, un parecido o el +1 suman un cliente al MISMO renglón pendiente (se compara con `dominio.clave_pedido_cliente`: sin mayúsculas, tildes, espacios de más ni los caracteres invisibles que trae un texto pegado); anotar, sumar y TRAJIMOS (`ya_lo_trajimos`; el dueño pidió que el botón diga solo "TRAJIMOS") exigen un operador habilitado (`usuario_habilitado`); cada cliente es una fila de `pedidos_clientes_veces` con fecha y operador, y la cantidad es su COUNT. TRAJIMOS (cualquiera) lo pasa al historial y lo que se pida después arranca otro renglón con 1. Renombrar, Juntar y Borrar: solo el Admin (`exigir_admin`), y nada se borra (queda BORRADO). Tablas en `database_esquema_pedidos_clientes.py`, sin paso de migración, con un índice único de un solo pendiente por clave. No son los `PEDIDO_*` de Gestión Impresiones. Pantalla: quinto acceso del inicio, `ui/pedidos_clientes_window.py` (maqueta A), solo en el mostrador. Ver `tests/test_pedidos_clientes.py` y `tests/test_pedidos_clientes_pantalla.py` |
-| `tareas_turno_repo.crear_tarea` · `.modificar_tarea` · `.borrar_tarea` (usuario_id primero) · `.listar_tareas()` · `.tareas_del_dia(dia, ahora)` · `.tareas_para_avisar(ahora)` · `.cuantas_atrasadas(ahora)` · `.marcar_hecha(...)` · `.posponer(...)` · `.listar_historial(desde, hasta)` · `turnos.momento_de_la_tarea(dia, hora)` | se manejan las TAREAS DEL TURNO (pedido del dueño, 2026-11-03: "PRENDER LAS LUCES DE AFUERA" a las 19:30, con un aviso encima de todo hasta que alguien pone TAREA HECHA). Cargar, modificar y borrar: solo el Admin (`exigir_admin`); HECHA y POSPONER (5 o 10, `dominio.MINUTOS_PARA_POSPONER`): cualquier operador habilitado. Cada aparición es la tarea en un DÍA DEL LOCAL: la de las 02:00 es de la Noche del día y pasa el día siguiente (`turnos.momento_de_la_tarea`, el único lugar de esa cuenta), y "todos los días", "elegir días" y "solo hoy" se cuentan por el día del local. Lo que toca antes del minuto en que se cargó no cuenta (ni avisa ni queda atrasada; por eso un SOLO HOY con la hora pasada no se carga), y con MODIFICAR lo mismo desde el minuto del cambio si con cómo era ese día no le tocaba (si ya le tocaba, sigue contando: `_cuenta`). HECHA, una vez por aparición (índice único) y también antes de la hora; cada POSPONER es una fila con quién, cuándo y los minutos, y hasta entonces no avisa. Avisa solo el día en curso: lo de días anteriores queda NO SE HIZO en el historial (marcar o posponer se acepta también para ayer, por el aviso de las 05:50 contestado a las 06:01). Borrar la deja BORRADA (lo ya hecho sigue a la vista); Modificar no pierde lo de hoy y deja cómo era antes en `tareas_turno_cambios`. Hoy se ve como está la tarea ahora; un día que ya terminó, como PASÓ (`_version_del_dia`, con cada versión de la tarea y cuándo rigió): borrarla o cambiarle los días a la noche no saca del historial lo pospuesto ni el NO SE HIZO de ese día, y una HECHA sale con la hora que tenía cuando la marcaron. `minutos_que_no_vuelven` dice qué POSPONER pasa de las 06:00 (ya no vuelve a avisar; el aviso lo dice). La hora se escribe como quieran (`dominio.hora_de_tarea`: "1930", "19.30", "7:05") y el estado de cada una sale de `dominio.estado_de_la_tarea`. Tablas en `database_esquema_tareas_turno.py`, sin paso de migración. Pantalla: sexto acceso del inicio, `ui/tareas_turno_window.py` (con `ui/tareas_turno_dialogos.py`), y el aviso de `ui/aviso_tarea.py` (ver la fila de `RevisorDeTareas`). Solo en el mostrador: no entra en la lista blanca. Ver `tests/test_tareas_turno.py`, `tests/test_tareas_turno_cambios.py` (borrar y modificar), `tests/test_tareas_turno_cuentas.py`, `tests/test_tareas_turno_aviso.py` y `tests/test_tareas_turno_pantalla.py` (con sus bases compartidas `tests/base_tareas_turno.py` y `tests/base_tareas_turno_pantalla.py`) |
-| `ui.aviso_tarea.RevisorDeTareas` · `.AvisoDeTarea` | sale el aviso de TAREAS DEL TURNO: lo arranca `MainWindow` solo en el mostrador (la copia de otra PC no tiene `_tareas`) y lo para al cerrarse (al cerrar la sesión el aviso se va sin grabar nada). Cada `INTERVALO_REVISION_TAREAS_MS` (15 s) cuenta las atrasadas (el numerito amarillo del acceso y su titileo rojo, `MainWindow._poner_tareas_atrasadas`) y saca las de `tareas_para_avisar` de a una ("1 de 2"). El aviso va SIN ventana madre (como el cartel de `ui/espera_del_mostrador.py`), `WindowStaysOnTopHint` y modal para todo el programa, mostrado con `show()` (no `exec()`: así sale y se contesta con Vender abierta). Sin la cruz; Esc, Enter, la barra espaciadora y cualquier tecla no hacen nada (la pistola escribe dígitos + Enter); los botones responden recién a `MILISEGUNDOS_SIN_RESPONDER` (1 s) de salir. Tiene `se_puede_cerrar_sola`: el cierre forzoso y la vuelta sola del Admin lo corren con `reject`, que no graba nada, y no vuelve a salir hasta `SEGUNDOS_SIN_AVISAR_TRAS_CORRERSE` (60 s) después: si saliera en la revisión siguiente, el forzoso (cada 10 s) nunca pasaría. Pero da False si abajo hay otra ventana modal a la vista que no se cierra sola (Compras, un formulario): igual tienen que esperar, y la vuelta del Admin (cada 1 s) lo corría antes de que se lo pudiera contestar. `RevisorDeTareas.contestaron` avisa a la ventana de Tareas del Turno abierta (la conecta `MainWindow._abrir_tareas_turno`). No lo hagas hijo de una ventana ni le pongas la cruz |
-| `dominio.telefono_limpio(...)` · `.enlace_whatsapp(...)` · `.mensaje_pedido_listo(...)` | se guarda el celular de un pedido (10 números, sin 0 ni 15) y se arma el WhatsApp Web de "ya está listo" (con el 549 adelante); lo manda quien atiende |
-| `dominio.CODIGO_ARTICULO_IMPRESIONES` | se decide qué artículo de kiosko es "Impresiones" (el código "4"), para mostrarlo como renglón propio en Reportes, Caja y Cierre de Turno |
-| `dominio.cuenta_del_cobro(total, efectivo, digital, paga_con)` · `.lo_que_falta_para(total, monto)` | se calcula el cobro: la parte en efectivo y la digital, el billete que da el cliente, el vuelto, lo que falta y los pagos que quedan en la caja; y lo que completa el otro medio al escribir en uno |
-| `dominio.total_cobrado(efectivo, digital)` · `.monto_a_retirar(efectivo_cobrado)` · `.diferencia_de_plata(contado, esperado)` · `.coincide(diferencia)` · `.falta_plata(diferencia)` | se calcula la plata de la caja y del sobre: el TOTAL cobrado (efectivo + digital, sin el Cambio Fijo; es también el `importe` de la app de gastos), lo que va al sobre (todo el efectivo cobrado: el cambio queda en el cajón), la diferencia entre lo contado y lo esperado (negativo = falta; la apertura y el relevo de una caja y el sobre) y si esa diferencia es cero (`TOLERANCIA_DE_PLATA`, medio centavo: todo va al centavo) o si falta plata. `turnos_repo` pone `"monto_a_retirar"` y `"ventas_total"` en el resumen del turno en curso y graba ese mismo monto en el cierre: Caja, la tarjeta del Cierre de Turno, el relevo y la app de gastos leen esa clave, nunca el efectivo suelto. Toda pantalla que dice "coincide"/"faltan"/"sobran" o pinta una diferencia usa `coincide` o `falta_plata` (el Resumen del Día marca en rojo solo lo que falta). Ver `tests/test_reglas_de_la_caja.py` |
-| `dominio.precio_con_margen(costo, porcentaje)` · `.costo_sin_margen(precio_venta, porcentaje)` | se calcula el margen de Artículos (la calculadora COSTO + GANANCIA % = PRECIO DE VENTA de `ui/dialogo_articulo.py`, en la tarjeta oscura del precio de la maqueta B del 2026-10-31: costo → precio de venta y al revés). Va como `round(costo * (1 + %/100), 2)` y su vuelta; escrita como `costo + costo * %/100` da a veces otro centavo. El % no puede ser negativo |
-| `dominio.porcentaje_de_ganancia(costo, precio_venta)` · `.ganancia_por_unidad(costo, precio_venta)` · `.MARGEN_POR_DEFECTO` | se saca el % que se le gana a un artículo con su costo y su venta (el "＝ Calcular" del medio: $ 20 y $ 200 dan 900%, con dos decimales para que precio_con_margen vuelva a dar la misma venta), o la línea debajo del precio grande (cuánto se gana por unidad, en pesos; el % sobre la venta se sacó a pedido del dueño: al lado del % sobre el costo confundía). El % de la calculadora arranca en `MARGEN_POR_DEFECTO`, 80% (pedido del dueño) |
-| `dominio.bajo_el_minimo(stock, stock_minimo)` | se decide si un artículo quedó por debajo de su stock mínimo (`<` estricto: justo en el mínimo no avisa; el stock negativo sí): el rojo de la grilla de Artículos y ORDENAR Stock (`poner_stock`), el de Modificar y el aviso de Ventas, que le pasa el stock menos lo que ya está en el carrito |
-| `dominio.suma_de_las_filas(filas, claves)` | se suma la fila TOTAL de un reporte con las filas que la pantalla ya tiene (Reportes > Totales): tal como se ven, en su orden y sin redondear de nuevo; nunca con otro SUM en la base (Kiosko sale por resta en cada fila). Es pura a propósito: Reportes se abre desde otra PC y así no cambia lo que devuelve ninguna función de la lista blanca |
-| `ui.dialogo_pago.cobrar(parent, monto)` | se cobra algo que no es una venta de kiosko con la ventana de cobro de Ventas (medio, reparto y vuelto). Devuelve los pagos netos de vuelto, o None si se canceló. Hoy no la usa ninguna pantalla; una pantalla nueva que cobre la usa a ella |
-| `database.conexion_db()` | se abre una transacción contra la base. Todo lo que graba la abre así (con `get_connection`, que espera `ESPERA_BASE_OCUPADA_SEGUNDOS`, 30 s, si otra conexión la tiene ocupada; con la espera de fábrica de 5 s la venta fallaba con "database is locked"). La única conexión suelta es la de `_backup_consistente`, que solo lee (y `Connection.backup` reintenta solo) |
-| `database.DATA_DIR` / `DB_PATH` · `.usar_carpeta_de_datos(carpeta)` · `.es_base_de_prueba()` | se resuelve dónde viven los datos (código vs `.exe`): `data_fr/` al lado del programa, u otra carpeta con `python main.py --base <carpeta>` (la base de prueba de `armar_base_de_prueba.py`, marcada con `ARCHIVO_DE_BASE_DE_PRUEBA`). Todos leen `database.DATA_DIR` en el momento: nunca `from database import DB_PATH` |
-| `database.hash_clave()` / `verificar_clave()` | se maneja una contraseña |
-| `database_migraciones.comprobar_base_kiosko(conexion)` · `.migrar_base(conexion)` · `.PASOS` | se rechaza una base de CYBERCONTROL o de un FRKiosko más nuevo, antes de crear ninguna tabla, y se lleva la base a `VERSION_ESQUEMA` corriendo en orden los pasos que le faltan. Cada paso va en su transacción, y antes del primero pendiente queda la copia `antes_de_migrar_v<versión>_...` (regla 6) |
-| `usuarios_repo.tiene_permiso(usuario, clave)` | se decide si alguien puede entrar a algo |
-| `usuarios_repo.exigir_admin(usuario_id, para)` · `.usuario_habilitado(usuario_id)` | un repo exige que quien opera siga activo (y sea Admin), releyéndolo de la base: un usuario dado de baja con la sesión abierta no puede seguir. Lo usan ORDENAR Stock, las marcas, Control de Stock, anular una venta (que además exige un motivo escrito), Pedidos de Clientes y Tareas del Turno (cargar, modificar y borrar con `exigir_admin`; HECHA y POSPONER con `usuario_habilitado`) |
-| `usuarios_repo._exigir_que_quede_otro_admin(conexion, usuario_id, que_se_quiere)` | se decide que siempre quede al menos un Administrador activo: `modificar_usuario` (al pasarlo a Empleada), `desactivar_usuario` y `borrar_usuario` lo llaman con el permiso de escritura ya tomado (`BEGIN IMMEDIATE`: dos Admins que se bajan a la vez, uno desde otra PC, no dejan cero) y rechazan con ValueError tocar al único. Sin Admin nadie vuelve a entrar a Usuarios, anular ventas ni usar ORDENAR Stock sin tocar la base a mano. No cambia quién puede hacer qué; "no te podés borrar a vos mismo" sigue en `ui/usuarios_window.py`. Ver `TestSiempreQuedaUnAdministrador` |
-| `config_repo.leer(conexion, clave)` · `.guardar(conexion, clave, valor)` · `.obtener_fondo_cambio()` · `.actualizar_fondo_cambio(valor)` | se lee y se graba la tabla `configuracion`, con la conexión (y la transacción) de quien llama: `guardar` crea la clave si falta, salvo con `crear_si_falta=False`. Cada repo que guarda algo ahí tiene su clave con nombre y decide cómo se entiende su valor; la del Cambio Fijo es `database.CLAVE_FONDO_CAMBIO` (se guarda redondeado a centavos, y cambiarlo no crea la clave si faltara). La única excepción es la siembra de `database._cargar_datos_iniciales`, porque database.py no importa repos. `tests/test_config_repo.py` vigila que nadie más escriba SQL de esa tabla |
-| `admin_remoto_repo.esta_activo()` · `.activar(...)` · `.entrar(nombre, clave, ip)` · `.exigir_admin_habilitado(id)` | se decide quién administra desde otra PC del local: viene apagado, solo un ADMIN activo, cada ingreso en `sesiones.desde_ip` |
-| `admin_remoto.lista_blanca.FUNCIONES` · `.ACTOR` · `.huella()` | qué funciones de los repos se pueden pedir desde otra PC, qué parámetro es "quién lo hizo" (lo completa el mostrador) y la huella que tienen que compartir las dos copias del .exe |
-| `admin_remoto.modo.direccion_del_mostrador()` · `.es_copia_remota()` | se decide si esta copia es la del mostrador o una abierta por la red (y a qué PC le habla), y las pantallas esconden lo que solo se hace en el mostrador |
-| `ui.utils.solo_en_el_mostrador` · `.avisar_que_es_en_el_mostrador(padre)` | se decide qué hace desde otra PC un botón que vende, cobra o cierra: está igual que en el mostrador y avisa "Esto se hace en el mostrador". En el mostrador no cambia nada |
-| `ui.piezas_ventana.restringir(boton)` · `.solo_para_el_admin(boton, es_admin)` · `ui.utils.avisar_acceso_restringido(padre)` | se decide qué ve y qué pasa con un botón que quien está adentro no puede usar (pedido del dueño, 2026-11-04: "tienen que aparecer igual, solo que cuando se hace click, dirá Acceso Restringido"): se ve igual que para quien sí puede (ni escondido, ni en gris, ni con candado) y al apretarlo sale el cartel "Acceso Restringido" en vez de lo suyo. Vale para la barra (Admin Kiosko, Config ADMIN), las tarjetas de Administrar Kiosko y Configuración ADMIN, el acceso Ranking de Rotación y las teclas del Admin de Artículos, Consulta de Ventas, Control de Cierres, Gestión Impresiones, Pedidos de Clientes y Tareas del Turno (`solo_para_el_admin`: borde punteado para todos). El repo igual vuelve a exigir el permiso. No vuelvas a esconder ni a poner en gris un botón por permisos. Lo de "solo en el mostrador" es otra cosa y sigue como está |
-| `copias_repo.copia_automatica_si_corresponde()` · `.toca_copia(...)` · `.nombres_a_borrar(...)` · `.agregar_carpeta_extra(...)` | se decide cuándo se hace una copia de seguridad (después de cada Cierre de Turno y cada `HORAS_ENTRE_COPIAS`, con el programa abierto; lo corre el hilo de `iniciar_copias_automaticas`), cuántas quedan y en qué otras carpetas se guarda. La pantalla es `ui/copias_dialogo.py` (Usuarios > "Copias de Seguridad") |
-| `database.carpeta_de_copias()` | se decide en qué carpeta de esta PC quedan las copias (data_fr/backups): la usan `copias_repo.carpeta_local()` y la copia de antes de migrar. Está en `database.py` porque las migraciones no pueden importar un repo (regla 1) |
-| `envio_pwa_repo.encolar(conexion, cierre_id)` · `.enviar_pendientes(ahora, transporte)` · `.datos_del_cierre(conexion, cierre_id)` · `.mandar_cierre(usuario_id, cierre_id)` · `.activar(usuario_id, prendido)` · `.probar_conexion()` · `.estado()` | se manda cada Cierre de Turno a la app de gastos de FR ("Gestión Central", proyecto `frkioskos`, negocio `gestionfr`): la cola `envios_pwa` se llena en la transacción de `turnos_repo.cerrar_turno` solo con el envío prendido (Configuración ADMIN > "Cierres a la app de gastos", solo Admin y solo en el mostrador; viene apagado), un hilo la manda cada minuto con reintentos, y lo que viaja es lo que carga una empleada a mano más el desglose de la tarjeta del cierre (`dominio.NEGOCIOS_DEL_CIERRE`), quién abrió la caja y a qué hora (`abiertaPor`, `abiertaEn`) y las TAREAS DEL TURNO de la ventana del cierre (`tareas`, desde el 2026-11-03; ver la fila de `tareas_del_cierre_repo`). La app (repo FRWEB, `facturado.js` > `openDetalleCierre`, desde el 2026-11-02) marca esos cierres con 🖥️ y al tocarlos muestra la misma tarjeta, igual que la app de CyberBIOS. Se habla con Firestore como un celular: login anónimo con la clave pública de la PWA y REST con `urllib` |
-| `tareas_del_cierre_repo.tareas_del_cierre(conexion, desde, hasta)` | se decide qué TAREAS DEL TURNO van con un cierre a la app de gastos (pedido del dueño, 2026-11-03: abajo del resumen de caja, que no cambia): las que tocaban después del cierre anterior y hasta este (la ventana de lo vendido), como estaban AL CERRAR: las marcas de después no cuentan y la tarea va como era a esa hora (cambiarla o borrarla después no cambia el cierre; mandarlo de nuevo manda lo mismo). Usa `tareas_turno_repo._leer_todo` y `._apariciones_del_dia` con el reloj en la hora del cierre; está aparte para no pasar ese repo de las 600 líneas. `envio_pwa_repo._tareas_para_la_app` les pone las claves de la app; sin tareas no viaja el campo. En FRKiosko la tarjeta del cierre no las muestra. Ver `tests/test_envio_pwa_tareas.py` |
-| `vuelta_admin_repo.volver(usuario_id)` · `ui.vuelta_del_admin.VueltaDelAdmin` | se decide si la sesión del Administrador vuelve sola a la empleada: a los `dominio.MINUTOS_ADMIN_VUELVE_SOLO` de entrar, en silencio (sin cartel: el dueño pidió sacarlo; no lo vuelvas a poner), vuelve a quien dejó el mostrador con "🔄 Operador" sin pedirle la clave, solo si su caja sigue abierta a su nombre y en hora; si no, a la pantalla de ingreso. Nunca corta un cobro ni un formulario abierto. Solo en el mostrador |
-| `errores.registrar_error(excepcion, contexto)` | la UI y el servidor guardan fallos inesperados en `data_fr/errores.log` sin depender de Qt |
-| `main.aplicar_estilo(app)` | se fija el aspecto de TODO el programa: estilo Fusion, esquema de color CLARO y la hoja de estilos (`HOJA_DE_ESTILOS`, en `ui/hoja_de_estilos.py`) |
-| `dominio.texto_pesos(monto)` · `ui.utils.formato_pesos(monto)` | un monto se convierte en texto: `"$ 1.500"`, `"$ 30.000"`, con el punto de los miles y SIN centavos (pedido del dueño: todos los precios son en miles); con centavos solo si los tiene de verdad. Los repos lo usan en sus mensajes; la pantalla, con `formato_pesos` |
-| `ui.utils.CampoPesos` · `ui.utils.pedir_pesos(parent, titulo, texto, valor)` | se escribe un monto: el campo se ve `"$ 1.500"` igual que `formato_pesos` y `pedir_pesos` es el `getDouble` con ese campo. Ninguna pantalla arma un `QDoubleSpinBox()` ni un `getDouble` suelto para plata (`tests/test_formato_pesos.py` lo vigila) |
-| `ui.utils.formato_fecha_hora(fecha)` | una fecha con hora de la base se convierte en `"16/10/2026 22:13"` |
-| `ui.utils.manejar_errores` | se atrapa un error de una acción de pantalla |
-| `ui.en_segundo_plano.EnSegundoPlano(ventana, teclas)` · `.arrancar(trabajo, *argumentos, al_terminar=...)` | un botón espera la red o una carpeta de red sin congelar el mostrador: la función del repo corre en un hilo daemon aparte, un QTimer de la ventana mira cada 100 ms si terminó, las teclas que mandan algo se apagan (Cerrar no), el cursor ocupado es solo de esa ventana y otro clic o un Enter no arrancan otra vez. `al_terminar(respuesta)` recibe una `Respuesta`: `respuesta.valor()` da lo que devolvió o levanta su error, y con `@manejar_errores` sale el mismo cartel que con la llamada directa. Si la ventana se cerró antes, no se muestra nada, pero un error inesperado igual va a `data_fr/errores.log`. Al hilo van solo la función del repo y datos, nunca un widget (ver la trampa del recolector cíclico). Lo usan "Probar la conexión" y "Reintentar ahora" (`ui/envio_pwa_dialogo.py`) y Copias de Seguridad (copia ahora, copia al pendrive y "Agregar" otra carpeta, que no se cierra mientras prueba). Ver `tests/test_en_segundo_plano.py` |
-| `ui.espera_del_mostrador.esperar(trabajo, *argumentos)` · `.CartelEsperandoAlMostrador` · `.SeDejoDeEsperar` | la copia abierta desde otra PC espera cada pedido al mostrador sin trabarse: `admin_remoto.cliente.ConexionConElMostrador` recibe `esperar` (se lo pasa `main._conectar_con_el_mostrador`; el paquete `admin_remoto` no sabe de Qt) y le da `_mandar` y el pedido. El pedido corre en un hilo aparte (mismas `_correr` y `Respuesta` de `ui.en_segundo_plano`); si tarda más de `SEGUNDOS_SIN_CARTEL` (0,7 s) sale el cartel modal "Esperando al mostrador" con los segundos y DEJAR DE ESPERAR (también Esc y la cruz), que levanta `SeDejoDeEsperar`, un TimeoutError: `_pedir` lo convierte en `SinRespuesta` (o en "no contestó a tiempo" al entrar), porque el mostrador pudo haberlo hecho. El cartel va sin ventana madre (la del frente puede tener un deleteLater pendiente y se lo llevaría). Desde otro hilo, o con un cartel ya abierto, se espera ahí mismo (nunca un cartel encima de otro). La revisión de la caja de `MainWindow` cada 10 s, desde otra PC, pregunta en su propio hilo (`_preguntar_la_caja_al_mostrador`), sin cartel: si no, saldría solo con el mostrador cerrado. Ver `tests/test_espera_del_mostrador.py` |
-| `ui.utils.encadenar_enter(...)` | se arma el salto de campo en campo con Enter, como Tab, y la acción del último campo (todo formulario lo usa). Descarta el Enter repetido de una tecla que quedó apretada. Ojo: en un QSpinBox/QDoubleSpinBox/QDateEdit/QComboBox editable el Enter del teclado le llega al campo de AFUERA, no a su `lineEdit()`; una prueba que le manda el Enter al `lineEdit()` pasa aunque en el mostrador no ande. Ver `TestDondeLlegaElEnter` |
-| `ui.utils.aplicar_clase(widget, clase)` | un botón se marca como primario/peligro/barra |
-| `ui.piezas_ventana.cabecera_oscura(...)` · `.agregar_pastilla(...)` · `.panel_blanco()` · `.titulo_de_seccion(...)` · `.tarjeta_de_menu(...)` · `.restringir(...)` · `.tecla(...)` · `.cifra_destacada(...)` | se arma una ventana con el diseño "clara con cabecera cyber" que eligió el dueño el 2026-10-26 (Configuración ADMIN, Administrar Kiosko, Caja y Cierre de Turno): cabecera oscura como la barra, con estela celeste y pastillas con números; paneles blancos; tarjetas de menú (dibujito, título y para qué es; la que solo usa el Admin, con candado y "Solo el Administrador"); teclas con relieve (`teclaAzul` lo principal, `teclaRoja` lo peligroso y Cerrar). Los colores van en `ui/hoja_de_estilos.py`, siempre por objectName o "clase" (y `>` para las etiquetas de un panel): los avisos que se abren encima son hijos de la ventana y no heredan nada (`test_estilo_ui`). El título de una tarjeta está en `accessibleName()`, y por ahí la buscan las pruebas |
-| `ui.piezas_ventana.agregar_indicador(...)` · `.poner_indicador(...)` · `.buscador(...)` · `.fila_de_filtros(...)` · `.panel_de_tabla(...)` · `.pie_de_ventana(...)` · `.marcar_solo_admin(...)` · `.tecla_de_renglon(...)` · `ui.dibujos_tabla.DelegadoEtiqueta` · `.DelegadoStock` | se arma una LISTA con la maqueta B que eligió el dueño el 2026-10-30 para Artículos y pidió en todas las pantallas básicas (Artículos y sus diálogos, Compras, Control de Stock, ORDENAR Stock, Consulta de Ventas, Control de Cierres, Reportes, Usuarios, Accesos de Admin, Copias, Impresiones, Entrar desde otra PC): cabecera oscura con indicadores (un número grande y su título; en rojo con `alerta`), teclas en mayúscula con un símbolo (lo que usa solo el Admin, con borde punteado, `solo_para_el_admin`), buscador grande, filtros en pastillas, la grilla en un panel blanco con renglones altos y los títulos con la raya azul, y una línea de ayuda abajo. Adentro de las celdas, `DelegadoEtiqueta` pone el texto en una etiqueta de color (`colores_en_orden` para los rubros, sin repetir; `colores_fijos` para un color por nombre, como ANULADA en rosa) y `DelegadoStock` dibuja el stock con su barrita contra el mínimo; los dos pintan la celda sin reemplazarla, así que ordenar por columna y las pruebas siguen leyendo el texto. Los números de arriba salen de lo que la pantalla ya trae (los de Artículos, de `dominio.numeros_de_los_articulos`): nunca de una función de repo nueva, que la copia remota no tendría. `ui.utils.fila_guardar_cancelar` y `armar_filtro_por_fechas` ya traen sus botones como teclas. `tecla_de_renglon` es la tecla que va adentro de un renglón de la grilla (+1 y TRAJIMOS de Pedidos de Clientes, HECHA de Tareas del Turno): sin `autoDefault`, así el Enter de un campo no la aprieta |
-| `ui.login_dibujos.FichasDeJugadores` · `.FondoDelIngreso` · `.TextoDegradado` | se dibuja la pantalla de ingreso "Elegí tu Jugador" (la maqueta C que eligió el dueño el 2026-10-30): una ficha por usuario (círculo de color con las iniciales; la elegida se agranda, brilla, tiene la flechita que rebota y "P1"), en dos filas más chicas con más de `MAX_EN_UNA_FILA` (5); se elige tocándola, con las flechas, Inicio/Fin o la primera letra, y Enter pasa a la clave. El fondo con rayas que se deslizan corre solo con la pantalla a la vista, y lo que no se mueve (las capas del fondo, las fichas no elegidas y el halo) se dibuja una vez y se guarda: redibujado en cada cuadro le costaba a la PC casi el triple. Las fichas tienen lo que se usaba de la lista desplegable (`count`, `itemText`, `currentText`, `currentIndexChanged`...) y siguen en `LoginWindow.combo_nombre`. Todo con QPainter y sin emojis; las etiquetas, la clave y ENTRAR van por objectName en `ui/hoja_de_estilos.py`, con la letra ahí y no con `setFont` (la regla `QWidget` le gana): los avisos y la caja que se abren al entrar son hijos de esa ventana. Ver `tests/test_pantalla_de_ingreso.py` |
-| `ui.utils.sin_boton_por_defecto(ventana)` | se evita que Enter en un campo active el primer botón de un diálogo (llamarla al final de `_armar_interfaz`) |
-| `ui.utils.crear_tabla(titulos, ...)` | se arma una tabla de solo lectura (filas alternadas, columna que se estira, selección por filas) |
-| `ui.utils.mostrar_columna_entera(tabla, columna)` | se ensancha una columna para que su texto no se corte con "..." (la de códigos de barras; en el carrito de Ventas el código va chiquito debajo del producto, `ui.ventas_dibujos.DelegadoProducto`) |
-| `articulos_repo.ajustar_stock(usuario_id, codigo, stock_nuevo, clave)` · `.comprobar_clave_para_ordenar_stock(...)` | se corrige el stock de un artículo a mano (ORDENAR Stock): solo Admin activo con la contraseña de `CLAVE_ORDENAR_STOCK`, entero de 0 para arriba, anotado en `ajustes_stock` y visible en Movimientos. Es la única forma de mover el stock aparte de Compras y Ventas |
-| `articulos_repo.cambiar_codigo(usuario_id, codigo_actual, codigo_nuevo, clave)` · `._TABLAS_CON_CODIGO_DE_ARTICULO` | se corrige el código de un artículo (ORDENAR Stock, doble clic en el código): mismo permiso y contraseña que el stock; las ventas, compras y ajustes de antes pasan al código nuevo en la misma transacción, anotado en `cambios_codigo`. Es el único lugar donde se cambia un código |
-| `articulos_repo.crear_marca` · `.renombrar_marca` · `.juntar_marcas` · `.borrar_marca` (usuario_id primero) | se corrige el catálogo de marcas: SOLO el Admin (`exigir_admin`, y el botón "Gestionar Marcas" de Artículos solo lo ve el Admin). Renombrar con el nombre de otra marca pregunta si juntarlas; borrar una con artículos se rechaza. Una marca nueva al cargar un artículo sigue libre para quien entra a Artículos |
-| `articulos_repo.listar_para_control_de_stock(usuario_id)` | se arma la lista de Control de Stock (Administrar Kiosko, solo Admin; `ui/control_stock_window.py`): los artículos con stock de 1 para arriba, de la A a la Z, para imprimirla y contar el estante. Solo muestra: corregir es de ORDENAR Stock |
-| `dominio.sin_acentos(texto)` | se compara u ordena un texto sin mayúsculas ni acentos, como lo haría una persona |
-| `dominio.orden_de_codigo(codigo)` | se ordenan códigos de artículo de menor a mayor como números (1, 2, 10 y no 1, 10, 2; los que tienen letras al final): F5 Código |
-| `ui.articulos_tabla.llenar_tabla_de_articulos(...)` · `.poner_stock(...)` | se arma la grilla de artículos (columnas y el stock en rojo, que decide `dominio.bajo_el_minimo`): la usan Artículos y ORDENAR Stock |
-| `ui.buscar_articulo.avisar_codigo_no_encontrado(ventana, codigo)` | se avisa en Ventas y Compras que lo escaneado no es ningún artículo, con cuántos dígitos llegaron |
-| `ui.buscar_articulo.armar_botones_de_busqueda(ventana, ...)` | se arman los botones F5/F6/F7 de Compras y sus atajos (cada uno abre el cuadro de búsqueda) |
-| `ui.venta_buscador.BuscadorDeLaVenta` | Ventas busca por código de barras, descripción o marca en SU MISMO campo, sin abrir otra ventana (pedido del dueño, 2026-11-02: el cuadro aparte "no es estético, ni lógico, ni práctico"). Sin apretar nada, lo que se TIPEA también lo cambia (pedido del dueño, 2026-11-04; `criterio_segun_lo_escrito`, conectada a `textEdited`, no a `textChanged`): una letra pasa del código a la descripción y solo números vuelven al código; por marca, las letras la dejan en marca. F5/F6/F7 cambian el criterio: el dibujo de la izquierda (código de barras, "ABC" o una etiqueta, de `ui/ventas_dibujos.py`, en una etiqueta propia porque como ícono del campo Qt lo achica a 16 px), la ayuda y la tecla marcada (`elegida`). Por descripción o marca, lo encontrado sale en una lista que flota debajo del campo (flechas, Enter o clic; arranca marcado el primero); sin nada en la lista, Enter busca el código exacto, así la pistola anda en los tres. Esc borra y después vuelve al código de barras sin cerrar la venta. Por código no hay lista: el Enter y el aviso de código no encontrado son los de siempre. Ver `tests/test_venta_buscar_en_el_campo.py` |
-| `ui.utils.crear_selector_de_fecha(...)` | se crea un campo de fecha con calendario (usarlo siempre, nunca un `QDateEdit` a mano) |
-| `ui.utils.armar_filtro_por_fechas(...)` · `rango_de_fechas(...)` · `fecha_iso(...)` | se arma la fila Desde/Hasta con "Buscar" y se leen sus fechas como `"YYYY-MM-DD"` |
-| `ui.utils.fila_guardar_cancelar(dialogo, ...)` | se arma la fila Guardar/Cancelar de un formulario |
-| `ui.detalle_venta.VentanaConDetalleDeVenta` | lista de ventas + artículos de la elegida (Consulta de Ventas y Detalle de un cierre) |
-| `ui.tarjeta_cierre.TarjetaCierreDeTurno` · `.TablaDeNegocios` | se dibuja el resumen de un Cierre de Turno (A RETIRAR, que es `resumen["monto_a_retirar"]`, y TOTAL en grande; en la tabla, cada negocio con su efectivo y digital en columnas, lo cobrado y el Cambio Fijo). La tabla es también la de Caja; la tarjeta la usan la pantalla Cierre de Turno (turno en curso) y "Ver Detalle" de Control de Cierres (cualquier cierre ya hecho, también el forzoso). Un cambio de diseño del Cierre de Turno se hace ahí y se ve en las dos |
-| `dominio.articulos_para_comprar(articulos)` · `dominio.STOCK_PARA_LISTA_DE_COMPRAS` | se arma la LISTA DE COMPRAS (botón de la barra antes de Operador, para cualquiera; `ui/lista_compras_window.py`): los artículos con 4 unidades o menos, también los de 0 o negativo, sin Impresiones, de la A a la Z. Sale de `articulos_repo.listar_articulos`, así también se abre desde otra PC |
-| `rotacion_repo.ranking_por_compras()` · `._lotes_de_compra(eventos)` · `dominio.COMPRAS_PARA_PROMEDIAR` · `.texto_tiempo_de_venta` | se decide cuánto tardó en venderse cada compra (RANKING DE ROTACIÓN > POR COMPRA, la idea del dueño del 2026-11-04): se rearma la historia del stock de cada artículo desde su primera compra con las compras (su `stock_antes`), las ventas confirmadas y los ajustes de ORDENAR Stock; la mercadería sale en el orden en que entró (lo del estante, sin fecha, antes que lo que llega), una compra se vendió entera cuando sale su última unidad, lo vendido sin stock lo tapa la compra siguiente (vendida en el momento, 0 días) y una compra que terminó con un ajuste (faltaba mercadería) no se mide. Antes de cada compra la cuenta se empareja con el `stock_antes` que guardó. El ranking promedia las últimas 3 vendidas enteras (lo eligió el dueño: con una sola, una semana rara da vuelta todo) y va del más rápido al más lento; sin ninguna, al final sin puesto. Ojo: depende de cuánto se compra cada vez (una compra grande tarda más aunque el artículo se venda mucho): para el ritmo de venta está POR PERÍODO. Ver `TestRankingPorCompras` y `TestLotesDeCompra` |
-| `rotacion_repo.ranking_de_rotacion(desde, hasta)` · `dominio.unidades_por_dia` · `.dias_que_alcanza` · `.se_acaba_pronto` | se arma el RANKING DE ROTACIÓN > POR PERÍODO (pedido del dueño, 2026-11-04; séptimo acceso del inicio, `ui/ranking_rotacion_window.py`, con permiso de Reportes): todos los artículos menos Impresiones, del que más se vendió en el período al que menos (ventas confirmadas, días de 06:00 a 06:00), con los quietos al final sin puesto. Para cuántos días alcanza se cuenta con lo vendido, no con el por día redondeado; None sin ventas, 0 sin stock. Las dos funciones del ranking están en la lista blanca (se abre desde otra PC). Ver `tests/test_ranking_rotacion.py` |
-| `ui.imprimir.html_del_listado(...)` · `.vista_previa(parent, html, nombre)` | se imprime un listado: HTML en hojas A4 con los títulos repetidos en cada hoja y vista previa (desde ahí se imprime o se guarda en PDF). Lo usan el "Renglón por renglón" del Detalle del Día y Control de Stock |
+Una línea por cada uno, en el mismo orden que la tabla completa de
+`docs/PUNTOS_DE_VERDAD.md` (buscá ahí el nombre antes de tocar o usar uno).
+
+- `turnos.calcular_turno` — a qué turno pertenece una hora
+- `turnos.es_domingo` — si un día es domingo
+- `turnos.turnos_del_dia` — qué turnos tiene un día (siempre 3)
+- `turnos.etiqueta_turno` — el nombre legible de un turno
+- `turnos.dia_en_que_empezo_el_turno` — a qué día pertenece el turno de un momento (de madrugada, la Noche del día anterior)
+- `turnos.limites_de_los_dias` · `.sql_dia_del_local` — filtrar y agrupar por día en un reporte de ventas (días de 06:00 a 06:00)
+- `reportes_repo._filtro_por_caja` · `._CON_SU_CAJA` · `._TURNO_DE_LA_CAJA` — repartir un reporte POR TURNO según la caja de cada venta
+- `turnos.dia_del_turno_que_arranca_tras_un_cierre` — con qué día queda anotado lo que sigue a un cierre
+- `ui.utils.hoy_del_local` — qué es "hoy" en los reportes de ventas
+- `turnos.turno_vencimiento` — cuándo un turno ya debería estar cerrado (y la hora del cierre forzoso)
+- `turnos.fin_del_turno` · `.inicio_del_aviso_de_cierre` — a qué hora termina un turno y desde cuándo titila Cierre de Turno
+- `turnos.turno_que_arranca_tras_un_cierre` — con qué turno queda anotado lo que sigue a un cierre (y el de una caja que se abre)
+- `turnos.turno_para_la_app_de_gastos` — el nombre del turno para la app de gastos
+- `relevo_repo.situacion_al_entrar` · `.abrir_caja` · `.recibir_caja` · `.cerrar_para_entrar` — qué pasa con la caja cuando alguien entra
+- `relevo_repo.estado_de_la_caja` · `.cierre_forzoso_si_corresponde` — si titila Cierre de Turno y si toca el cierre forzoso
+- `cajas_repo._quien_vende` — a nombre de quién y en qué caja queda una venta
+- `cajas_repo.cambio_inicial` — con cuánto cambio arrancó una caja
+- `cajas_repo.cerrada_en_ausencia` — si una caja se cerró en ausencia de su responsable
+- `control_cierres_repo.listar_cierres` · `.detalle_cierre` · `.verificar_cierre` — lo que muestra Control de Cierres y el conteo del sobre
+- `turnos_repo._cerrado_pasado_su_vencimiento` — si un turno se cerró "tarde"
+- `turnos_repo._desglose_de_totales` · `turnos_ventas_repo._PREFIJO_COLUMNAS_POR_ORIGEN` — lo cobrado de un turno por origen y medio, y el efectivo del cajón
+- `turnos_ventas_repo._vendido_aparte_entre` · `._aparte_por_metodo` · `._separar_de_kiosko` — las impresiones aparte de Kiosko en Caja, Cierre de Turno y el detalle de un cierre
+- `turnos_ventas_repo._efectivo_y_digital_de_cada_venta` — lo cobrado por cada medio en UNA venta (pedazo de SQL compartido)
+- `turnos_repo._ventanas_del_dia` — qué ventas son de qué turno de un día
+- `detalle_dia_repo.detalle_del_dia` — el detalle venta por venta de un día
+- `reportes_repo.resumen_por_operador` · `.ventas_de_operador` — Reportes > Por Operador
+- `dominio.es_admin` — si alguien es Administrador
+- `ventas_repo.subtotal_linea` — lo que se cobra por un renglón
+- `ventas_repo.total_carrito` — el total de una venta en curso
+- `ventas_repo._grabar_venta_kiosko` — grabar una venta de kiosko (único INSERT en `venta_detalle`, descuento de stock y control de los pagos)
+- `impresiones_repo.cobrar_impresiones` (y las demás de su fila) — el cobro del botón de impresiones de la barra
+- `acomodar_caja_repo.acomodar_caja` — ORDENAR $: sumar a la caja lo que ya había cobrado el programa anterior
+- `pedidos_impresion_repo.tomar_pedido` · `.entregar_pedido` · `.dar_por_perdida` · `.anular_pedido` · `.anotar_aviso` — los pedidos de Gestión Impresiones
+- `pedidos_clientes_repo.anotar` · `.sumar_uno` · `.parecidos` · `.ya_lo_trajimos` y compañía — Pedidos de Clientes
+- `tareas_turno_repo.crear_tarea` y compañía · `turnos.momento_de_la_tarea` — Tareas del Turno
+- `ui.aviso_tarea.RevisorDeTareas` · `.AvisoDeTarea` — el aviso de Tareas del Turno
+- `dominio.telefono_limpio` · `.enlace_whatsapp` · `.mensaje_pedido_listo` — el celular de un pedido y el WhatsApp de "ya está listo"
+- `dominio.CODIGO_ARTICULO_IMPRESIONES` — qué artículo es Impresiones (el código "4")
+- `dominio.cuenta_del_cobro` · `.lo_que_falta_para` — la cuenta del cobro (efectivo, digital, vuelto, lo que falta)
+- `dominio.total_cobrado` · `.monto_a_retirar` · `.diferencia_de_plata` · `.coincide` · `.falta_plata` — la plata de la caja y del sobre
+- `dominio.precio_con_margen` · `.costo_sin_margen` — el margen de Artículos
+- `dominio.porcentaje_de_ganancia` · `.ganancia_por_unidad` · `.MARGEN_POR_DEFECTO` — el % que se le gana a un artículo y la ganancia por unidad
+- `dominio.bajo_el_minimo` — si un artículo quedó por debajo de su stock mínimo
+- `dominio.suma_de_las_filas` — la fila TOTAL de un reporte
+- `ui.dialogo_pago.cobrar` — cobrar algo que no es una venta de kiosko
+- `database.conexion_db` — abrir una transacción contra la base
+- `database.DATA_DIR` / `DB_PATH` · `.usar_carpeta_de_datos` · `.es_base_de_prueba` — dónde viven los datos
+- `database.hash_clave` / `verificar_clave` — manejar una contraseña
+- `database_migraciones.comprobar_base_kiosko` · `.migrar_base` · `.PASOS` — rechazar una base ajena o más nueva y migrar la base
+- `usuarios_repo.tiene_permiso` — si alguien puede entrar a algo
+- `usuarios_repo.exigir_admin` · `.usuario_habilitado` — que quien opera siga activo (y sea Admin)
+- `usuarios_repo._exigir_que_quede_otro_admin` — que siempre quede un Administrador activo
+- `config_repo.leer` · `.guardar` · `.obtener_fondo_cambio` · `.actualizar_fondo_cambio` — la tabla `configuracion` (y el Cambio Fijo)
+- `admin_remoto_repo.esta_activo` · `.activar` · `.entrar` · `.exigir_admin_habilitado` — quién administra desde otra PC
+- `admin_remoto.lista_blanca.FUNCIONES` · `.ACTOR` · `.huella` — qué funciones se pueden pedir desde otra PC
+- `admin_remoto.modo.direccion_del_mostrador` · `.es_copia_remota` — si esta copia es la del mostrador o una abierta por la red
+- `ui.utils.solo_en_el_mostrador` · `.avisar_que_es_en_el_mostrador` — los botones que desde otra PC avisan "Esto se hace en el mostrador"
+- `ui.piezas_ventana.restringir` · `.solo_para_el_admin` · `ui.utils.avisar_acceso_restringido` — un botón sin permiso se ve igual y dice "Acceso Restringido"
+- `copias_repo.copia_automatica_si_corresponde` · `.toca_copia` · `.nombres_a_borrar` · `.agregar_carpeta_extra` — cuándo y dónde se hacen las copias de seguridad
+- `database.carpeta_de_copias` — en qué carpeta de esta PC quedan las copias
+- `envio_pwa_repo.encolar` · `.enviar_pendientes` · `.mandar_cierre` y compañía — mandar cada Cierre de Turno a la app de gastos
+- `tareas_del_cierre_repo.tareas_del_cierre` — qué Tareas del Turno viajan con un cierre a la app de gastos
+- `vuelta_admin_repo.volver` · `ui.vuelta_del_admin.VueltaDelAdmin` — la vuelta sola del Administrador a la operadora
+- `errores.registrar_error` — guardar fallos inesperados en `data_fr/errores.log`
+- `main.aplicar_estilo` — el aspecto de TODO el programa
+- `dominio.texto_pesos` · `ui.utils.formato_pesos` — un monto como texto ("$ 1.500")
+- `ui.utils.CampoPesos` · `ui.utils.pedir_pesos` — escribir un monto
+- `ui.utils.formato_fecha_hora` — una fecha con hora como texto
+- `ui.utils.manejar_errores` — atrapar un error de una acción de pantalla
+- `ui.en_segundo_plano.EnSegundoPlano` · `.arrancar` — un botón que espera la red sin congelar el mostrador
+- `ui.espera_del_mostrador.esperar` · `.CartelEsperandoAlMostrador` · `.SeDejoDeEsperar` — la copia de otra PC espera al mostrador sin trabarse
+- `ui.utils.encadenar_enter` — Enter de campo en campo, como Tab
+- `ui.utils.aplicar_clase` — marcar un botón como primario/peligro/barra
+- `ui.piezas_ventana.cabecera_oscura` · `.tarjeta_de_menu` · `.tecla` y compañía — una ventana "clara con cabecera cyber"
+- `ui.piezas_ventana.agregar_indicador` · `.buscador` · `.panel_de_tabla` y compañía · `ui.dibujos_tabla.DelegadoEtiqueta` · `.DelegadoStock` — una LISTA con la maqueta B
+- `ui.login_dibujos.FichasDeJugadores` · `.FondoDelIngreso` · `.TextoDegradado` — la pantalla de ingreso "Elegí tu Jugador"
+- `ui.utils.sin_boton_por_defecto` — que Enter en un campo no apriete el primer botón de un diálogo
+- `ui.utils.crear_tabla` — una tabla de solo lectura
+- `ui.utils.mostrar_columna_entera` — una columna que no se corta con "..."
+- `articulos_repo.ajustar_stock` · `.comprobar_clave_para_ordenar_stock` — corregir el stock a mano (ORDENAR Stock)
+- `articulos_repo.cambiar_codigo` · `._TABLAS_CON_CODIGO_DE_ARTICULO` — corregir el código de un artículo
+- `articulos_repo.crear_marca` · `.renombrar_marca` · `.juntar_marcas` · `.borrar_marca` — el catálogo de marcas (solo Admin)
+- `articulos_repo.listar_para_control_de_stock` — la lista de Control de Stock
+- `dominio.sin_acentos` — comparar u ordenar un texto sin mayúsculas ni acentos
+- `dominio.orden_de_codigo` — ordenar códigos de artículo como números
+- `ui.articulos_tabla.llenar_tabla_de_articulos` · `.poner_stock` — la grilla de artículos
+- `ui.buscar_articulo.avisar_codigo_no_encontrado` — el aviso de que lo escaneado no es ningún artículo
+- `ui.buscar_articulo.armar_botones_de_busqueda` — los botones F5/F6/F7 de Compras
+- `ui.venta_buscador.BuscadorDeLaVenta` — el buscador de Ventas en su mismo campo
+- `ui.utils.crear_selector_de_fecha` — un campo de fecha con calendario
+- `ui.utils.armar_filtro_por_fechas` · `rango_de_fechas` · `fecha_iso` — la fila Desde/Hasta
+- `ui.utils.fila_guardar_cancelar` — la fila Guardar/Cancelar de un formulario
+- `ui.detalle_venta.VentanaConDetalleDeVenta` — lista de ventas con los artículos de la elegida
+- `ui.tarjeta_cierre.TarjetaCierreDeTurno` · `.TablaDeNegocios` — la tarjeta del Cierre de Turno (y la tabla de Caja)
+- `dominio.articulos_para_comprar` · `.STOCK_PARA_LISTA_DE_COMPRAS` — la Lista de Compras
+- `rotacion_repo.ranking_por_compras` · `._lotes_de_compra` · `dominio.COMPRAS_PARA_PROMEDIAR` — Ranking de Rotación > POR COMPRA
+- `rotacion_repo.ranking_de_rotacion` · `dominio.unidades_por_dia` · `.dias_que_alcanza` · `.se_acaba_pronto` — Ranking de Rotación > POR PERÍODO
+- `ui.imprimir.html_del_listado` · `.vista_previa` — imprimir un listado en hojas A4 con vista previa
 
 Si necesitás uno de esos datos, **llamá a la función existente**.
 
@@ -338,39 +356,13 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
 
 ## Trampas conocidas (no las rompas sin entenderlas)
 
-- **El turno NOCHE cruza la medianoche** (22:00–05:59), así que vence a la
-  madrugada del día *siguiente*. Por eso **el día del local va de 06:00 a
-  06:00** (`turnos.HORA_CAMBIO_DE_DIA`): el día 1 es Mañana, Tarde y la Noche
-  ENTERA, aunque termine el día 2. Todo reporte de ventas filtra con
-  `turnos.limites_de_los_dias` (nunca `date(?)`/`'+1 day'`), agrupa por día con
-  `turnos.sql_dia_del_local` y toma su "hoy" de `ui.utils.hoy_del_local`: a las
-  02:00, "Solo Hoy" es todavía el día anterior. Un cierre hecho pasada la
-  medianoche deja lo que sigue en la Noche del día ANTERIOR
-  (`turnos.dia_del_turno_que_arranca_tras_un_cierre`). Los historiales que no
-  son de ventas (accesos, movimientos de un artículo) siguen por día calendario.
-  Ver `tests/test_noche_del_dia.py` y `tests/test_reportes_fechas.py`. En las
-  pruebas pasa lo mismo: el "hoy" de una prueba de reportes es
-  `turnos.dia_en_que_empezo_el_turno(datetime.now())` o `hoy_del_local()`, nunca
-  `date.today()` ni `QDate.currentDate()`.
-- **Todos los días tienen tres turnos, incluidos los domingos.** `MAÑANA`
-  va de 06 a 14, `TARDE` de 14 a 22 y `NOCHE` de 22 a 06 del día siguiente.
-  FRKiosko tiene su propio calendario: no hereda la excepción de CyberBIOS.
-  Las etiquetas y los envíos usan Mañana/Tarde/Noche todos los días.
+Estas van enteras porque tocan la plata, la caja, la base real o el repo
+público:
+
 - **El `.exe` empaquetado resuelve las rutas distinto.** Con PyInstaller
   `__file__` apunta a una carpeta temporal que se borra en cada arranque;
   por eso `BASE_DIR` usa `sys.executable` si está `frozen`. Si guardás un
   archivo nuevo, hacelo bajo `DATA_DIR` (`data_fr/`), nunca al lado de un `.py`.
-- **Un objeto de Qt que se pasa a otro sin que lo adopte tiene que quedar en una
-  variable.** `QPrintPreviewDialog(QPrinter(...), parent)` usa la impresora
-  pero no la guarda: pasada sin variable, Python la borraba apenas se armaba el
-  diálogo, la vista previa leía memoria liberada y el programa se cerraba **sin
-  ningún cartel** (ni `manejar_errores` ni `sys.excepthook` lo ven: es una caída
-  de Qt, no de Python). Le pasó al dueño en el cyber con Control de Stock >
-  Imprimir (2026-10-26); vale para todos los listados (`ui/imprimir.vista_previa`).
-  Ver `test_la_impresora_sigue_viva_mientras_esta_abierta_la_vista_previa`.
-- **El stock puede quedar negativo a propósito.** No agregues una
-  validación que lo impida: prefieren vender y corregir después antes que
-  frenar la cola en el mostrador.
 - **El stock se corrige a mano SOLO con ORDENAR Stock** (botón de Artículos).
   Lo ve solo el Admin y pide una contraseña fija que eligió el dueño; en el
   código está solo su hash con salt (`articulos_repo.CLAVE_ORDENAR_STOCK`, el
@@ -380,22 +372,6 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   auditar un faltante de mercadería. Ahí sí se rechaza un número negativo (es lo
   que hay contado en el estante). El alta/edición de un artículo sigue sin tocar
   el stock.
-- **El código de un artículo se cambia SOLO en ORDENAR Stock** (doble clic en
-  el código; pregunta antes de guardar y pasa por `articulos_repo.cambiar_codigo`).
-  El código es la clave de `articulos` y lo guardan `venta_detalle`,
-  `compra_detalle`, `ajustes_stock` y `cambios_codigo`: se corrigen todas en la
-  misma transacción con `PRAGMA defer_foreign_keys`. Una tabla nueva que guarde
-  el código de un artículo va en `articulos_repo._TABLAS_CON_CODIGO_DE_ARTICULO`
-  (`tests/test_ordenar_stock.py` lo vigila). No deja usar el código de otro
-  artículo ni tocar el de Impresiones.
-- **El carrito de una venta vive solo en memoria** hasta que se cobra. No
-  lo persistas "por las dudas": es lo que permite borrar un renglón mal
-  escaneado sin dejar basura en la base.
-- **El login es por nombre y exige nombres únicos entre usuarios activos.**
-  Dos "Matías" activos romperían el login.
-- **Las claves están hasheadas con salt, pero esto no es un sistema
-  seguro.** Cualquiera con acceso al archivo `data_fr/kiosko.db` lee y
-  modifica todo. No le prometas al usuario que esto protege datos.
 - **Todo se cobra con la misma ventana de cobro, nunca con un combo "Medio de
   pago"** (pedido del dueño, 2026-10-18: "a todo"). Ventas e Impresiones abren
   `ui.dialogo_pago.DialogoPago`; una pantalla nueva que cobre algo que no es una
@@ -404,17 +380,6 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   existe un método "mixto". No lo sumes a `METODOS_PAGO` ni al `CHECK` de
   `venta_pagos.metodo`: Caja y Cierre de Turno no sabrían cuánto de un pago
   "mixto" quedó en el cajón.
-- **El cobro arranca con el total escrito y, si pagan justo, un Enter cobra**
-  (pedido del dueño, 2026-10-18: casi siempre pagan justo). En `DialogoPago`
-  Efectivo y Digital están siempre a la vista y suman el total: arranca con el
-  total en Efectivo, seleccionado; al escribir en uno, el otro se completa con
-  lo que falta; "Todo efectivo"/"Todo digital"; y "Paga con" (opcional) es el
-  billete que da el cliente, para dar vuelto sin tocar lo digital. La cuenta es
-  `dominio.cuenta_del_cobro`. Un Enter cobra SIEMPRE: pago justo, una parte en
-  cada medio o con vuelto (hasta el 18/10 con vuelto frenaba en Confirmar y se
-  sacó a pedido del dueño; no vuelvas a poner la frenada). Un Enter que queda
-  apretado no cobra: `encadenar_enter` descarta la repetición del teclado
-  (`tests/test_dialogo_pago.py`, `tests/test_enter_como_tab.py`).
 - **Sumar un origen de venta nuevo toca la caja, no solo `dominio.py`.** Si un
   origen no figura en `turnos_ventas_repo._PREFIJO_COLUMNAS_POR_ORIGEN` (y en
   las columnas de `cierres_turno`), su plata desaparece del efectivo esperado en
@@ -503,68 +468,6 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   (7) cada pedido de la copia remota se espera en un hilo aparte con ese cartel:
   no lo vuelvas a esperar en el hilo de la pantalla (la copia quedaba "No
   responde" hasta 60 s).
-- **El servidor de red no debe tocar Qt.** Usa conexiones SQLite propias desde
-  sus hilos y registra fallos inesperados con `errores.registrar_error`, sin
-  incluir claves ni el cuerpo de los pedidos en el contexto del log. Su puerto
-  es 8909 (y el candado de instancia única, 8908): distintos de los de
-  CYBERCONTROL (8899) a propósito, para que los dos programas convivan en una PC.
-- **Las copias de seguridad se hacen en caliente, desde un hilo propio, y nunca
-  pueden frenar el mostrador.** `copias_repo` copia a `data_fr/backups` después
-  de cada Cierre de Turno (todos pasan por `turnos_repo.cerrar_turno`: se
-  compara `MAX(fecha_cierre)` con la última copia) y cada 8 horas, y lleva la
-  última a cada "otra carpeta" en cada revisión. Reglas que no hay que romper:
-  (1) una copia se graba como `.parcial` y se renombra al final; (2) solo se
-  borran archivos con nombre de copia automática de ESTE programa
-  (`frkiosko_AAAA-MM-DD_HHMMSS.db`): nunca las manuales, las `antes_de_migrar_...`
-  (las deja `database_migraciones` antes de un paso) ni las de CYBERCONTROL,
-  que se llaman `kiosko_...` y borran con la misma regla (con el mismo prefijo,
-  los dos programas en una misma carpeta se borraban las copias entre sí; no
-  vuelvas a `kiosko_`, lo vigila `tests/test_copias.py`); (3) las copias cuentan
-  días CON copias, no días del calendario; (4) una carpeta de otra PC se
-  pregunta primero con `_que_conteste` (3 s al puerto 445): con esa PC apagada
-  Windows tarda ~50 s; (5) el usuario y la clave de una carpeta de red se le
-  pasan a Windows con `cmdkey` y NO se guardan en la base ni en un log (este
-  repo es público: nunca escribas la clave real en un test o un doc); (6) las
-  copias nunca crean una carpeta que falta. La pantalla lee lo que pasó de
-  `_estado`, en memoria, y no mira las carpetas. Los botones de la pantalla que
-  copian o prueban una carpeta ("Hacer copia de seguridad ahora", la copia al
-  pendrive y "Agregar" otra carpeta) corren el repo en un hilo aparte
-  (`ui.en_segundo_plano`): con una PC de la red apagada el mostrador no se traba.
-  Mientras prueba una carpeta nueva, "Agregar carpeta" no se cierra (Cancelar,
-  "Buscar..." y los campos se apagan, y Esc y la cruz no hacen nada): `agregar_carpeta_extra` lee la lista antes
-  de probar y la graba después, y otra carpeta agregada o quitada en el medio se
-  perdería sin aviso. Para dejar cancelar, primero hace falta un candado en
-  `copias_repo` para leer y grabar la lista (el `_candado` que hay es solo el de
-  las copias). Lo vigila
-  `test_mientras_prueba_la_carpeta_no_se_cierra_y_la_lista_no_se_pisa`.
-- **El envío de un cierre a la app de gastos nunca frena el cierre ni lo
-  duplica** (`envio_pwa_repo`). El cierre se graba como siempre y en la MISMA
-  transacción queda la fila de la cola (hay fila si y solo si hay cierre);
-  mandarlo es tarea del hilo, nunca de `cerrar_turno` ni del hilo de una
-  pantalla: ningún pedido de red va dentro de una transacción de la base, y
-  "Probar la conexión" y "Reintentar ahora" (`ui/envio_pwa_dialogo.py`) corren la
-  función del repo en un hilo aparte (`ui.en_segundo_plano.EnSegundoPlano`): la
-  ventana se puede cerrar mientras esperan y lo que se mandó queda mandado.
-  `cerrar_turno` solo lo
-  despierta (`avisar_que_hay_un_cierre`, después del commit), y la barra
-  "ENVIANDO CIERRE DE TURNO" (`ui/envio_pwa_progreso.py`, 3 s como mínimo) solo
-  mira la cola. El documento allá tiene nombre fijo por cierre (`documento_id`,
-  `frkiosko-<id>-<fecha>`) y el PATCH lo pisa entero: un reintento tras un corte
-  no deja dos. Un ENVIADO no se vuelve a mandar solo; a mano sí: Control de
-  Cierres > "Mandar a la app de gastos" (solo Admin). Solo se encola con el envío
-  prendido, y nunca en la base de prueba (`database.es_base_de_prueba()`: ahí
-  `activar` lo rechaza y el hilo no manda nada, porque sus cierres son
-  inventados). `registradoPor` es la responsable de la caja, no quien apretó el
-  botón, y tiene que ser el nombre EXACTO que usa la app. La clave de Firebase
-  que está acá es la PÚBLICA de la PWA de FR (ya publicada en su código): no es
-  un secreto. **Apunta a la app de FR ("Gestión Central", proyecto `frkioskos`),
-  no a la de CyberBIOS**: si alguna vez hay que cambiar de app, son las
-  constantes de arriba de `envio_pwa_repo.py`. Las pruebas usan una app de
-  mentira: ninguna sale a internet ni toca el Firestore real.
-- **Un cierre hecho tras días sin cerrar NO aparece en las filas de hoy.** Cubre
-  desde el cierre anterior, así que queda anotado en el turno viejo y el Resumen
-  del Día de hoy sale en cero. No es un error ni plata perdida: el reporte lo
-  avisa arriba de la tabla (`cierres_de_otro_dia`) con un botón para ir a verlo.
 - **Un cierre guarda una foto de lo cobrado.** En Resumen del Día, si una venta
   se anula después de cerrar, el desglose de Impresiones debe seguir conciliando
   con ese cierre; ver `turnos_ventas_repo._vendido_aparte_entre` y
@@ -580,36 +483,27 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
   Control de Cierres muestra cada cierre con la tarjeta del Cierre de Turno,
   con las impresiones recalculadas de las ventas de esa ventana contadas como
   estaban al cerrar.
-- **En pantalla, el fondo de cambio se llama "Cambio Fijo" en TODOS lados**
-  (Caja, Cierre de Turno, Control de Cierres y su tarjeta de Administrar Kiosko,
-  `ui/cambio_fijo_dialogo.py`; hasta el 2026-11-04 estaba adentro de Usuarios). Por dentro sigue siendo
-  `fondo_cambio` (columnas, repos, claves): no se renombra, solo el texto que se
-  ve.
-- **En pantalla, quien atiende se llama "Operador", nunca empleado/empleada**
-  (pedido del dueño, 2026-11-04). El rol se muestra con `dominio.nombre_del_rol`
-  ("OPERADOR"); por dentro sigue siendo `ROL_EMPLEADA` / `'EMPLEADA'` en la base
-  (con su CHECK), y los comentarios no se renombraron: no lo migres sin pedido.
-- **El esquema de color se fija en CLARO a propósito (`main.aplicar_estilo`).**
-  Fusion toma los colores de Windows: con el modo oscuro puesto, los widgets que
-  la hoja de estilos no pinta salían negros con la letra oscura encima. Si se
-  agrega un widget nuevo que se vea oscuro, hay que pintarlo en `HOJA_DE_ESTILOS`
-  (no sacar el esquema claro).
-- **El "Renglón por renglón" del Detalle del Día muestra cada renglón TAL CUAL se
-  cobró** (pedido del dueño: "si se cobran 14 impresiones juntas, que diga 14;
-  si se hacen 4 por separado, que las ponga tal cual se cobraron"). No lo
-  agrupes por producto "para que sea más corto": para eso está "Lo vendido
-  (cantidades)". En pantalla y en papel salen las mismas filas.
-- **El recolector cíclico está desactivado a propósito** en `main.py`: evita que
-  un hilo (el servidor, el de copias o el de envíos) destruya un `QTimer` de Qt.
-  Antes de reactivarlo, revisar la propiedad de los objetos de UI y sus ciclos
-  de referencias. Por lo mismo, un hilo que arranca una pantalla
-  (`ui/en_segundo_plano.py`) recibe solo la función del repo, datos y un dict
-  para la respuesta: nunca la ventana, un widget ni un método de la ventana (si
-  el hilo soltara la última referencia, Python destruiría el objeto de Qt desde
-  ese hilo). `arrancar` rechaza con TypeError los casos comunes (un widget, un
-  método o un lambda que nombra la ventana, un partial, una lista o un dict con
-  uno adentro), no todos. El error que vuelve de ese hilo se suelta sin dejar
-  ciclos; lo vigila `test_el_error_no_queda_dando_vueltas_con_el_recolector_apagado`.
+
+Las demás están enteras en `docs/TRAMPAS.md` (leé la que toque tu tarea):
+
+- El turno NOCHE cruza la medianoche: el día del local va de 06:00 a 06:00 (leela antes de tocar un reporte de ventas)
+- Todos los días tienen tres turnos, incluidos los domingos.
+- Un objeto de Qt que se pasa a otro sin que lo adopte tiene que quedar en una variable.
+- El stock puede quedar negativo a propósito.
+- El código de un artículo se cambia SOLO en ORDENAR Stock
+- El carrito de una venta vive solo en memoria
+- El login es por nombre y exige nombres únicos entre usuarios activos.
+- Las claves están hasheadas con salt, pero esto no es un sistema seguro.
+- El cobro arranca con el total escrito y, si pagan justo, un Enter cobra
+- El servidor de red no debe tocar Qt.
+- Las copias de seguridad se hacen en caliente, desde un hilo propio, y nunca pueden frenar el mostrador.
+- El envío de un cierre a la app de gastos nunca frena el cierre ni lo duplica
+- Un cierre hecho tras días sin cerrar NO aparece en las filas de hoy.
+- En pantalla, el fondo de cambio se llama "Cambio Fijo" en TODOS lados
+- En pantalla, quien atiende se llama "Operador", nunca empleado/empleada
+- El esquema de color se fija en CLARO a propósito (`main.aplicar_estilo`).
+- El "Renglón por renglón" del Detalle del Día muestra cada renglón TAL CUAL se cobró
+- El recolector cíclico está desactivado a propósito
 
 ---
 
@@ -662,67 +556,5 @@ Si necesitás uno de esos datos, **llamá a la función existente**.
 
 ## Estado actual
 
-El programa es el kiosko solo: Vender (diseño "B": total y COBRAR grandes a la
-derecha), Impresiones, Caja, Gestión Impresiones (pedidos con seña y aviso por
-WhatsApp), Cierre de Turno, Lista de Compras, Administrar Kiosko (Artículos con
-ORDENAR Stock y Gestionar Marcas, Compras, Control de Stock, Consulta de Ventas,
-Reportes con el Resumen del Día y su detalle para imprimir, Control de Cierres,
-Usuarios con Copias de Seguridad), Configuración ADMIN (Accesos de Admin,
-Entrar desde otra PC, Cierres a la app de gastos), la barra oscura con los
-mismos botones para todos, el Administrador que vuelve solo a la empleada a los
-10 minutos y la plata en miles sin centavos ("$ 1.500").
-
-Pedidos de Clientes (lo que piden y no tenemos, 2026-11-03): quinto acceso del
-inicio (`ui/pedidos_clientes_window.py`, maqueta A: campo con GUARDAR, parecidos
-mientras se escribe, +1 y TRAJIMOS en cada renglón, HISTORIAL; RENOMBRAR, JUNTAR y
-BORRAR solo el Admin). Reglas en `repositories/pedidos_clientes_repo.py`.
-
-Tareas del Turno (cosas para hacer a una hora, 2026-11-03): sexto acceso del inicio
-(`ui/tareas_turno_window.py`: PARA HACER, ATRASADAS y HECHAS arriba; ESTE TURNO
-(con las atrasadas de un turno anterior de hoy), TODO EL DÍA y TODAS LAS TAREAS;
-HECHA en cada renglón; + NUEVA TAREA, MODIFICAR y
-BORRAR solo el Admin: a los demás les dicen "Acceso Restringido", como en Pedidos; HISTORIAL). A la
-hora sale el aviso de `ui/aviso_tarea.py` encima de todo, con POSPONER 5 MIN,
-POSPONER 10 MIN y TAREA HECHA, y el acceso titila en rojo con el numerito de las
-atrasadas. Para que entraran seis accesos en la pantalla del mostrador, cada uno
-bajó de 110 a 98 de alto y de 20 a 14 de separación. Reglas en
-`repositories/tareas_turno_repo.py`.
-
-Ranking de Rotación (qué tan rápido sale cada artículo, 2026-11-04): séptimo acceso
-del inicio, debajo de Tareas del Turno (`ui/ranking_rotacion_window.py`), con dos
-pestañas. POR COMPRA (la idea del dueño, abre en esta): cuánto tarda en venderse cada
-compra, desde que entra hasta que sale su última unidad, promedio de las últimas
-`dominio.COMPRAS_PARA_PROMEDIAR` (3) vendidas enteras, del más rápido al más lento
-(`rotacion_repo.ranking_por_compras`). POR PERÍODO: últimos 7, 30 o 90 días; vendidas,
-por día, stock y para cuántos días alcanza, con los quietos al final y en rojo lo que
-se acaba en menos de `dominio.DIAS_PARA_AVISAR_ROTACION`
-(`rotacion_repo.ranking_de_rotacion(desde, hasta)`). Las dos consultas están en la
-lista blanca de otra PC. Lo abre quien tiene `permiso_reportes`. Con el séptimo, cada
-acceso bajó a 86 de alto y 10 de separación. `MainWindow.acceso_tareas` se busca por
-nombre: ya no es el último.
-
-La suite se ejecuta con `python -m unittest discover tests` y tiene 1025 pruebas
-al 2026-11-04 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
-fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
-de CYBERCONTROL.
-
-La barra de arriba de la ventana principal es oscura, con teclas en relieve
-(elegida por el dueño entre cuatro maquetas). Los colores viven en la hoja de
-estilos (`ui/hoja_de_estilos.py`: `#encabezadoInicio`, clases `barra` y
-`alerta`, y Vender/Operador dentro de la barra). Cuidado al tocar `alerta`:
-tiene que llevar los mismos bordes, relleno y letra que `barra`, porque si no
-Cierre de Turno cambia de tamaño cada vez que titila (lo cuida `test_estilo_ui`).
-Todos los botones de la barra van en negrita y en mayúscula (la pone
-`MainWindow._agregar_boton_barra`). La barra muestra los mismos botones a
-todos: el que alguien no tiene habilitado (Admin Kiosko, Config ADMIN) se ve
-igual pero no hace nada al apretarlo (lo cuida `tests/test_barra_para_todos.py`).
-
-Desde el 2026-11-03 toda la ventana principal tiene de fondo la foto del kiosko de
-noche que eligió el dueño (`assets/fondo_inicio.jpg`, dibujada por
-`ui/fondo_del_inicio.FondoDelInicio`: tapa todo sin deformarse y se recorta centrada), y
-el título y los accesos van en un panel oscuro medio transparente
-(`#panelInicio`, `#tituloInicio`, `#detalleInicio`). La foto agrandada es una sola
-para todo el programa, no una por ventana: la ventana del Admin ya cerrada sigue
-viva (la agarra `VueltaDelAdmin`) y con una copia propia cada salida del Admin
-dejaba ~8 MB en memoria. Si falta el archivo, el fondo sale en `COLOR_SIN_FONDO`
-(azul oscuro: sobre el gris de siempre el título claro no se leería).
+Está en `docs/ESTADO.md`: qué tiene hoy el programa, cuántas pruebas tiene la
+suite y cómo son la barra y el fondo de la ventana principal.
