@@ -15,7 +15,12 @@ este archivo se puede adjuntar tal cual.
 
 - **Una sola vez, en el mostrador:**
   1. Configuración ADMIN > **Entrar desde otra PC**: tildar "Permitir que el
-     Administrador entre desde otra PC" y Guardar. Viene **apagado**.
+     Administrador entre desde otra PC" y Guardar. Viene **apagado**. Al
+     guardar, el programa se fija que el firewall de Windows deje pasar a las
+     otras PCs al puerto 8909 y, si no, lo abre: Windows pide permiso (decile
+     Sí). Sin eso, la otra PC decía "No encuentro el FRKiosko del mostrador"
+     aunque el mostrador estuviera abierto (pasó en el local el 05/11/2026:
+     la carpeta compartida andaba, el puerto no). Ver `admin_remoto/firewall.py`.
   2. Compartir en la red la carpeta donde está FRKiosko.exe (con contraseña).
      La pantalla del paso 1 dice el nombre y la IP del mostrador.
 - **Cada vez, en la otra PC:** abrir FRKiosko.exe **desde la carpeta
@@ -98,6 +103,11 @@ abre la base de esa carpeta: le habla al programa del mostrador.
 
 - **El mostrador está apagado o con FRKiosko cerrado:** la otra PC avisa "No
   encuentro el FRKiosko del mostrador". Lo que ya guardaste quedó guardado.
+- **El mostrador está abierto y la otra PC igual dice "No encuentro...":** es el
+  firewall de Windows del mostrador. En el mostrador, Configuración ADMIN >
+  Entrar desde otra PC > Guardar: lo revisa y, si hace falta, lo abre (Windows
+  pide permiso). Si el mostrador tiene un antivirus con firewall propio, ahí
+  hay que permitir a FRKiosko (puerto 8909).
 - **Se corta la red con la sesión abierta:** cada acción avisa que no encuentra
   el mostrador; cuando vuelve la red, sigue andando (si pasaron más de 3 horas,
   hay que cerrar sesión y volver a entrar).

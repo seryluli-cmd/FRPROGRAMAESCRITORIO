@@ -5,15 +5,27 @@ admin_remoto_dialogo.py
 apagar que el Administrador administre desde otra PC del local, con los pasos
 para hacerlo. La regla (viene apagado, solo Admin) vive en
 repositories/admin_remoto_repo.py; cómo viaja cada pedido, en admin_remoto/.
+
+Al guardar PRENDIDO, además revisa que el firewall de Windows deje pasar a las
+otras PCs al puerto del programa y, si no, lo abre con el permiso de Windows
+(admin_remoto/firewall.py explica por qué hizo falta). Las dos cosas corren en
+un hilo aparte (ui/en_segundo_plano.py): la de abrir espera a que alguien
+conteste el cartel de Windows, y el mostrador no se puede quedar trabado.
 """
 
 import socket
 
 from PySide6.QtWidgets import QCheckBox, QDialog, QLabel, QVBoxLayout
 
+import servidor_red
+from admin_remoto import firewall
 from repositories import admin_remoto_repo
+from ui.en_segundo_plano import EnSegundoPlano
 from ui.piezas_ventana import TONO_AZUL, TONO_GRIS, agregar_pastilla, cabecera_oscura, panel_blanco, titulo_de_seccion
-from ui.utils import fila_guardar_cancelar, manejar_errores, mostrar_info, sin_boton_por_defecto
+from ui.utils import fila_guardar_cancelar, manejar_errores, mostrar_aviso, mostrar_info, sin_boton_por_defecto
+
+_PRENDIDA = "La entrada desde otra PC quedó PRENDIDA."
+_NO_LO_ENCUENTRA = "desde otra PC va a decir \"No encuentro el FRKiosko del mostrador\""
 
 
 def _nombre_y_ips_de_esta_pc():
@@ -35,8 +47,9 @@ class DialogoEntrarDesdeOtraPC(QDialog):
         super().__init__(parent)
         self.usuario = usuario
         self.setWindowTitle("Entrar desde otra PC")
-        self.resize(640, 580)
+        self.resize(640, 620)
         self._armar_interfaz()
+        self._espera = EnSegundoPlano(self, [self.boton_guardar, self.check_activo])
 
     def _armar_interfaz(self):
         nombre, ips = _nombre_y_ips_de_esta_pc()
@@ -57,6 +70,9 @@ class DialogoEntrarDesdeOtraPC(QDialog):
             "carpeta se comparte con el nombre FRKiosko, es:<br>"
             f"<b>\\\\{nombre}\\FRKiosko\\FRKiosko.exe</b></li>"
             "<li>Entrá con el usuario Administrador y su clave.</li></ol>"
+            "Al guardar con la casilla tildada, el programa se fija que el firewall de Windows deje "
+            "pasar a las otras PCs y, si hace falta, lo arregla: Windows te pide permiso, decile "
+            "<b>Sí</b>.<br><br>"
             f"Esta PC es <b>{nombre}</b> (IP {ips_texto}). Este programa tiene que estar abierto acá.<br><br>"
             "Los operadores no pueden entrar desde otra PC. Vender, cobrar y cerrar el turno "
             "se sigue haciendo solo acá."
@@ -79,7 +95,11 @@ class DialogoEntrarDesdeOtraPC(QDialog):
         layout.addWidget(panel_pasos)
         layout.addWidget(panel_casilla)
         layout.addStretch()
-        layout.addLayout(fila_guardar_cancelar(self, self._guardar))
+        fila = fila_guardar_cancelar(self, self._guardar)
+        # La fila es [espacio, Guardar, Cancelar]: Guardar se apaga mientras se
+        # revisa el firewall (Cancelar no).
+        self.boton_guardar = fila.itemAt(1).widget()
+        layout.addLayout(fila)
         self.setLayout(layout)
         sin_boton_por_defecto(self)
 
@@ -87,9 +107,66 @@ class DialogoEntrarDesdeOtraPC(QDialog):
     def _guardar(self):
         activo = self.check_activo.isChecked()
         admin_remoto_repo.activar(self.usuario["id"], activo)
+        if not activo:
+            mostrar_info(
+                self, "Listo",
+                "La entrada desde otra PC quedó APAGADA (si alguien estaba adentro desde otra PC, ya no puede seguir).",
+            )
+            self.accept()
+            return
+        self._programa = firewall.programa_de_este_frkiosko()
+        self._espera.arrancar(firewall.revisar, self._programa, al_terminar=self._firewall_revisado)
+
+    @manejar_errores
+    def _firewall_revisado(self, respuesta):
+        revision = respuesta.valor()
+        if revision is None:
+            self._terminar(
+                f"{_PRENDIDA}\n\nNo pude revisar el firewall de Windows de esta PC. Si {_NO_LO_ENCUENTRA}, "
+                "puede ser que el firewall no deje pasar a las otras PCs."
+            )
+            return
+        if revision.abierto:
+            self._terminar(_PRENDIDA)
+            return
         mostrar_info(
-            self, "Listo",
-            "La entrada desde otra PC quedó PRENDIDA." if activo else
-            "La entrada desde otra PC quedó APAGADA (si alguien estaba adentro desde otra PC, ya no puede seguir).",
+            self, "Falta un permiso de Windows",
+            f"{_PRENDIDA}\n\nPero el firewall de Windows de esta PC no deja pasar a las otras PCs: así, "
+            f"{_NO_LO_ENCUENTRA}.\n\n"
+            "Al apretar OK, Windows te va a preguntar si dejás que haga cambios en el equipo: decile Sí. "
+            "(Si el usuario de Windows de esta PC no es Administrador, te va a pedir la clave de uno.)",
         )
+        self._espera.arrancar(
+            firewall.abrir, self._programa, int(self.winId()), al_terminar=self._firewall_abierto,
+        )
+
+    @manejar_errores
+    def _firewall_abierto(self, respuesta):
+        resultado = respuesta.valor()
+        if resultado == firewall.ABIERTO:
+            self._terminar(f"{_PRENDIDA}\n\nY el firewall de Windows ya deja pasar a las otras PCs del local.")
+            return
+        # La entrada ya quedó prendida; la ventana sigue abierta para volver a
+        # apretar Guardar.
+        if resultado == firewall.CANCELADO:
+            mostrar_aviso(
+                self, "Entrar desde otra PC",
+                f"{_PRENDIDA}\n\nPero Windows no dio el permiso, así que {_NO_LO_ENCUENTRA}.\n\n"
+                "Apretá Guardar de nuevo y decile Sí a Windows.",
+            )
+        else:
+            mostrar_aviso(
+                self, "Entrar desde otra PC",
+                f"{_PRENDIDA}\n\nPero no pude abrir el paso en el firewall de Windows de esta PC, así que "
+                f"{_NO_LO_ENCUENTRA}.\n\nSi esta PC tiene un antivirus con firewall propio, ahí hay que "
+                f"permitir a FRKiosko (puerto {servidor_red.PUERTO_SERVIDOR}).",
+            )
+
+    def _terminar(self, mensaje: str):
+        if not servidor_red.esta_escuchando():
+            mensaje += (
+                f"\n\nOjo: este programa no pudo abrir su puerto de red ({servidor_red.PUERTO_SERVIDOR}); "
+                "puede que otro programa lo esté usando. Cerrá FRKiosko y volvé a abrirlo."
+            )
+        mostrar_info(self, "Listo", mensaje)
         self.accept()

@@ -149,9 +149,13 @@ class ConexionConElMostrador:
         try:
             contenido = self._esperar(_mandar, pedido, espera)
         except urllib.error.URLError as error:
+            # La última frase, por lo que pasó el 2026-11-05: el mostrador abierto y
+            # escuchando, y el firewall de Windows sin dejar pasar (admin_remoto/firewall.py).
             raise SinConexion(
                 f"No encuentro el FRKiosko del mostrador ({self.mostrador}). Fijate que esa PC esté "
-                "prendida, con el programa abierto, y que esta PC tenga red."
+                "prendida, con el programa abierto, y que esta PC tenga red.\n\n"
+                "Si todo eso está bien, en el mostrador entrá a Configuración ADMIN > Entrar desde otra PC "
+                "y apretá Guardar: se fija que Windows deje pasar a las otras PCs."
             ) from error
         except http.client.InvalidURL as error:
             raise SinConexion(

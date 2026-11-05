@@ -72,6 +72,12 @@ class _ManejadorAdminRemoto(BaseHTTPRequestHandler):
             pass
 
 
+def esta_escuchando() -> bool:
+    """Si este programa pudo abrir el puerto (si no, iniciar_servidor lo anotó en
+    errores.log: suele ser otro programa usándolo)."""
+    return _servidor is not None
+
+
 def iniciar_servidor():
     """Arranca el acceso remoto sin impedir que el Kiosko abra si falla el puerto."""
     global _servidor

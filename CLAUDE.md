@@ -308,6 +308,7 @@ Una línea por cada uno, en el mismo orden que la tabla completa de
 - `admin_remoto_repo.esta_activo` · `.activar` · `.entrar` · `.exigir_admin_habilitado` — quién administra desde otra PC
 - `admin_remoto.lista_blanca.FUNCIONES` · `.ACTOR` · `.huella` — qué funciones se pueden pedir desde otra PC
 - `admin_remoto.modo.direccion_del_mostrador` · `.es_copia_remota` — si esta copia es la del mostrador o una abierta por la red
+- `admin_remoto.firewall.revisar` · `.abrir` — que el firewall de Windows del mostrador deje pasar a las otras PCs
 - `ui.utils.solo_en_el_mostrador` · `.avisar_que_es_en_el_mostrador` — los botones que desde otra PC avisan "Esto se hace en el mostrador"
 - `ui.piezas_ventana.restringir` · `.solo_para_el_admin` · `ui.utils.avisar_acceso_restringido` — un botón sin permiso se ve igual y dice "Acceso Restringido"
 - `copias_repo.copia_automatica_si_corresponde` · `.toca_copia` · `.nombres_a_borrar` · `.agregar_carpeta_extra` — cuándo y dónde se hacen las copias de seguridad
