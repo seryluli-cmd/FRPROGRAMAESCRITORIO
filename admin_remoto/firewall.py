@@ -132,8 +132,12 @@ def _script_abrir(programa: Optional[str]) -> str:
 
 
 def _powershell() -> str:
-    raiz = os.environ.get("SystemRoot", r"C:\Windows")
-    return os.path.join(raiz, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+    """De la carpeta de sistema que dice Windows (GetSystemDirectoryW), no de la
+    variable SystemRoot: lo que corre como Administrador no sale de algo que
+    cualquier programa de esta PC puede cambiar."""
+    carpeta = ctypes.create_unicode_buffer(260)
+    ctypes.WinDLL("kernel32").GetSystemDirectoryW(carpeta, len(carpeta))
+    return os.path.join(carpeta.value, "WindowsPowerShell", "v1.0", "powershell.exe")
 
 
 def _argumentos(script: str) -> list:
@@ -177,8 +181,11 @@ def abrir(programa: Optional[str], ventana: int = 0) -> str:
     dijeron que No; NO_SE_PUDO si no."""
     if os.name != "nt":
         return NO_SE_PUDO
+    powershell = _powershell()
+    if not os.path.isfile(powershell):
+        return NO_SE_PUDO
     codigo = _correr_como_administrador(
-        _powershell(), subprocess.list2cmdline(_argumentos(_script_abrir(programa))), ventana,
+        powershell, subprocess.list2cmdline(_argumentos(_script_abrir(programa))), ventana,
     )
     if codigo is None:
         return CANCELADO
