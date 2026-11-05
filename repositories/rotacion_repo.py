@@ -11,9 +11,9 @@ artículo, de dos maneras (las dos pestañas de la ventana):
   a cuántas por día, el stock de hoy y para cuántos días alcanza a ese ritmo.
 
 Las dos cuentan solo ventas confirmadas (una anulada ya devolvió su stock). Las
-impresiones (dominio.CODIGO_ARTICULO_IMPRESIONES, también la seña de un pedido) no
-entran: son hojas que se cobran, no mercadería de un estante, y su stock no dice
-cuándo hay que comprar.
+impresiones y las fotocopias (dominio.CODIGOS_QUE_NO_SON_MERCADERIA, también la seña
+de un pedido) no entran: son hojas que se cobran, no mercadería de un estante, y su
+stock no dice cuándo hay que comprar.
 """
 
 from datetime import date, datetime
@@ -26,10 +26,13 @@ from turnos import limites_de_los_dias
 # instante: la compra primero (lo vendido en ese segundo ya salió de ella).
 _COMPRA, _AJUSTE, _VENTA = 0, 1, 2
 
+# Los signos de pregunta de "NOT IN (...)" para los códigos que no son mercadería.
+_NO_MERCADERIA = ", ".join("?" * len(dominio.CODIGOS_QUE_NO_SON_MERCADERIA))
+
 
 def ranking_de_rotacion(desde: str, hasta: str):
     """
-    Todos los artículos (menos las impresiones), del que más se vendió entre
+    Todos los artículos (menos impresiones y fotocopias), del que más se vendió entre
     `desde` y `hasta` ("YYYY-MM-DD", incluidos los dos, días del local) al que
     menos. Cada renglón es un dict con: puesto, codigo, descripcion, rubro ("" si
     no tiene), stock, vendidas, por_dia y alcanza (dias_que_alcanza: None si no
@@ -44,7 +47,7 @@ def ranking_de_rotacion(desde: str, hasta: str):
     inicio, fin = limites_de_los_dias(desde, hasta)
     with conexion_db() as conexion:
         filas = conexion.execute(
-            """
+            f"""
             SELECT a.codigo, a.descripcion, a.stock, COALESCE(r.nombre, '') AS rubro,
                    COALESCE(v.vendidas, 0) AS vendidas
             FROM articulos a
@@ -56,9 +59,9 @@ def ranking_de_rotacion(desde: str, hasta: str):
                 WHERE ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
                 GROUP BY venta_detalle.articulo_codigo
             ) v ON v.codigo = a.codigo
-            WHERE a.codigo <> ?
+            WHERE a.codigo NOT IN ({_NO_MERCADERIA})
             """,
-            (dominio.VENTA_CONFIRMADA, inicio, fin, dominio.CODIGO_ARTICULO_IMPRESIONES),
+            (dominio.VENTA_CONFIRMADA, inicio, fin, *dominio.CODIGOS_QUE_NO_SON_MERCADERIA),
         ).fetchall()
 
     # El orden se arma acá y no en el SQL: los empates y los quietos van de la A a
@@ -98,7 +101,7 @@ def ranking_de_rotacion(desde: str, hasta: str):
 
 def ranking_por_compras(ahora=None):
     """
-    Todos los artículos (menos las impresiones), del que más rápido vende cada
+    Todos los artículos (menos impresiones y fotocopias), del que más rápido vende cada
     compra al que más tarda. Cada renglón es un dict con: puesto, codigo,
     descripcion, rubro, stock, dias (lo que tardaron en venderse enteras las
     últimas dominio.COMPRAS_PARA_PROMEDIAR compras, en promedio y en días con
@@ -112,27 +115,27 @@ def ranking_por_compras(ahora=None):
     sin puesto (None). `ahora` (datetime) es para las pruebas.
     """
     ahora = ahora or datetime.now()
-    impresiones = dominio.CODIGO_ARTICULO_IMPRESIONES
+    no_mercaderia = dominio.CODIGOS_QUE_NO_SON_MERCADERIA
     with conexion_db() as conexion:
         articulos = conexion.execute(
-            """
+            f"""
             SELECT a.codigo, a.descripcion, a.stock, COALESCE(r.nombre, '') AS rubro
             FROM articulos a
             LEFT JOIN rubros r ON r.id = a.rubro_id
-            WHERE a.codigo <> ?
+            WHERE a.codigo NOT IN ({_NO_MERCADERIA})
             """,
-            (impresiones,),
+            no_mercaderia,
         ).fetchall()
         compras = conexion.execute(
-            """
+            f"""
             SELECT compra_detalle.articulo_codigo AS codigo, compras.fecha, compra_detalle.cantidad,
                    compra_detalle.stock_antes
             FROM compra_detalle
             JOIN compras ON compras.id = compra_detalle.compra_id
-            WHERE compra_detalle.articulo_codigo <> ?
+            WHERE compra_detalle.articulo_codigo NOT IN ({_NO_MERCADERIA})
             ORDER BY compras.fecha, compra_detalle.id
             """,
-            (impresiones,),
+            no_mercaderia,
         ).fetchall()
         # Lo de antes de la primera compra no hace falta: la historia arranca con el
         # stock que había en ella. Así se lee solo desde ahí (con el índice de fecha).
@@ -140,13 +143,13 @@ def ranking_por_compras(ahora=None):
         if compras:
             primera = compras[0]["fecha"]
             ventas = conexion.execute(
-                """
+                f"""
                 SELECT venta_detalle.articulo_codigo AS codigo, ventas.fecha, venta_detalle.cantidad
                 FROM venta_detalle
                 JOIN ventas ON ventas.id = venta_detalle.venta_id
-                WHERE ventas.estado = ? AND ventas.fecha >= ? AND venta_detalle.articulo_codigo <> ?
+                WHERE ventas.estado = ? AND ventas.fecha >= ? AND venta_detalle.articulo_codigo NOT IN ({_NO_MERCADERIA})
                 """,
-                (dominio.VENTA_CONFIRMADA, primera, impresiones),
+                (dominio.VENTA_CONFIRMADA, primera, *no_mercaderia),
             ).fetchall()
             ajustes = conexion.execute(
                 "SELECT articulo_codigo AS codigo, fecha, stock_nuevo - stock_anterior AS cambio "

@@ -149,10 +149,16 @@ VENTAS Y CAJA
   digital): muestra el VUELTO mientras escribís y Enter cobra (en
   Ventas el vuelto sale de nuevo en el cartel de la venta cobrada).
   Siempre alcanza con un Enter.
-- Impresiones: botón de la barra, al lado de Vender. Escribí cuántas son y
-  Enter: abre la ventana de cobro de siempre (otro Enter cobra). Es el
-  artículo código 4: si cambia el precio en Artículos, el botón ya usa el
-  nuevo.
+- IMPRE/FOTOC: botón de la barra, al lado de Vender (y en el inicio).
+  Tiene un recuadro para Impresiones y otro para Fotocopias, cada una con
+  su precio: escribí cuántas impresiones, Enter, cuántas fotocopias, y
+  otro Enter abre la ventana de cobro de siempre (otro Enter cobra). La
+  que no se usa queda en 0. Se cobran juntas en una sola venta.
+  Impresiones es el artículo código 4 y Fotocopias el 55: si cambia el
+  precio en Artículos, el botón ya usa el nuevo. Es solo un atajo: en
+  Caja y Cierre de Turno las fotocopias suman dentro de Kiosko, como si
+  se vendieran desde Vender. Separadas se ven en Reportes > Resumen de
+  Ventas.
 - Caja: muestra el efectivo esperado del turno y el desglose de ventas.
 - Cierre de Turno: registra cuánto retirar, dejando el Cambio Fijo. Es el
   resumen que se le manda al dueño: muestra Efectivo, Digital y TOTAL, y
@@ -164,6 +170,9 @@ VENTAS Y CAJA
   la hora en que se abrió: quien abre a las 05:55 abre la Mañana). Si
   pasaron días sin cerrar, el cierre de hoy queda anotado en el día viejo:
   Reportes > Resumen del Día lo avisa y tiene un botón para ir a verlo.
+- Reportes > Resumen de Ventas: el total vendido, el efectivo y el digital
+  de las fechas elegidas y, debajo, IMPRESIONES y FOTOCOPIAS por separado:
+  la plata y cuántas se vendieron (ya están sumadas en el total vendido).
 - Reportes > Resumen del Día: cada turno del día (quién lo cerró, cuánto
   se vendió y si el sobre cuadró) y, abajo, el detalle de TODO lo vendido.
   "Renglón por renglón" muestra cada cosa tal cual se cobró (hora, turno,

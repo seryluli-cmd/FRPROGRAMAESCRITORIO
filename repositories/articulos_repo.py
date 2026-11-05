@@ -410,19 +410,21 @@ def cambiar_codigo(usuario_id: int, codigo_actual: str, codigo_nuevo, clave: str
 
     PermissionError como ajustar_stock, o ValueError: código nuevo vacío, que ya
     es de otro artículo (dos artículos no pueden compartirlo: no se juntan solos),
-    o el de Impresiones, que no se cambia ni se le da a otro (el botón Impresiones
-    y los reportes lo buscan por ese número, dominio.CODIGO_ARTICULO_IMPRESIONES).
+    o el de Impresiones o el de Fotocopias, que no se cambian ni se le dan a otro (el
+    botón IMPRE/FOTOC y los reportes los buscan por ese número,
+    dominio.CODIGO_ARTICULO_IMPRESIONES y CODIGO_ARTICULO_FOTOCOPIAS).
     """
     comprobar_clave_para_ordenar_stock(usuario_id, clave)
     nuevo = "" if codigo_nuevo is None else str(codigo_nuevo).strip()
     if not nuevo:
         raise ValueError("El código nuevo no puede quedar vacío.")
-    impresiones = dominio.CODIGO_ARTICULO_IMPRESIONES
-    if impresiones in (codigo_actual, nuevo) and codigo_actual != nuevo:
-        raise ValueError(
-            f"El código {impresiones} es el de Impresiones: el botón Impresiones y los reportes "
-            "lo buscan por ese número, así que no se cambia ni se le pone a otro artículo."
-        )
+    for fijo, nombre in ((dominio.CODIGO_ARTICULO_IMPRESIONES, "Impresiones"),
+                         (dominio.CODIGO_ARTICULO_FOTOCOPIAS, "Fotocopias")):
+        if fijo in (codigo_actual, nuevo) and codigo_actual != nuevo:
+            raise ValueError(
+                f"El código {fijo} es el de {nombre}: el botón IMPRE/FOTOC y los reportes "
+                "lo buscan por ese número, así que no se cambia ni se le pone a otro artículo."
+            )
     ahora = datetime.now().isoformat(timespec="seconds")
     with conexion_db() as conexion:
         conexion.execute("BEGIN IMMEDIATE")

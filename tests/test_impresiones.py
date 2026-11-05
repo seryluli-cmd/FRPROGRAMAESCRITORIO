@@ -61,6 +61,7 @@ class _ConArticulo(BaseConBaseTemporal):
         self.usuario_id = usuarios_repo.crear_usuario("Lucia", "1234", dominio.ROL_EMPLEADA)
         self.usuario = usuarios_repo.obtener_usuario(self.usuario_id)
         articulos_repo.crear_articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", None, None, 150.0, 0.0, 0)
+        articulos_repo.crear_articulo(dominio.CODIGO_ARTICULO_FOTOCOPIAS, "FOTOCOPIAS", None, None, 200.0, 0.0, 0)
         articulos_repo.crear_articulo("COD9", "Producto", None, None, 100.0, 50.0, 0)
 
     def _vender(self, lineas, pagos):
@@ -155,6 +156,77 @@ class TestCobrarImpresiones(_ConArticulo):
             impresiones_repo.cobrar_impresiones(self.usuario_id, 1, 0.0, [])
 
 
+IMP = dominio.CODIGO_ARTICULO_IMPRESIONES
+FOT = dominio.CODIGO_ARTICULO_FOTOCOPIAS
+
+
+class TestCobrarImpreFotoc(_ConArticulo):
+    """IMPRE/FOTOC (pedido del dueño, 2026-11-04): impresiones y fotocopias, cada
+    una con su precio, en una sola venta."""
+
+    def _detalle(self, venta_id):
+        _, detalle, _ = ventas_repo.buscar_venta(venta_id)
+        return [(d["articulo_codigo"], d["cantidad"], d["precio_unitario"], d["subtotal"]) for d in detalle]
+
+    def test_graba_una_venta_con_un_renglon_de_cada_una(self):
+        venta_id = impresiones_repo.cobrar_impre_fotoc(
+            self.usuario_id, {IMP: (3, 150.0), FOT: (10, 200.0)}, [_pago(EF, 2450.0)])
+
+        self.assertEqual(self._detalle(venta_id), [(IMP, 3, 150.0, 450.0), (FOT, 10, 200.0, 2000.0)])
+        self.assertEqual(ventas_repo.buscar_venta(venta_id)[0]["total"], 2450.0)
+
+    def test_la_que_va_en_cero_no_lleva_renglon(self):
+        venta_id = impresiones_repo.cobrar_impre_fotoc(
+            self.usuario_id, {IMP: (0, 150.0), FOT: (4, 200.0)}, [_pago(DIG, 800.0)])
+
+        self.assertEqual(self._detalle(venta_id), [(FOT, 4, 200.0, 800.0)])
+
+    def test_en_la_caja_las_fotocopias_siguen_dentro_de_kiosko(self):
+        # Es solo un atajo: el renglón Impresiones de Caja es solo el código 4.
+        impresiones_repo.cobrar_impre_fotoc(
+            self.usuario_id, {IMP: (2, 150.0), FOT: (5, 200.0)}, [_pago(EF, 1300.0)])
+
+        resumen = turnos_repo.resumen_turno_actual()
+
+        self.assertEqual(resumen["impresiones_efectivo"], 300.0)
+        self.assertEqual(resumen["kiosko_solo_efectivo"], 1000.0)
+
+
+class TestResumenDeVentasConImpresionesYFotocopias(_ConArticulo):
+    """Reportes > Resumen de Ventas: impresiones y fotocopias por separado, en
+    plata y en cantidad (pedido del dueño, 2026-11-04)."""
+
+    def _hoy(self):
+        return dia_en_que_empezo_el_turno(datetime.now()).isoformat()
+
+    def test_separa_impresiones_y_fotocopias_con_su_cantidad(self):
+        impresiones_repo.cobrar_impre_fotoc(
+            self.usuario_id, {IMP: (3, 150.0), FOT: (10, 200.0)}, [_pago(EF, 2450.0)])
+        self._vender([self._linea(FOT, 2, 200.0), self._linea("COD9", 1, 100.0)], [_pago(DIG, 500.0)])
+        # La seña de un pedido de Gestión Impresiones suma plata pero no hojas.
+        self._vender([{"codigo": IMP, "descripcion": dominio.DESCRIPCION_SENA_IMPRESIONES,
+                       "cantidad": 1, "precio_unitario": 1000.0}], [_pago(EF, 1000.0)])
+
+        resumen = reportes_repo.resumen_ventas(self._hoy(), self._hoy())
+
+        self.assertEqual(resumen["total"], 3950.0)
+        self.assertEqual((resumen["impresiones"], resumen["cantidad_impresiones"]), (1450.0, 3))
+        self.assertEqual((resumen["fotocopias"], resumen["cantidad_fotocopias"]), (2400.0, 12))
+
+    def test_la_pestana_muestra_las_dos_cifras(self):
+        from ui.reportes_window import PestañaResumen
+
+        impresiones_repo.cobrar_impre_fotoc(
+            self.usuario_id, {IMP: (1, 150.0), FOT: (10, 200.0)}, [_pago(EF, 2150.0)])
+        pestaña = PestañaResumen()
+        self.addCleanup(pestaña.deleteLater)
+
+        self.assertEqual((pestaña.etiqueta_impresiones.text(), pestaña.etiqueta_cantidad_impresiones.text()),
+                         ("$ 150", "1 impresión"))
+        self.assertEqual((pestaña.etiqueta_fotocopias.text(), pestaña.etiqueta_cantidad_fotocopias.text()),
+                         ("$ 2.000", "10 fotocopias"))
+
+
 class TestKioskoSinImpresionesEnLaCaja(_ConArticulo):
     """Lo que muestran Caja y Cierre de Turno (eligió el dueño, 2026-10-19):
     Kiosko e Impresiones, cada uno con su ef. + dig., y ambos suman
@@ -225,10 +297,13 @@ class TestKioskoSinImpresionesEnLaCaja(_ConArticulo):
 
 
 class TestPantallaDeImpresiones(_ConArticulo):
+    """La pantalla de IMPRE/FOTOC (maqueta A, 2026-11-04): "Impresiones [ ]" y
+    "Fotocopias [ ]", cada una con su subtotal, y el TOTAL."""
+
     def _dialogo(self):
         from ui.impresiones_window import DialogoImpresiones
 
-        dialogo = DialogoImpresiones(self.usuario, impresiones_repo.articulo_impresiones())
+        dialogo = DialogoImpresiones(self.usuario, impresiones_repo.articulos_del_boton())
         self.addCleanup(dialogo.deleteLater)
         dialogo.show()
         QApplication.processEvents()
@@ -252,32 +327,41 @@ class TestPantallaDeImpresiones(_ConArticulo):
         self.addCleanup(mock.patch.stopall)
         return llamados
 
-    def test_arranca_en_una_y_muestra_el_total(self):
+    def test_arranca_en_cero_con_el_cursor_en_impresiones_y_suma_las_dos(self):
         dialogo = self._dialogo()
+        impresiones, fotocopias = dialogo.cantidades[IMP], dialogo.cantidades[FOT]
 
-        self.assertEqual(dialogo.spin_cantidad.value(), 1)
-        self.assertEqual(dialogo.etiqueta_total.text(), "TOTAL: $ 150")
-        dialogo.spin_cantidad.setValue(14)
-        self.assertEqual(dialogo.etiqueta_total.text(), "TOTAL: $ 2.100")
+        self.assertEqual(dialogo.windowTitle(), "Impre/Fotoc")
+        self.assertEqual((impresiones.value(), fotocopias.value()), (0, 0))
+        self.assertTrue(impresiones.hasFocus())
+        self.assertEqual(dialogo.etiqueta_total.text(), "TOTAL: $ 0")
+        impresiones.setValue(3)
+        fotocopias.setValue(10)
+        self.assertEqual((dialogo.subtotales[IMP].text(), dialogo.subtotales[FOT].text()), ("$ 450", "$ 2.000"))
+        self.assertEqual(dialogo.etiqueta_total.text(), "TOTAL: $ 2.450")
 
-    def test_enter_en_la_cantidad_abre_el_cobro_y_graba_la_venta(self):
+    def test_enter_pasa_a_fotocopias_y_otro_enter_cobra_las_dos_juntas(self):
         llamados = self._cobro_justo()
         dialogo = self._dialogo()
-        dialogo.spin_cantidad.setValue(14)
-        dialogo.spin_cantidad.setFocus()
+        impresiones, fotocopias = dialogo.cantidades[IMP], dialogo.cantidades[FOT]
+        impresiones.setValue(3)
 
-        _enter(dialogo.spin_cantidad)
+        _enter(impresiones)
+        self.assertTrue(fotocopias.hasFocus())
+        self.assertEqual(llamados, [])
+        fotocopias.setValue(10)
+        _enter(fotocopias)
 
-        self.assertEqual(llamados, [2100.0])
+        self.assertEqual(llamados, [2450.0])
         self.assertEqual(dialogo.result(), QDialog.Accepted)
         venta = ventas_repo.listar_ventas_recientes()[0]
         _, detalle, _ = ventas_repo.buscar_venta(venta["id"])
-        self.assertEqual([(d["articulo_codigo"], d["cantidad"]) for d in detalle],
-                         [(dominio.CODIGO_ARTICULO_IMPRESIONES, 14)])
+        self.assertEqual([(d["articulo_codigo"], d["cantidad"]) for d in detalle], [(IMP, 3), (FOT, 10)])
 
     def test_si_se_cancela_el_cobro_no_graba_nada(self):
         self._cobro_justo(aceptar=False)
         dialogo = self._dialogo()
+        dialogo.cantidades[IMP].setValue(1)
 
         dialogo._cobrar()
 
@@ -299,24 +383,25 @@ class TestBotonEnLaBarra(_ConArticulo):
         botones = [boton for boton in barra.findChildren(QPushButton)]
         textos = [boton.text() for boton in botones]
 
-        i = textos.index("🖨️  IMPRESIONES")
+        i = textos.index("🖨️  IMPRE/FOTOC")
         self.assertEqual(textos[i - 1], "🛒  VENDER")
         self.assertEqual(botones[i].property("clase"), "barra")
 
-    def test_abre_la_ventana_con_el_articulo(self):
+    def test_abre_la_ventana_con_los_dos_articulos(self):
         ventana = self._ventana(self.usuario)
 
         with mock.patch("ui.main_window.DialogoImpresiones") as dialogo:
             ventana._abrir_impresiones()
 
-        usuario, articulo, padre = dialogo.call_args.args
-        self.assertEqual(articulo["codigo"], dominio.CODIGO_ARTICULO_IMPRESIONES)
+        usuario, articulos, padre = dialogo.call_args.args
+        self.assertEqual({codigo: articulo["codigo"] for codigo, articulo in articulos.items()},
+                         {IMP: IMP, FOT: FOT})
         self.assertIs(padre, ventana)
         dialogo.return_value.exec.assert_called_once()
 
-    def test_sin_el_articulo_avisa_y_no_abre_nada(self):
+    def test_sin_ninguno_de_los_dos_avisa_y_no_abre_nada(self):
         with conexion_db() as conexion:
-            conexion.execute("DELETE FROM articulos WHERE codigo = ?", (dominio.CODIGO_ARTICULO_IMPRESIONES,))
+            conexion.execute("DELETE FROM articulos WHERE codigo IN (?, ?)", (IMP, FOT))
         ventana = self._ventana(self.usuario)
 
         with mock.patch("ui.main_window.DialogoImpresiones") as dialogo, \
@@ -325,6 +410,7 @@ class TestBotonEnLaBarra(_ConArticulo):
 
         dialogo.assert_not_called()
         self.assertIn("código 4", mostrar_error.call_args.args[2])
+        self.assertIn("código 55", mostrar_error.call_args.args[2])
 
 
 class TestCajaMuestraImpresionesAparte(_ConArticulo):

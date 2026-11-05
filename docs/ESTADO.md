@@ -6,7 +6,7 @@ más rápido. Lo nuevo del programa se anota acá, no en `CLAUDE.md`.
 ## Estado actual
 
 El programa es el kiosko solo: Vender (diseño "B": total y COBRAR grandes a la
-derecha), Impresiones, Caja, Gestión Impresiones (pedidos con seña y aviso por
+derecha), IMPRE/FOTOC (impresiones y fotocopias, cada una con su precio), Caja, Gestión Impresiones (pedidos con seña y aviso por
 WhatsApp), Cierre de Turno, Lista de Compras, Administrar Kiosko (Artículos con
 ORDENAR Stock y Gestionar Marcas, Compras, Control de Stock, Consulta de Ventas,
 Reportes con el Resumen del Día y su detalle para imprimir, Control de Cierres,

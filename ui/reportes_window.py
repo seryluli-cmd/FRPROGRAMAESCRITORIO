@@ -3,7 +3,8 @@ reportes_window.py
 =====================
 Reportes, una pestaña por cada pregunta que se le hace a las ventas:
 
-- Resumen de Ventas: cuánta plata se trabajó en un rango de fechas.
+- Resumen de Ventas: cuánta plata se trabajó en un rango de fechas y, debajo,
+  las impresiones y las fotocopias por separado.
 - Resumen del Día: un día abierto por turno, con quién cerró y si el sobre
   cuadró; Kiosko e Impresiones van en columnas aparte. Abajo, el detalle de lo vendido (venta por venta, por
   producto y por operador) del día o del turno que se toque (en su propio
@@ -99,9 +100,17 @@ class ReportesWindow(QDialog):
         sin_boton_por_defecto(self)
 
 
+def _cuantas(cantidad, singular: str, plural: str) -> str:
+    """"1 impresión", "14 impresiones" (sin el ",0" de una cantidad guardada como real)."""
+    cantidad = int(cantidad) if float(cantidad).is_integer() else cantidad
+    return f"{cantidad} {singular if cantidad == 1 else plural}"
+
+
 class PestañaResumen(QWidget):
     """Total vendido, cantidad de ventas y desglose Efectivo/Digital de un
-    rango de fechas, en las cifras grandes de Caja (piezas_ventana.cifra_destacada)."""
+    rango de fechas, en las cifras grandes de Caja (piezas_ventana.cifra_destacada).
+    Debajo, las impresiones y las fotocopias por separado, con cuántas se vendieron
+    (pedido del dueño, 2026-11-04): ya están sumadas en el Total vendido."""
 
     def __init__(self):
         super().__init__()
@@ -123,11 +132,27 @@ class PestañaResumen(QWidget):
         for cifra in (total, efectivo, digital):
             cifras.addWidget(cifra, 1)
 
+        impresiones = cifra_destacada("IMPRESIONES", "", TONO_AZUL)
+        fotocopias = cifra_destacada("FOTOCOPIAS", "", TONO_AZUL)
+        self.etiqueta_impresiones = impresiones.valor
+        self.etiqueta_cantidad_impresiones = impresiones.aclaracion
+        self.etiqueta_fotocopias = fotocopias.valor
+        self.etiqueta_cantidad_fotocopias = fotocopias.aclaracion
+        # Del mismo ancho que las de arriba: el tercer lugar queda vacío.
+        impre_fotoc = QHBoxLayout()
+        impre_fotoc.setSpacing(12)
+        impre_fotoc.addWidget(impresiones, 1)
+        impre_fotoc.addWidget(fotocopias, 1)
+        impre_fotoc.addWidget(QWidget(), 1)
+
         layout = QVBoxLayout()
         layout.setContentsMargins(*MARGENES_DE_PESTAÑA)
         layout.setSpacing(12)
         layout.addLayout(filtros)
         layout.addLayout(cifras)
+        layout.addSpacing(6)
+        layout.addWidget(titulo_de_seccion("Impresiones y fotocopias (ya sumadas en el Total vendido)"))
+        layout.addLayout(impre_fotoc)
         layout.addStretch()
         self.setLayout(layout)
         sin_boton_por_defecto(self)
@@ -140,6 +165,12 @@ class PestañaResumen(QWidget):
         self.etiqueta_cantidad.setText(f"{resumen['cantidad_ventas']} venta(s)")
         self.etiqueta_efectivo.setText(formato_pesos(resumen["efectivo"]))
         self.etiqueta_digital.setText(formato_pesos(resumen["digital"]))
+        self.etiqueta_impresiones.setText(formato_pesos(resumen["impresiones"]))
+        self.etiqueta_cantidad_impresiones.setText(
+            _cuantas(resumen["cantidad_impresiones"], "impresión", "impresiones"))
+        self.etiqueta_fotocopias.setText(formato_pesos(resumen["fotocopias"]))
+        self.etiqueta_cantidad_fotocopias.setText(
+            _cuantas(resumen["cantidad_fotocopias"], "fotocopia", "fotocopias"))
 
 
 class PestañaPorTurno(QWidget):

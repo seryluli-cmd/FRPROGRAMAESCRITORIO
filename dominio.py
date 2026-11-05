@@ -39,6 +39,15 @@ ORIGENES_VENTA = (ORIGEN_KIOSKO,)
 
 # Impresiones es un artículo de mercadería, pero se muestra aparte en Caja.
 CODIGO_ARTICULO_IMPRESIONES = "4"
+# Fotocopias (pedido del dueño, 2026-11-04): el botón IMPRE/FOTOC cobra las dos
+# juntas, cada una con su precio. Es solo un atajo: en Caja y Cierre de Turno las
+# fotocopias siguen dentro de Kiosko, como cuando se venden desde Venta; aparte se
+# ven en Reportes > Resumen de Ventas. Dato del dueño: en su base es el código 55.
+CODIGO_ARTICULO_FOTOCOPIAS = "55"
+# Hojas que se cobran, no mercadería de un estante: su stock baja sin que nadie lo
+# cargue y no dice cuándo hay que comprar. No entran en los números de Artículos, la
+# Lista de Compras ni el Ranking de Rotación (las fotocopias, pedido del dueño 2026-11-04).
+CODIGOS_QUE_NO_SON_MERCADERIA = (CODIGO_ARTICULO_IMPRESIONES, CODIGO_ARTICULO_FOTOCOPIAS)
 
 # ACOMODAR CAJA (pedido del dueño, 2026-11-04, para pasar del programa anterior a
 # mitad de turno): lo que el otro programa ya había cobrado entra como una venta
@@ -234,11 +243,12 @@ def numeros_de_los_articulos(articulos) -> dict:
     """
     Los números de arriba de Artículos (maqueta B, 2026-10-30): cuántos artículos
     hay, cuántos quedaron bajo el mínimo y cuánto vale la mercadería del estante a
-    precio de compra. Impresiones no entra: no es mercadería que se cuenta y su
-    stock baja sin que nadie lo cargue, así que siempre estaría "bajo el mínimo".
+    precio de compra. Impresiones y fotocopias no entran (CODIGOS_QUE_NO_SON_MERCADERIA):
+    no son mercadería que se cuenta y su stock baja sin que nadie lo cargue, así que
+    siempre estarían "bajo el mínimo".
     El stock negativo (puede quedar a propósito) vale cero, no resta.
     """
-    mercaderia = [a for a in articulos if a["codigo"] != CODIGO_ARTICULO_IMPRESIONES]
+    mercaderia = [a for a in articulos if a["codigo"] not in CODIGOS_QUE_NO_SON_MERCADERIA]
     return {
         "cantidad": len(mercaderia),
         "bajo_el_minimo": sum(1 for a in mercaderia if bajo_el_minimo(a["stock"], a["stock_minimo"])),
@@ -255,11 +265,12 @@ def articulos_para_comprar(articulos) -> list:
     """
     Los artículos de la LISTA DE COMPRAS: los que tienen STOCK_PARA_LISTA_DE_COMPRAS
     unidades o menos (también los que están en 0 o en negativo), de la A a la Z sin
-    mirar mayúsculas ni acentos. Impresiones no entra: no es mercadería que se compra.
+    mirar mayúsculas ni acentos. Impresiones y fotocopias no entran: no son mercadería
+    que se compra (CODIGOS_QUE_NO_SON_MERCADERIA).
     """
     return sorted(
         (a for a in articulos
-         if a["codigo"] != CODIGO_ARTICULO_IMPRESIONES and a["stock"] <= STOCK_PARA_LISTA_DE_COMPRAS),
+         if a["codigo"] not in CODIGOS_QUE_NO_SON_MERCADERIA and a["stock"] <= STOCK_PARA_LISTA_DE_COMPRAS),
         key=lambda a: sin_acentos(a["descripcion"]),
     )
 

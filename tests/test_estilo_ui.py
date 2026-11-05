@@ -42,7 +42,7 @@ from base import BaseConBaseTemporal  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
-ACCESOS_DEL_INICIO = ["VENTA DE MERCADERÍA", "IMPRESIONES", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES",
+ACCESOS_DEL_INICIO = ["VENTA DE MERCADERÍA", "IMPRE/FOTOC", "CAJA", "GESTIÓN IMPRESIONES", "PEDIDOS DE CLIENTES",
                       "TAREAS DEL TURNO", "RANKING DE ROTACIÓN"]
 
 
@@ -413,7 +413,7 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
 
         titulo = next(e for e in barra.findChildren(QLabel) if e.text() == "Administrador: Sergio")
         botones = {boton.text(): boton for boton in barra.findChildren(QPushButton)}
-        for texto in ("🖨️  IMPRESIONES", "🛠️  ADMIN KIOSKO", "⚙️  CONFIG ADMIN"):
+        for texto in ("🖨️  IMPRE/FOTOC", "🛠️  ADMIN KIOSKO", "⚙️  CONFIG ADMIN"):
             self.assertIn(texto, botones)
         ventana.resize(1340, 700)
         ventana.show()

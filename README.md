@@ -309,12 +309,17 @@ ingreso (el Admin se queda). Si hay un cobro a medias, espera.
   `ui/dialogo_pago.DialogoPago`: Efectivo y Digital siempre a la vista y suman
   el total; "Paga con" da el vuelto; un Enter cobra siempre. Confirmar llama a
   `ventas_repo.confirmar_venta`.
-- **Impresiones** (`impresiones_window.py`, `DialogoImpresiones`) — botón de la
-  barra al lado de "Vender": cobro rápido del artículo de impresiones
-  (`dominio.CODIGO_ARTICULO_IMPRESIONES`, el código 4). Se escribe la cantidad,
-  Enter abre la ventana de cobro y otro Enter cobra. Se graba con
-  `impresiones_repo.cobrar_impresiones` como una venta de kiosko común del
-  artículo. Si el artículo no está cargado con ese código, avisa y no abre.
+- **IMPRE/FOTOC** (`impresiones_window.py`, `DialogoImpresiones`) — botón de la
+  barra al lado de "Vender" y del inicio: cobro rápido de impresiones
+  (`dominio.CODIGO_ARTICULO_IMPRESIONES`, el código 4) y fotocopias
+  (`dominio.CODIGO_ARTICULO_FOTOCOPIAS`, el 55), cada una con su precio
+  (maqueta A del dueño, 2026-11-04: "Impresiones [ ]" y "Fotocopias [ ]"). Enter
+  pasa de un recuadro al otro, el último abre la ventana de cobro y otro Enter
+  cobra; la que queda en 0 no lleva renglón. Se graba con
+  `impresiones_repo.cobrar_impre_fotoc` como UNA venta de kiosko común. Si falta
+  uno de los dos artículos, su recuadro sale apagado; sin ninguno, avisa y no
+  abre. Es solo un atajo: en Caja y Cierre de Turno las fotocopias siguen dentro
+  de Kiosko; aparte se ven en Reportes > Resumen de Ventas.
 - **Caja** (`caja_window.py`, `CajaWindow`) — solo lectura, resumen del turno
   en curso vía `turnos_repo.resumen_turno_actual()`: número de caja y
   responsable, caja inicial (el cambio con que arrancó), caja actual (solo el
@@ -390,7 +395,9 @@ Lo que una encargada no tiene habilitado lo ve en gris, con candado y el porqué
   exigir un Admin activo (`usuarios_repo.exigir_admin`) y un motivo escrito,
   **repone el stock** y marca `estado='ANULADA'` con auditoría.
 - **Reportes** (`reportes_window.py`, `ReportesWindow`) — 6 pestañas:
-  **Resumen de Ventas** (`reportes_repo.resumen_ventas`), **Resumen del Día**
+  **Resumen de Ventas** (`reportes_repo.resumen_ventas`: total, efectivo,
+  digital y, debajo, impresiones y fotocopias por separado con su cantidad; las
+  señas de Gestión Impresiones suman plata pero no hojas), **Resumen del Día**
   (`turnos_repo.resumen_del_dia`: un día abierto por turno con estado, quién
   cerró, cantidad de ventas, Kiosko / Impresiones, Efectivo/Digital, Total y la
   diferencia del sobre; con el aviso "Hoy se cerró un turno que quedó anotado en

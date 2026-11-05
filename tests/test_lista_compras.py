@@ -32,12 +32,13 @@ def _articulo(codigo, descripcion, stock):
 
 
 class TestLaCuenta(BaseConBaseTemporal):
-    def test_los_de_4_o_menos_de_la_a_a_la_z_sin_impresiones(self):
+    def test_los_de_4_o_menos_de_la_a_a_la_z_sin_impresiones_ni_fotocopias(self):
         articulos = [
             _articulo("1", "Zucaritas 300 g", 4), _articulo("2", "alfajor Jorgito", 15),
             _articulo("3", "Coca 500", 5), _articulo("5", "Álamo chicles", 2),
             _articulo("6", "Bon o Bon", 0), _articulo("7", "Agua 500", -3),
             _articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "Impresiones", -40),
+            _articulo(dominio.CODIGO_ARTICULO_FOTOCOPIAS, "Fotocopias", 0),
         ]
         self.assertEqual([a["descripcion"] for a in dominio.articulos_para_comprar(articulos)],
                          ["Agua 500", "Álamo chicles", "Bon o Bon", "Zucaritas 300 g"])

@@ -91,6 +91,7 @@ desde ahí, nunca escritos a mano:
 | Negocios del cierre | `NEGOCIOS_DEL_CIERRE` (los renglones de Caja, Cierre de Turno y lo que viaja a la app de gastos) |
 | Envío a la app de gastos | `ENVIO_PENDIENTE`, `ENVIO_ENVIADO`, `ENVIO_ERROR`, `ESTADOS_ENVIO_PWA` |
 | Impresiones | `CODIGO_ARTICULO_IMPRESIONES` (el código "4") |
+| Fotocopias | `CODIGO_ARTICULO_FOTOCOPIAS` (el código "55"; solo el botón IMPRE/FOTOC y el Resumen de Ventas: en Caja siguen dentro de Kiosko) |
 | Acomodar Caja | `CODIGO_ARTICULO_ACOMODAR_CAJA`, `DESCRIPCION_ACOMODAR_CAJA` (el artículo escondido de lo que cobró el programa anterior) |
 
 Un typo en uno de esos strings **no falla ruidosamente**: la consulta

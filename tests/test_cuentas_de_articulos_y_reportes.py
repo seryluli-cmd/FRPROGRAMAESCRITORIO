@@ -289,9 +289,10 @@ class TestNumerosDeLosArticulos(unittest.TestCase):
         numeros = dominio.numeros_de_los_articulos([self._articulo("A", -5, 0, 100.0)])
         self.assertEqual(numeros, {"cantidad": 1, "bajo_el_minimo": 1, "valor_del_stock": 0})
 
-    def test_impresiones_no_entra(self):
+    def test_impresiones_y_fotocopias_no_entran(self):
         numeros = dominio.numeros_de_los_articulos(
-            [self._articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, -130, 0, 40.0)])
+            [self._articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, -130, 0, 40.0),
+             self._articulo(dominio.CODIGO_ARTICULO_FOTOCOPIAS, 0, 0, 30.0)])
         self.assertEqual(numeros, {"cantidad": 0, "bajo_el_minimo": 0, "valor_del_stock": 0})
 
 

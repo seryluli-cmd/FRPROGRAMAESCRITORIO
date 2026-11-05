@@ -56,6 +56,11 @@ def resumen_ventas(desde: str, hasta: str):
     Totales de ventas confirmadas entre dos fechas (incluidas ambas
     puntas), separados por medio de pago. `desde` y `hasta` son fechas
     en formato "YYYY-MM-DD" (días del local, de 06:00 a 06:00).
+
+    Además, lo de impresiones y de fotocopias por separado, en plata y en
+    cantidad (pedido del dueño, 2026-11-04): ya están sumadas en "total". Los
+    renglones de la seña de un pedido de Gestión Impresiones cuentan la plata
+    pero no las hojas (llevan 1 o -1, no hojas: las hojas entran al retirarlo).
     """
     desde, hasta = limites_de_los_dias(desde, hasta)
     with conexion_db() as conexion:
@@ -79,16 +84,38 @@ def resumen_ventas(desde: str, hasta: str):
             (dominio.VENTA_CONFIRMADA, desde, hasta),
         ).fetchall()
 
+        impre_fotoc = {fila["codigo"]: fila for fila in conexion.execute(
+            """
+            SELECT venta_detalle.articulo_codigo AS codigo,
+                   COALESCE(SUM(venta_detalle.subtotal), 0) AS importe,
+                   COALESCE(SUM(CASE WHEN venta_detalle.descripcion = ? THEN 0
+                                     ELSE venta_detalle.cantidad END), 0) AS cantidad
+            FROM venta_detalle
+            JOIN ventas ON ventas.id = venta_detalle.venta_id
+            WHERE venta_detalle.articulo_codigo IN (?, ?)
+              AND ventas.estado = ? AND ventas.fecha >= ? AND ventas.fecha < ?
+            GROUP BY venta_detalle.articulo_codigo
+            """,
+            (dominio.DESCRIPCION_SENA_IMPRESIONES, dominio.CODIGO_ARTICULO_IMPRESIONES,
+             dominio.CODIGO_ARTICULO_FOTOCOPIAS, dominio.VENTA_CONFIRMADA, desde, hasta),
+        )}
+
     totales_por_metodo = {metodo: 0.0 for metodo in dominio.METODOS_PAGO}
     for fila in por_metodo:
         totales_por_metodo[fila["metodo"]] = fila["total"] or 0.0
 
-    return {
+    resumen = {
         "total": total_general["total"],
         "cantidad_ventas": total_general["cantidad_ventas"],
         "efectivo": totales_por_metodo[dominio.PAGO_EFECTIVO],
         "digital": totales_por_metodo[dominio.PAGO_DIGITAL],
     }
+    for clave, codigo in (("impresiones", dominio.CODIGO_ARTICULO_IMPRESIONES),
+                          ("fotocopias", dominio.CODIGO_ARTICULO_FOTOCOPIAS)):
+        fila = impre_fotoc.get(codigo)
+        resumen[clave] = round(fila["importe"], 2) if fila else 0.0
+        resumen[f"cantidad_{clave}"] = fila["cantidad"] if fila else 0
+    return resumen
 
 
 def resumen_por_turno(desde: str, hasta: str):

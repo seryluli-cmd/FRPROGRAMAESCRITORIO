@@ -168,10 +168,12 @@ class TestRankingDeRotacion(_ConArticulos):
         # La anulada devolvió su stock y no cuenta como vendida.
         self.assertEqual((alfajor["vendidas"], alfajor["stock"], alfajor["puesto"]), (0, 10, None))
 
-    def test_deja_afuera_las_impresiones(self):
+    def test_deja_afuera_las_impresiones_y_las_fotocopias(self):
         self._articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES", stock=500)
+        self._articulo(dominio.CODIGO_ARTICULO_FOTOCOPIAS, "FOTOCOPIAS", stock=0)
         self._articulo("1", "Alfajor", stock=10)
         self._vender(dominio.CODIGO_ARTICULO_IMPRESIONES, 80)
+        self._vender(dominio.CODIGO_ARTICULO_FOTOCOPIAS, 30)
 
         self.assertEqual([r["codigo"] for r in self._ultimos(30)], ["1"])
 
@@ -264,10 +266,13 @@ class TestRankingPorCompras(_ConArticulos):
         self._vender("1", 5, self._en(2))
         self.assertEqual(self._por_codigo()["1"]["dias"], 2.0)
 
-    def test_deja_afuera_las_impresiones(self):
-        self._articulo(dominio.CODIGO_ARTICULO_IMPRESIONES, "IMPRESIONES")
-        self._comprar(dominio.CODIGO_ARTICULO_IMPRESIONES, 500, self._en(0))
-        self.assertNotIn(dominio.CODIGO_ARTICULO_IMPRESIONES, self._por_codigo())
+    def test_deja_afuera_las_impresiones_y_las_fotocopias(self):
+        for codigo in dominio.CODIGOS_QUE_NO_SON_MERCADERIA:
+            self._articulo(codigo, f"HOJAS {codigo}")
+            self._comprar(codigo, 500, self._en(0))
+        por_codigo = self._por_codigo()
+        for codigo in dominio.CODIGOS_QUE_NO_SON_MERCADERIA:
+            self.assertNotIn(codigo, por_codigo)
 
 
 class TestLotesDeCompra(unittest.TestCase):
@@ -336,12 +341,14 @@ class TestElAccesoDelInicio(_ConArticulos):
         con_permiso = usuarios_repo.crear_usuario("Sofía", "1234", dominio.ROL_EMPLEADA, {"permiso_reportes": True})
 
         _ventana, acceso = self._inicio(sin_permiso)
+        # Desde el 2026-11-04 dice "Acceso Restringido" (ui.utils.avisar_acceso_restringido).
+        # Sin tapar ese cartel, la prueba se quedaba esperando que alguien lo cerrara.
         with mock.patch("ui.main_window.VentanaRankingRotacion") as abierta, \
-                mock.patch("ui.main_window.mostrar_info") as aviso:
+                mock.patch("ui.utils.mostrar_aviso") as aviso:
             acceso.click()
         abierta.assert_not_called()
         aviso.assert_called_once()
-        self.assertIn("Reportes", aviso.call_args.args[2])
+        self.assertIn("Acceso Restringido", aviso.call_args.args[2])
 
         _ventana, acceso = self._inicio(con_permiso)
         with mock.patch("ui.main_window.VentanaRankingRotacion") as abierta:

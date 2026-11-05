@@ -53,7 +53,7 @@ AGRANDAR_DIBUJITO_OPERADOR = 1.25
 # estilos). Con eso la barra mide ~1410 px de ancho: en una pantalla de 1366 ya no entra.
 ALTO_BOTON_BARRA = 42
 SEPARACION_BOTONES_BARRA = 7
-# Los accesos de la pantalla de inicio (Venta de Mercadería, Impresiones, Caja,
+# Los accesos de la pantalla de inicio (Venta de Mercadería, Impre/Fotoc, Caja,
 # Gestión Impresiones, Pedidos de Clientes, Tareas del Turno y Ranking de
 # Rotación): todos del mismo tamaño, uno debajo del otro a la izquierda (pedido del
 # dueño, 2026-11-02, con un dibujo: antes eran tres botones que ocupaban toda la
@@ -223,7 +223,7 @@ class MainWindow(QMainWindow):
         por_nombre = {}
         for dibujito, texto, accion in (
             ("🛒", "VENTA DE MERCADERÍA", self._abrir_ventas),
-            ("🖨️", "IMPRESIONES", self._abrir_impresiones),
+            ("🖨️", "IMPRE/FOTOC", self._abrir_impresiones),
             ("💵", "CAJA", self._abrir_caja),
             ("📑", "GESTIÓN IMPRESIONES", self._abrir_gestion_impresiones),
             ("🙋", "PEDIDOS DE CLIENTES", self._abrir_pedidos_clientes),
@@ -295,8 +295,8 @@ class MainWindow(QMainWindow):
         que venden, cobran o cierran el turno avisan que eso se hace en el
         mostrador (ver los `_abrir_...` con `solo_en_el_mostrador`)."""
         self._agregar_boton_barra(layout_barra, "🛒  Vender", self._abrir_ventas, clase="primario")
-        # Cobro rápido de impresiones, sin entrar a Vender.
-        self._agregar_boton_barra(layout_barra, "🖨️  Impresiones", self._abrir_impresiones)
+        # Cobro rápido de impresiones y fotocopias, sin entrar a Vender.
+        self._agregar_boton_barra(layout_barra, "🖨️  Impre/Fotoc", self._abrir_impresiones)
         # Nombres cortos en la barra (pedido del dueño, 2026-10-18); las ventanas
         # que abren siguen con su nombre entero.
         self._agregar_boton_barra(
@@ -533,11 +533,14 @@ class MainWindow(QMainWindow):
 
     @solo_en_el_mostrador
     def _abrir_impresiones(self):
-        articulo = impresiones_repo.articulo_impresiones()
-        if articulo is None:
-            mostrar_error(self, "Falta el artículo", impresiones_repo.mensaje_sin_articulo())
+        # IMPRE/FOTOC: con uno de los dos artículos cargado ya abre (el otro sale
+        # apagado, con el aviso de qué código falta).
+        articulos = impresiones_repo.articulos_del_boton()
+        if not any(articulos.values()):
+            mostrar_error(self, "Faltan los artículos", "\n\n".join(
+                impresiones_repo.mensaje_sin_articulo(codigo) for codigo in articulos))
             return
-        DialogoImpresiones(self.usuario, articulo, self).exec()
+        DialogoImpresiones(self.usuario, articulos, self).exec()
 
     def _abrir_caja(self):
         CajaWindow(self).exec()
