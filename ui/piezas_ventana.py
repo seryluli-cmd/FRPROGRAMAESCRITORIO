@@ -26,7 +26,8 @@ from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QVBoxLayout, QWidget,
 )
 
-from ui.utils import aplicar_clase, avisar_acceso_restringido
+from ui import dibujos_propios
+from ui.utils import aplicar_clase, avisar_acceso_restringido, icono_de_emoji
 
 # Colores de las pastillas de la cabecera (QLabel#pastillaCabecera[tono=...]) y de las
 # cifras destacadas (QFrame#cifraDestacada[tono=...], solo azul y verde).
@@ -35,6 +36,10 @@ TONO_VERDE = "verde"
 TONO_GRIS = "gris"
 
 TEXTO_SOLO_ADMIN = "Solo el Administrador"
+
+# El tamaño de letra del dibujito de la cabecera: el mismo que QLabel#iconoCabecera en
+# ui/hoja_de_estilos.py, para que un dibujo propio mida como un emoji.
+TAMANO_ICONO_CABECERA = 26
 
 
 def cabecera_oscura(icono: str, titulo: str, detalle: str = "") -> QFrame:
@@ -49,6 +54,10 @@ def cabecera_oscura(icono: str, titulo: str, detalle: str = "") -> QFrame:
 
     etiqueta_icono = QLabel(icono)
     etiqueta_icono.setObjectName("iconoCabecera")
+    if dibujos_propios.es_dibujo_propio(icono):
+        # No es un emoji (ui/dibujos_propios.py): va como dibujo, no como letra.
+        dibujo, tamano = icono_de_emoji(icono, TAMANO_ICONO_CABECERA)
+        etiqueta_icono.setPixmap(dibujo.pixmap(tamano))
     etiqueta_titulo = QLabel(titulo)
     etiqueta_titulo.setObjectName("tituloCabecera")
     cabecera.titulo = etiqueta_titulo

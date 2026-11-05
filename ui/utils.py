@@ -14,7 +14,7 @@ import functools
 import re
 from datetime import datetime
 
-from PySide6.QtCore import QDate, QEvent, QObject, QRect, QSize, Qt
+from PySide6.QtCore import QDate, QEvent, QObject, QRect, QRectF, QSize, Qt
 from PySide6.QtGui import QFont, QGuiApplication, QIcon, QImage, QPainter, QPixmap, QValidator
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QComboBox, QDateEdit, QDialog, QDialogButtonBox, QDoubleSpinBox, QHBoxLayout,
@@ -25,6 +25,7 @@ import dominio
 from admin_remoto import modo as modo_remoto
 from errores import registrar_error
 from turnos import dia_en_que_empezo_el_turno
+from ui import dibujos_propios
 
 
 def manejar_errores(func):
@@ -515,12 +516,19 @@ def confirmar(padre, titulo: str, mensaje: str) -> bool:
     return respuesta == QMessageBox.Yes
 
 
+# Un dibujo propio se pinta en un cuadrado un 15% más grande que la letra del emoji: así,
+# recortado, mide de alto lo mismo que un emoji de Windows (medido en la maqueta del
+# 2026-11-04, al lado de 📑 y ⏰).
+AGRANDAR_DIBUJO_PROPIO = 1.15
+
+
 def icono_de_emoji(emoji: str, tamano_px: float):
     """
     El emoji dibujado como ícono, recortado justo a su borde: (QIcon, QSize). Sirve para un
     dibujito más grande que la letra del botón (un emoji dentro del texto mide lo que la letra).
     `tamano_px` es el tamaño de letra con que se lo dibuja; se dibuja a la escala de la pantalla
-    para que no salga borroso.
+    para que no salga borroso. También acepta los dibujos de `ui.dibujos_propios` (como
+    `DOS_SILUETAS`), que salen del mismo tamaño que un emoji.
     """
     pantalla = QGuiApplication.primaryScreen()
     escala = pantalla.devicePixelRatio() if pantalla is not None else 1.0
@@ -530,8 +538,14 @@ def icono_de_emoji(emoji: str, tamano_px: float):
     imagen = QImage(lado, lado, QImage.Format_ARGB32_Premultiplied)
     imagen.fill(Qt.transparent)
     pintor = QPainter(imagen)
-    pintor.setFont(letra)
-    pintor.drawText(QRect(0, 0, lado, lado), Qt.AlignCenter, emoji)
+    if dibujos_propios.es_dibujo_propio(emoji):
+        # Un poco más grande que la letra: lo que dibuja un emoji de Windows de `tamano_px`
+        # mide eso de alto, y los dibujos propios dejan aire dentro de su cuadrado.
+        medida = letra.pixelSize() * AGRANDAR_DIBUJO_PROPIO
+        dibujos_propios.pintar(pintor, emoji, QRectF((lado - medida) / 2, (lado - medida) / 2, medida, medida))
+    else:
+        pintor.setFont(letra)
+        pintor.drawText(QRect(0, 0, lado, lado), Qt.AlignCenter, emoji)
     pintor.end()
     pintados = [(x, y) for y in range(lado) for x in range(lado) if imagen.pixelColor(x, y).alpha()]
     if pintados:

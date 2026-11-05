@@ -31,6 +31,7 @@ from ui.usuarios_window import DialogoCambiarClave
 from ui.ingreso_caja import mensaje_del_sobre
 from ui.lista_compras_window import VentanaListaDeCompras
 from ui.pelotita import PelotitaQueRebota
+from ui.dibujos_propios import DOS_SILUETAS
 from ui.vuelta_del_admin import VueltaDelAdmin
 from ui.en_segundo_plano import MILISEGUNDOS_ENTRE_VISTAS, Respuesta, _correr
 # La foto de fondo vive en su archivo desde el 2026-11-03; se sigue pidiendo de acá.
@@ -231,7 +232,7 @@ class MainWindow(QMainWindow):
             ("🖨️", "IMPRE/FOTOC", self._abrir_impresiones),
             ("💵", "CAJA", self._abrir_caja),
             ("📑", "GESTIÓN IMPRESIONES", self._abrir_gestion_impresiones),
-            ("🙋", "PEDIDOS DE CLIENTES", self._abrir_pedidos_clientes),
+            (DOS_SILUETAS, "PEDIDOS DE CLIENTES", self._abrir_pedidos_clientes),
             ("⏰", "TAREAS DEL TURNO", self._abrir_tareas_turno),
             ("📈", "RANKING DE ROTACIÓN", self._abrir_ranking_rotacion),
         ):

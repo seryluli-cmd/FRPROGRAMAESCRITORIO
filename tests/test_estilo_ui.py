@@ -36,6 +36,8 @@ from ui.login_window import LoginWindow  # noqa: E402
 from ui.main_window import (  # noqa: E402
     COLOR_SIN_FONDO, MARGEN_DEL_PANEL, RUTA_FONDO_INICIO, FondoDelInicio, MainWindow,
 )
+from ui.dibujos_propios import DOS_SILUETAS  # noqa: E402
+from ui.piezas_ventana import cabecera_oscura  # noqa: E402
 from ui.utils import crear_tabla, icono_de_emoji  # noqa: E402
 from ui.caja_window import CajaWindow, CierreTurnoWindow  # noqa: E402
 from base import BaseConBaseTemporal  # noqa: E402
@@ -191,6 +193,42 @@ class TestAspectoDelPrograma(BaseConBaseTemporal):
                     por_nombre[nombre].click()
                 abierta.assert_not_called()
                 aviso.assert_called_once()
+
+    def test_pedidos_de_clientes_lleva_dos_siluetas_grises_y_no_un_emoji(self):
+        # Pedido del dueño (2026-11-04): el 🙋 que tenía, Windows lo dibuja como una mujer de
+        # pelo naranja, y lo quería sin género y gris. De cuatro dibujos eligió las dos
+        # siluetas (ui/dibujos_propios.py): en el acceso del inicio y en la cabecera.
+        pedidos = []
+
+        def icono_anotado(dibujito, tamano_px):
+            pedidos.append(dibujito)
+            return icono_de_emoji(dibujito, tamano_px)
+
+        admin = usuarios_repo.obtener_usuario(usuarios_repo.crear_usuario("Admin", "1234", dominio.ROL_ADMIN))
+        with mock.patch("ui.main_window.icono_de_emoji", icono_anotado):
+            ventana = MainWindow(admin, lambda: None)
+        self.addCleanup(ventana.deleteLater)
+        self.assertIn(DOS_SILUETAS, pedidos)
+        self.assertNotIn("🙋", pedidos)
+
+        # Mide de alto lo que mide un emoji del mismo tamaño en Windows (~27 px los de los
+        # accesos; la plataforma offscreen no tiene esa letra, así que el número va fijo).
+        icono, tamano = icono_de_emoji(DOS_SILUETAS, 27)
+        self.assertTrue(25 <= tamano.height() <= 29, tamano)
+        # Y es gris: en todo lo pintado del todo, el rojo, el verde y el azul casi iguales.
+        imagen = icono.pixmap(tamano).toImage()
+        colores = [imagen.pixelColor(x, y) for y in range(imagen.height()) for x in range(imagen.width())]
+        llenos = [c for c in colores if c.alpha() == 255]
+        self.assertTrue(llenos)
+        self.assertLessEqual(max(max(c.red(), c.green(), c.blue()) - min(c.red(), c.green(), c.blue())
+                                 for c in llenos), 30)
+
+        # En la cabecera va como dibujo, no como letra.
+        cabecera = cabecera_oscura(DOS_SILUETAS, "PEDIDOS DE CLIENTES")
+        self.addCleanup(cabecera.deleteLater)
+        etiqueta = cabecera.findChild(QLabel, "iconoCabecera")
+        self.assertEqual(etiqueta.text(), "")
+        self.assertFalse(etiqueta.pixmap().isNull())
 
     def test_tareas_del_turno_no_cambia_de_tamano_al_titilar(self):
         # Mientras haya tareas atrasadas, el acceso titila en rojo (2026-11-03). Como

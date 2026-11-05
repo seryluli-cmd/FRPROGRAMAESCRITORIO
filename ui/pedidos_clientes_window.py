@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 
 import dominio
 from repositories import pedidos_clientes_repo
+from ui.dibujos_propios import DOS_SILUETAS
 from ui.piezas_ventana import (
     agregar_indicador, cabecera_oscura, solo_para_el_admin, panel_de_tabla, pie_de_ventana, poner_indicador, tecla,
     tecla_de_renglon,
@@ -113,7 +114,7 @@ class VentanaPedidosClientes(QDialog):
 
     def _armar_interfaz(self):
         cabecera = cabecera_oscura(
-            "🙋", TITULO, f"Lo que vienen a buscar y no tenemos · atiende: {self.usuario['nombre']}")
+            DOS_SILUETAS, TITULO, f"Lo que vienen a buscar y no tenemos · atiende: {self.usuario['nombre']}")
         self.indicador_productos = agregar_indicador(cabecera, "Productos")
         self.indicador_clientes = agregar_indicador(cabecera, "Clientes")
 

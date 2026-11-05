@@ -18,7 +18,8 @@ mismos botones para todos, el Administrador que vuelve solo a la empleada a los
 Pedidos de Clientes (lo que piden y no tenemos, 2026-11-03): quinto acceso del
 inicio (`ui/pedidos_clientes_window.py`, maqueta A: campo con GUARDAR, parecidos
 mientras se escribe, +1 y TRAJIMOS en cada renglón, HISTORIAL; RENOMBRAR, JUNTAR y
-BORRAR solo el Admin). Reglas en `repositories/pedidos_clientes_repo.py`.
+BORRAR solo el Admin). Reglas en `repositories/pedidos_clientes_repo.py`. Su
+dibujito son dos siluetas grises (2026-11-04, `ui/dibujos_propios.py`), no un emoji.
 
 Tareas del Turno (cosas para hacer a una hora, 2026-11-03): sexto acceso del inicio
 (`ui/tareas_turno_window.py`: PARA HACER, ATRASADAS y HECHAS arriba; ESTE TURNO
