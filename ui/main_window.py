@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QTimer
 import dominio
 from admin_remoto import modo as modo_remoto
 from errores import registrar_error
-from repositories import impresiones_repo, relevo_repo, usuarios_repo
+from repositories import impresiones_repo, pelotita_repo, relevo_repo, usuarios_repo
 from turnos import MINUTOS_PARA_CIERRE_FORZOSO
 from ui.acomodar_caja_window import DialogoAcomodarCaja
 from ui.administrar_kiosko_window import AdministrarKioskoWindow
@@ -30,6 +30,7 @@ from ui.caja_window import CajaWindow, CierreTurnoWindow
 from ui.usuarios_window import DialogoCambiarClave
 from ui.ingreso_caja import mensaje_del_sobre
 from ui.lista_compras_window import VentanaListaDeCompras
+from ui.pelotita import PelotitaQueRebota
 from ui.vuelta_del_admin import VueltaDelAdmin
 from ui.en_segundo_plano import MILISEGUNDOS_ENTRE_VISTAS, Respuesta, _correr
 # La foto de fondo vive en su archivo desde el 2026-11-03; se sigue pidiendo de acá.
@@ -115,7 +116,10 @@ class MainWindow(QMainWindow):
         # TURNO titila en rojo y muestra cuántas son (ver _poner_tareas_atrasadas).
         self._tareas_atrasadas = 0
         self._encendido_tareas = False
+        # La pelotita que rebota por el inicio (ui/pelotita.py), o None si está apagada.
+        self.pelotita = None
         self._armar_interfaz()
+        self._poner_pelotita()
         if self._remota:
             self._mostrar_la_caja_del_mostrador()
         else:
@@ -197,6 +201,7 @@ class MainWindow(QMainWindow):
 
         inicio = QFrame()
         inicio.setObjectName("inicioKiosko")
+        self._inicio = inicio  # por donde rebota la pelotita
         lugar_del_panel = QVBoxLayout(inicio)
         lugar_del_panel.setContentsMargins(MARGEN_DEL_PANEL, MARGEN_DEL_PANEL, MARGEN_DEL_PANEL, MARGEN_DEL_PANEL)
         # El título y los accesos van en un panel oscuro medio transparente, como los
@@ -355,6 +360,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, evento):
         self._timer_caja.stop()
         self._timer_parpadeo.stop()
+        if self.pelotita is not None:
+            self.pelotita.detener()
         if self._vuelta is not None:
             self._vuelta.detener()
         # Sin nadie adentro no hay quién conteste: el aviso abierto se va con la sesión.
@@ -606,6 +613,27 @@ class MainWindow(QMainWindow):
 
     def _abrir_configuracion_admin(self):
         ConfiguracionAdminWindow(self.usuario, self).exec()
+        # Ahí adentro se prende y se apaga la pelotita: que se note al volver.
+        self._poner_pelotita()
+
+    def _poner_pelotita(self):
+        """Pone o saca la pelotita del inicio según lo que eligió el Administrador
+        (pelotita_repo). Solo en el mostrador: desde otra PC no hay pelotita. Es un
+        adorno, así que si no se puede leer cómo está, la ventana sigue sin ella."""
+        if self._remota:
+            return
+        try:
+            prendida = pelotita_repo.esta_prendida()
+        except Exception as error:
+            registrar_error(error, "Leer si la pelotita del inicio está prendida")
+            prendida = False
+        if prendida and self.pelotita is None:
+            self.pelotita = PelotitaQueRebota(self._inicio)
+        elif not prendida and self.pelotita is not None:
+            self.pelotita.detener()
+            self.pelotita.hide()
+            self.pelotita.deleteLater()
+            self.pelotita = None
 
     def _cambiar_operador(self):
         """"🔄 Operador": vuelve al ingreso para que entre otro. Si el que entra es

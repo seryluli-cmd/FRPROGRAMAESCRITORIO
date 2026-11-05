@@ -711,8 +711,9 @@ _PANTALLA_PRINCIPAL = [
 _NO_VAN_A_LA_BASE = {
     ("usuarios_repo", "tiene_permiso"),
 }
-# Las que miran `self._remota` antes de tocar la base.
-_SE_SALTEAN_DESDE_OTRA_PC = {"_revisar_la_caja"}
+# Las que miran `self._remota` antes de tocar la base (la pelotita del inicio es
+# solo del mostrador: desde otra PC no se pregunta si está prendida).
+_SE_SALTEAN_DESDE_OTRA_PC = {"_revisar_la_caja", "_poner_pelotita"}
 
 
 class TestLasPantallasSoloPidenLoQueEstaEnLaLista(unittest.TestCase):

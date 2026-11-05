@@ -44,7 +44,7 @@ lista blanca de otra PC. Lo abre quien tiene `permiso_reportes`. Con el séptimo
 acceso bajó a 86 de alto y 10 de separación. `MainWindow.acceso_tareas` se busca por
 nombre: ya no es el último.
 
-La suite se ejecuta con `python -m unittest discover tests` y tiene 1025 pruebas
+La suite se ejecuta con `python -m unittest discover tests` y tiene 1078 pruebas
 al 2026-11-04 (el corte desde CYBERCONTROL fue el 2026-10-27). Lo que pasó antes de esa
 fecha está contado en el `CLAUDE.md`, el `README.md` y el `docs/HISTORIAL.md`
 de CYBERCONTROL.
@@ -69,3 +69,11 @@ para todo el programa, no una por ventana: la ventana del Admin ya cerrada sigue
 viva (la agarra `VueltaDelAdmin`) y con una copia propia cada salida del Admin
 dejaba ~8 MB en memoria. Si falta el archivo, el fondo sale en `COLOR_SIN_FONDO`
 (azul oscuro: sobre el gris de siempre el título claro no se leería).
+
+Desde el 2026-11-04 una pelotita celeste tipo Arkanoid, con estela de cometa, rebota por
+el inicio (debajo de la barra, no sobre ella), con el ángulo un poco cambiado al azar en
+cada choque (`ui/pelotita.py`; el dueño eligió la maqueta A de `PROPUESTA_PELOTITA`, en
+la carpeta de los proyectos, entre solo el inicio, toda la ventana o también Vender).
+Deja pasar los clics, repinta solo por donde pasa y no hace nada si no se ve. La prende y
+la apaga el Administrador con la tarjeta "Pelotita que rebota" de Configuración ADMIN
+(grupo "La pantalla", solo en el mostrador); viene prendida (`pelotita_repo`).

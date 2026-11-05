@@ -328,6 +328,7 @@ Una línea por cada uno, en el mismo orden que la tabla completa de
 - `ui.piezas_ventana.cabecera_oscura` · `.tarjeta_de_menu` · `.tecla` y compañía — una ventana "clara con cabecera cyber"
 - `ui.piezas_ventana.agregar_indicador` · `.buscador` · `.panel_de_tabla` y compañía · `ui.dibujos_tabla.DelegadoEtiqueta` · `.DelegadoStock` — una LISTA con la maqueta B
 - `ui.login_dibujos.FichasDeJugadores` · `.FondoDelIngreso` · `.TextoDegradado` — la pantalla de ingreso "Elegí tu Jugador"
+- `ui.pelotita.PelotitaQueRebota` · `.Rebote` · `pelotita_repo.esta_prendida` · `.prender` — la pelotita que rebota por el inicio (y si está prendida)
 - `ui.utils.sin_boton_por_defecto` — que Enter en un campo no apriete el primer botón de un diálogo
 - `ui.utils.crear_tabla` — una tabla de solo lectura
 - `ui.utils.mostrar_columna_entera` — una columna que no se corta con "..."
