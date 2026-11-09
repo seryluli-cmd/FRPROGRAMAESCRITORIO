@@ -659,16 +659,8 @@ HOJA_DE_ESTILOS = """
         margin-top: 2px;
         background-color: #F0F4FC;
     }
-    /* Qué busca el campo de escaneo (F5 Código, F6 Descripción o F7 Marca,
-       ui/venta_buscador.py): la tecla elegida queda marcada en azul. */
-    QPushButton[clase="tecla"][elegida="true"] {
-        background-color: #E6EEFE;
-        border-color: #2F6FED;
-        border-bottom-color: #1D48A0;
-        color: #1D48A0;
-    }
-    /* La lista de lo encontrado por descripción o marca, que flota debajo del campo
-       de escaneo encima del carrito. */
+    /* La lista de lo encontrado por nombre o marca, que flota debajo del campo de
+       escaneo encima del carrito (ui/venta_buscador.py). */
     QTableWidget#resultadosVenta {
         border: 1px solid #2F6FED;
         border-radius: 9px;
