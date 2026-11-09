@@ -296,14 +296,13 @@ ingreso (el Admin se queda). Si hay un cobro a medias, espera.
   el dueño: total y COBRAR grandes a la derecha, dibujos en `ui/ventas_dibujos.py`)
   — escaneo por código de barras (Enter en el campo código dispara
   `_escanear()`; Enter con el campo vacío y carrito no vacío pasa directo a
-  cobrar). F6 Descripción y F7 Marca cambian lo que busca ESE MISMO campo, sin
-  abrir otra ventana (pedido del dueño, 2026-11-02; `ui/venta_buscador.py`): el
-  dibujo de la izquierda pasa a "ABC" o a una etiqueta, y lo encontrado sale en
-  una lista debajo del campo que se elige con las flechas y Enter (o un clic). F5
-  Código (o Esc con el campo vacío) vuelve al código de barras; la pistola anda
-  en los tres. Sin apretar nada, una letra pasa sola a buscar por nombre ("ABC")
-  y solo números vuelven al código (pedido del dueño, 2026-11-04;
-  `venta_buscador.criterio_segun_lo_escrito`). Botón `*` "Cant." fija la cantidad para el próximo
+  cobrar). El operador no elige qué busca ESE MISMO campo (pedido del dueño,
+  2026-11-09; `ui/venta_buscador.py`): sin letras es un código de barras; con
+  alguna letra busca por nombre O marca, cada palabra en cualquier orden
+  (`articulos_repo.buscar_para_vender`), y lo encontrado sale en una lista debajo
+  del campo que se elige con las flechas y Enter (o un clic). Un código con letras
+  entra igual si la lista no trae nada. Esc borra lo escrito. Ya no hay botones
+  F5/F6/F7 (eran del 02/11 y 04/11). Botón `*` "Cant." fija la cantidad para el próximo
   escaneo. Doble clic en $ Unit. **solo si es Admin**. Avisa (no bloquea) si el
   stock proyectado queda por debajo de `stock_minimo`. Cobra con
   `ui/dialogo_pago.DialogoPago`: Efectivo y Digital siempre a la vista y suman

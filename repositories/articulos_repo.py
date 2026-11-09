@@ -251,6 +251,23 @@ def buscar_por_marca(texto: str, limite: int | None = None):
         )).fetchall()
 
 
+def buscar_para_vender(texto: str, limite: int | None = None):
+    """Lo que se escribe en el campo de Vender (pedido del dueño, 2026-11-09: que el
+    operador no tenga que elegir entre descripción y marca). Cada palabra tiene que
+    estar en la descripción o en la marca, en cualquier orden: "coca zero" encuentra
+    "Coca Cola Zero 500", y "jorgito" el alfajor de esa marca aunque el nombre no lo
+    diga. Mismo orden que las otras búsquedas; con `limite`, solo los primeros."""
+    palabras = texto.split()
+    if not palabras:
+        return []
+    cada_palabra = " AND (a.descripcion || ' ' || COALESCE(m.nombre, '')) LIKE ?" * len(palabras)
+    with conexion_db() as conexion:
+        return conexion.execute(*_hasta(
+            _SELECT_ARTICULOS + cada_palabra + " ORDER BY a.descripcion",
+            _SIN_ACOMODAR + tuple(f"%{palabra}%" for palabra in palabras), limite,
+        )).fetchall()
+
+
 def _marca_para_guardar(conexion, marca_id, nombre_marca_nueva):
     """Resuelve una marca nueva dentro de la misma transacción del artículo."""
     if not nombre_marca_nueva:

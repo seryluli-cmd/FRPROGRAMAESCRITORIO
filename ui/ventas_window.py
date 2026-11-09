@@ -75,9 +75,9 @@ class VentasWindow(QDialog):
         fila_encabezado.addStretch()
         fila_encabezado.addWidget(datos)
 
-        # Se escanea, o se busca por descripción o marca (F6/F7) en este mismo campo,
-        # sin abrir otra ventana: el dibujo, la ayuda y la lista de lo encontrado los
-        # pone el buscador (ui/venta_buscador.py).
+        # Se escanea, o se escribe el nombre o la marca, en este mismo campo y sin
+        # elegir nada: el dibujo, la ayuda y la lista de lo encontrado los pone el
+        # buscador (ui/venta_buscador.py).
         self.campo_codigo = QLineEdit()
         self.campo_codigo.setObjectName("campoEscaneo")
         self.campo_codigo.returnPressed.connect(self._escanear)
@@ -111,7 +111,7 @@ class VentasWindow(QDialog):
 
         fila_atajos = QHBoxLayout()
         fila_atajos.setSpacing(6)
-        for boton in self.buscador.botones + [boton_cantidad, boton_borrar]:
+        for boton in (boton_cantidad, boton_borrar):
             aplicar_clase(boton, "tecla")
             fila_atajos.addWidget(boton)
         fila_atajos.addStretch()

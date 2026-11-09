@@ -3,18 +3,18 @@ ventas_dibujos.py
 ===================
 Los dibujos del diseño de Venta de Mercadería que eligió el dueño (2026-10-26,
 la maqueta "B": el total y COBRAR siempre grandes a la derecha): las teclas con
-la tecla marcada aparte ("F5" en un recuadro azul y "Código" al lado), el dibujo
-de adentro del campo de escaneo (el código de barras con "Abc" al lado, o "ABC" y la
-etiqueta cuando busca por descripción o por marca) y el renglón del carrito con el código y el
-precio por unidad chiquitos debajo del producto.
+la tecla marcada aparte ("*" en un recuadro azul y "Cantidad" al lado), el dibujo
+de adentro del campo de escaneo (el código de barras con "Abc" al lado: se escanea o se
+escribe el nombre o la marca) y el renglón del carrito con el código y el precio por
+unidad chiquitos debajo del producto.
 
 Se dibujan con QPainter: un emoji puede salir como un rectángulo en el Windows
 del mostrador (pasó en CYBERCONTROL con el cubito de hielo 🧊 del botón
 DESCONGELAR, que por eso pasó a ser un copo de nieve dibujado).
 """
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPixmap, QPolygonF
+from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QPushButton, QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 # Se dibujan al doble y Qt los muestra a su tamaño: así salen prolijos también con la
@@ -39,7 +39,7 @@ def _fuente_de_tecla() -> QFont:
 
 
 def icono_de_tecla(tecla: str):
-    """La tecla en un recuadro azul clarito ("F5", "*", "Supr"), para ponerla
+    """La tecla en un recuadro azul clarito ("*", "Supr"), para ponerla
     adelante del nombre del botón. Devuelve el ícono y su tamaño: el recuadro es
     más ancho cuanto más largo es el texto, y Qt achicaría un ícono que no entra
     en el tamaño de siempre."""
@@ -61,7 +61,7 @@ def icono_de_tecla(tecla: str):
 
 
 def boton_con_tecla(tecla: str, nombre: str) -> QPushButton:
-    """Un botón con su tecla dibujada adelante, como F5/F6/F7."""
+    """Un botón con su tecla dibujada adelante, como "* Cantidad"."""
     boton = QPushButton(nombre)
     icono, tamano = icono_de_tecla(tecla)
     boton.setIcon(icono)
@@ -69,16 +69,9 @@ def boton_con_tecla(tecla: str, nombre: str) -> QPushButton:
     return boton
 
 
-# Los dibujos de adentro del campo de escaneo. Van en una etiqueta propia y no como
-# ícono del campo (QLineEdit.addAction): ahí Qt los achica a 16 px y "ABC" no se leía.
-ANCHO_DIBUJO_CAMPO = 30
+# El dibujo de adentro del campo de escaneo. Va en una etiqueta propia y no como
+# ícono del campo (QLineEdit.addAction): ahí Qt lo achica a 16 px y las letras no se leían.
 ALTO_DIBUJO_CAMPO = 22
-
-
-def _lienzo():
-    dibujo = QPixmap(ANCHO_DIBUJO_CAMPO * _ESCALA, ALTO_DIBUJO_CAMPO * _ESCALA)
-    dibujo.fill(Qt.transparent)
-    return dibujo
 
 
 def _terminado(pincel, dibujo) -> QPixmap:
@@ -113,8 +106,7 @@ def _pintar_letras(pincel, texto, x, ancho, alineado):
                     alineado | Qt.AlignVCenter, texto)
 
 
-# El código de barras con "Abc" al lado: es el dibujo más ancho, y el campo le deja
-# siempre ese lugar (si no, el texto saltaría al pasar solo del código a la descripción).
+# El código de barras con "Abc" al lado: el campo le deja ese lugar a la izquierda del texto.
 ANCHO_DIBUJO_CODIGO_O_ABC = 64
 
 
@@ -126,31 +118,6 @@ def dibujo_codigo_o_abc() -> QPixmap:
     pincel = QPainter(dibujo)
     _pintar_barras(pincel)
     _pintar_letras(pincel, "Abc", 33, ANCHO_DIBUJO_CODIGO_O_ABC - 33, Qt.AlignLeft)
-    return _terminado(pincel, dibujo)
-
-
-def dibujo_abc() -> QPixmap:
-    """"ABC" en azul: el campo busca por descripción, se escribe el nombre del producto
-    (pedido del dueño, 2026-11-02)."""
-    dibujo = _lienzo()
-    pincel = QPainter(dibujo)
-    _pintar_letras(pincel, "ABC", 0, ANCHO_DIBUJO_CAMPO, Qt.AlignHCenter)
-    return _terminado(pincel, dibujo)
-
-
-def dibujo_de_marca() -> QPixmap:
-    """Una etiqueta azul con su agujerito: el campo busca por marca."""
-    dibujo = _lienzo()
-    e = _ESCALA
-    etiqueta = QPainterPath()
-    etiqueta.addPolygon(QPolygonF([QPointF(2 * e, 11 * e), QPointF(10 * e, 3 * e), QPointF(28 * e, 3 * e),
-                                   QPointF(28 * e, 19 * e), QPointF(10 * e, 19 * e)]))
-    etiqueta.closeSubpath()
-    agujero = QPainterPath()
-    agujero.addEllipse(QPointF(10.5 * e, 11 * e), 2.5 * e, 2.5 * e)
-    pincel = QPainter(dibujo)
-    pincel.setRenderHint(QPainter.Antialiasing)
-    pincel.fillPath(etiqueta.subtracted(agujero), QColor(COLOR_BARRAS))
     return _terminado(pincel, dibujo)
 
 

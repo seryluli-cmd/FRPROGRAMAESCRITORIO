@@ -1,57 +1,39 @@
 """
 venta_buscador.py
 ===================
-El campo de arriba de Venta de Mercadería busca por código de barras, por
-descripción o por marca SIN abrir otra ventana (pedido del dueño, 2026-11-02: el
-cuadro chico aparte de F6 "no es estético, ni lógico, ni práctico"). F5, F6 y F7
-cambian solo el criterio de ese mismo campo: el dibujo de la izquierda (el código
-de barras con "Abc" al lado, porque ahí da lo mismo escanear que escribir el nombre;
-"ABC" o la etiqueta de la marca), el texto de ayuda y la tecla marcada.
+El campo de arriba de Venta de Mercadería sirve para todo y el operador no elige
+nada (pedido del dueño, 2026-11-09: "que no tenga que estar eligiendo el operador"):
 
-Por descripción o por marca, lo que se escribe abre una lista debajo del campo,
-encima del carrito: las flechas eligen (arranca marcado el primero), Enter o un
-clic lo agregan y la lista se cierra. El criterio queda hasta que se aprieta otra
-tecla (F5 vuelve al código de barras), y la pistola anda igual en los tres: si no
-hay nada en la lista, Enter busca el código exacto. Esc borra lo escrito y, con el
-campo vacío, vuelve al código de barras (en vez de cerrar la venta).
+- Sin letras (la pistola, o el código tipeado a mano): es un código de barras. No
+  abre lista: entra con Enter como siempre, y un código que no existe se avisa con
+  cuántos dígitos llegaron (ver ui/buscar_articulo.avisar_codigo_no_encontrado).
+- Con alguna letra: busca el producto por su nombre O por su marca, cada palabra en
+  cualquier orden ("coca zero", "jorgito"; ver articulos_repo.buscar_para_vender).
+  Lo encontrado sale en una lista debajo del campo, encima del carrito: las flechas
+  eligen (arranca marcado el primero), Enter o un clic lo agregan y la lista se
+  cierra. Un código con letras ("123A") entra igual: si la lista no trae nada,
+  Enter busca el código exacto.
 
-Además el criterio cambia solo con lo que se escribe (pedido del dueño, 2026-11-04:
-"me parece más práctico y rápido"): una letra pasa del código a la descripción (sale
-el "ABC") y solo números vuelven al código, así la pistola entra siempre como código
-aunque el campo esté en ABC. Por marca, las letras la dejan en marca: F7 se aprieta a
-propósito. F5/F6/F7 siguen andando, y lo que ellas eligen no lo da vuelta lo que ya
-estaba escrito: solo lo que se tipea después (`criterio_segun_lo_escrito`).
+Esc borra lo escrito; con el campo vacío hace lo de siempre (sale de la venta).
 
-Por código de barras no hay lista: lo que se escanea entra con Enter como siempre,
-y un código que no existe se avisa con cuántos dígitos llegaron (ver
-ui/buscar_articulo.avisar_codigo_no_encontrado). Compras sigue con el cuadro
+Antes: el 02/11 F6/F7 pasaron a buscar por descripción o por marca en este mismo
+campo (el cuadro chico aparte "no es estético, ni lógico, ni práctico"); el 04/11 una
+letra ya pasaba sola a la descripción, pero la marca seguía pidiendo F7. El 09/11 se
+juntaron las dos y se sacaron los botones F5/F6/F7. Compras sigue con el cuadro
 aparte de ui/buscar_articulo.py.
 """
 
 from PySide6.QtCore import QEvent, QPoint, Qt
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (
-    QGraphicsDropShadowEffect, QHeaderView, QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
-)
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QGraphicsDropShadowEffect, QHeaderView, QLabel, QLineEdit, QTableWidget, QTableWidgetItem
 
 from repositories import articulos_repo
 from ui.utils import formato_pesos, manejar_errores
 from ui.ventas_dibujos import (
-    ALTO_DIBUJO_CAMPO, ANCHO_DIBUJO_CODIGO_O_ABC, ROL_DETALLE, DelegadoProducto, boton_con_tecla, dibujo_abc,
-    dibujo_codigo_o_abc, dibujo_de_marca,
+    ALTO_DIBUJO_CAMPO, ANCHO_DIBUJO_CODIGO_O_ABC, ROL_DETALLE, DelegadoProducto, dibujo_codigo_o_abc,
 )
 
-CODIGO, DESCRIPCION, MARCA = "codigo", "descripcion", "marca"
-
-# criterio -> (tecla, botón, ayuda del botón, ayuda de adentro del campo, dibujo de adentro del campo)
-_CRITERIOS = {
-    CODIGO: ("F5", "Código", "Escanear con la pistola o tipear el código de barras",
-             "Escaneá el código de barras o escribí el nombre del producto...", dibujo_codigo_o_abc),
-    DESCRIPCION: ("F6", "Descripción", "Buscar escribiendo el nombre del producto",
-                  "Escribí el nombre del producto, elegilo con las flechas y apretá Enter...", dibujo_abc),
-    MARCA: ("F7", "Marca", "Buscar escribiendo la marca del producto",
-            "Escribí la marca, elegí el producto con las flechas y apretá Enter...", dibujo_de_marca),
-}
+AYUDA_DEL_CAMPO = "Escaneá el código de barras, o escribí el nombre o la marca del producto..."
 
 _TOPE_DE_RESULTADOS = 100   # se recorre con las flechas o la rueda: más no ayuda a elegir (va como LIMIT a la base)
 _RENGLONES_A_LA_VISTA = 6
@@ -60,49 +42,35 @@ _ANCHO_PRECIO = 120
 _X_DIBUJO = 10              # el borde (2 px) y el relleno (8 px) del campo en la hoja de estilos
 
 
-def criterio_segun_lo_escrito(texto: str, criterio: str) -> str:
-    """Qué busca el campo después de tipear `texto` (pedido del dueño, 2026-11-04).
-    Solo números: el código (la pistola entra siempre, aunque estuviera en ABC). Con
-    alguna letra, del código pasa a la descripción; por descripción o por marca, sigue
-    como estaba. Un código con letras ("123A") igual entra por descripción: sin nada en
-    la lista, Enter busca el código exacto (`codigo_elegido`)."""
-    texto = texto.strip()
-    if texto.isdigit():
-        return CODIGO
-    if criterio == CODIGO and any(letra.isalpha() for letra in texto):
-        return DESCRIPCION
-    return criterio
+def es_para_buscar(texto: str) -> bool:
+    """True si lo escrito se busca por nombre o marca (tiene alguna letra); False si es
+    un código de barras (solo números, como lo que manda la pistola)."""
+    return any(letra.isalpha() for letra in texto)
 
 
 class BuscadorDeLaVenta(QTableWidget):
-    """La lista que se abre debajo del campo con lo encontrado, y la que decide qué
-    busca ese campo (`criterio`). Es hija de la ventana y flota encima del carrito: no
-    ocupa lugar mientras está cerrada. `al_elegir(codigo)` agrega al carrito, lo mismo
-    que la pistola. Los botones F5/F6/F7 que la manejan quedan en `botones`."""
+    """La lista que se abre debajo del campo con lo encontrado. Es hija de la ventana
+    y flota encima del carrito: no ocupa lugar mientras está cerrada.
+    `al_elegir(codigo)` agrega al carrito, lo mismo que la pistola."""
 
     def __init__(self, ventana, campo: QLineEdit, al_elegir):
         super().__init__(0, 2, ventana)
         self.campo = campo
         self.al_elegir = al_elegir
-        self.criterio = CODIGO
         self._resultados = []
         self._armar_lista()
-        # El dibujo va en una etiqueta encima del campo, con lugar reservado a la
-        # izquierda del texto: como ícono del campo (addAction) Qt lo achica a 16 px. El
-        # lugar es el del más ancho (el código con "Abc"), en los tres criterios: así lo
-        # escrito no salta cuando una letra pasa sola del código a la descripción.
+        # El dibujo (el código de barras con "Abc" al lado: da lo mismo escanear que
+        # escribir) va en una etiqueta encima del campo, con lugar reservado a la
+        # izquierda del texto: como ícono del campo (addAction) Qt lo achica a 16 px.
         self.dibujo_del_campo = QLabel(campo)
         self.dibujo_del_campo.setFixedSize(ANCHO_DIBUJO_CODIGO_O_ABC, ALTO_DIBUJO_CAMPO)
         self.dibujo_del_campo.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.dibujo_del_campo.setAttribute(Qt.WA_TransparentForMouseEvents)   # un clic ahí es en el campo
+        self.dibujo_del_campo.setPixmap(dibujo_codigo_o_abc())
         campo.setTextMargins(ANCHO_DIBUJO_CODIGO_O_ABC + 8, 0, 0, 0)
-        self.botones = [self._armar_boton(ventana, criterio) for criterio in _CRITERIOS]
+        campo.setPlaceholderText(AYUDA_DEL_CAMPO)
         campo.textChanged.connect(self._buscar)
-        # textEdited y no textChanged: solo lo que se tipea cambia el criterio. Si no, F5
-        # con "coca" escrito volvería solo a la descripción, y borrar el campo también lo tocaría.
-        campo.textEdited.connect(self._criterio_por_lo_escrito)
         campo.installEventFilter(self)
-        self.poner_criterio(CODIGO)
 
     def _armar_lista(self):
         self.setObjectName("resultadosVenta")
@@ -130,41 +98,12 @@ class BuscadorDeLaVenta(QTableWidget):
         self.cellClicked.connect(self._al_hacer_clic)
         self.hide()
 
-    def _armar_boton(self, ventana, criterio):
-        tecla, nombre, ayuda, _ayuda_del_campo, _dibujo = _CRITERIOS[criterio]
-        boton = boton_con_tecla(tecla, nombre)
-        boton.setToolTip(ayuda)
-        boton.clicked.connect(lambda _apretado=False: self.poner_criterio(criterio))
-        QShortcut(QKeySequence(tecla), ventana, activated=lambda: self.poner_criterio(criterio))
-        return boton
-
-    def poner_criterio(self, criterio):
-        """Cambia qué busca el campo. Lo que ya estaba escrito queda y se busca con el
-        criterio nuevo."""
-        self.criterio = criterio
-        _tecla, _nombre, _ayuda, ayuda_del_campo, dibujo = _CRITERIOS[criterio]
-        self.dibujo_del_campo.setPixmap(dibujo())
-        self.dibujo_del_campo.setAccessibleName(dibujo.__name__)   # por ahí lo reconocen las pruebas
-        self.campo.setPlaceholderText(ayuda_del_campo)
-        for boton, suyo in zip(self.botones, _CRITERIOS):
-            boton.setProperty("elegida", suyo == criterio)
-            boton.style().unpolish(boton)
-            boton.style().polish(boton)
-        self.campo.setFocus()
-        self._buscar(self.campo.text())
-
-    def _criterio_por_lo_escrito(self, texto):
-        criterio = criterio_segun_lo_escrito(texto, self.criterio)
-        if criterio != self.criterio:
-            self.poner_criterio(criterio)
-
     def codigo_elegido(self, texto):
-        """El código que agrega un Enter con `texto` escrito en el campo. Por código de
-        barras, el texto tal cual (si no es ningún artículo, Ventas avisa como siempre).
-        Por descripción o marca, el renglón marcado de la lista; si no hay ninguno, el
-        código exacto (así la pistola anda en los tres criterios). None: no hay nada que
-        agregar, y la lista ya dice por qué."""
-        if self.criterio == CODIGO:
+        """El código que agrega un Enter con `texto` escrito en el campo. Un código de
+        barras, tal cual (si no es ningún artículo, Ventas avisa como siempre). Si se
+        buscó por nombre o marca, el renglón marcado de la lista; si no hay ninguno, el
+        código exacto. None: no hay nada que agregar, y la lista ya dice por qué."""
+        if not es_para_buscar(texto):
             return texto
         fila = self.currentRow()
         if 0 <= fila < len(self._resultados):
@@ -176,15 +115,11 @@ class BuscadorDeLaVenta(QTableWidget):
     @manejar_errores
     def _buscar(self, texto):
         texto = texto.strip()
-        if self.criterio == CODIGO or not texto:
+        if not es_para_buscar(texto):
             self._resultados = []
             self.hide()
             return
-        if self.criterio == DESCRIPCION:
-            encontrados = articulos_repo.buscar_por_descripcion(texto, limite=_TOPE_DE_RESULTADOS)
-        else:
-            encontrados = articulos_repo.buscar_por_marca(texto, limite=_TOPE_DE_RESULTADOS)
-        self._resultados = list(encontrados)
+        self._resultados = list(articulos_repo.buscar_para_vender(texto, limite=_TOPE_DE_RESULTADOS))
         self._llenar(texto)
         self._mostrar()
 
@@ -203,9 +138,8 @@ class BuscadorDeLaVenta(QTableWidget):
         if self._resultados:
             self.setCurrentCell(0, 0)   # Enter agrega el primero sin tocar las flechas
             return
-        que = "ningún producto que diga" if self.criterio == DESCRIPCION else "ninguna marca que diga"
-        aviso = QTableWidgetItem(f"No hay {que} “{texto}”")
-        aviso.setData(ROL_DETALLE, "Probá con otra palabra, o apretá F5 para volver al código de barras")
+        aviso = QTableWidgetItem(f"No hay ningún producto que diga “{texto}”")
+        aviso.setData(ROL_DETALLE, "Probá con otra palabra: sirve el nombre o la marca del producto")
         aviso.setFlags(Qt.ItemIsEnabled)
         self.insertRow(0)
         self.setItem(0, 0, aviso)
@@ -240,7 +174,7 @@ class BuscadorDeLaVenta(QTableWidget):
                 # Un clic en el carrito o en otra ventana la cierra: si no, taparía los
                 # renglones. Al volver al campo se abre de nuevo con lo que esté escrito.
                 self.hide()
-            elif tipo == QEvent.FocusIn and self.criterio != CODIGO and self.campo.text().strip():
+            elif tipo == QEvent.FocusIn and es_para_buscar(self.campo.text().strip()):
                 self._mostrar()
         return False
 
@@ -253,10 +187,7 @@ class BuscadorDeLaVenta(QTableWidget):
             self.setCurrentCell(fila, 0)
             self.scrollToItem(self.item(fila, 0))
             return True
-        if tecla == Qt.Key_Escape and self.criterio != CODIGO:
-            if self.campo.text():
-                self.campo.clear()
-            else:
-                self.poner_criterio(CODIGO)
+        if tecla == Qt.Key_Escape and self.campo.text():
+            self.campo.clear()   # con el campo vacío, Esc sigue de largo (sale de la venta)
             return True
         return False
